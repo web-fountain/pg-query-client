@@ -1,0 +1,32 @@
+{
+  "name": "template-nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.7",
+    "autoprefixer": "10.4.21",
+    "babel-plugin-react-compiler": "19.1.0-rc.2",
+    "del-cli": "6.0.0",
+    "postcss": "8.5.6",
+    "postcss-custom-media": "11.0.6",
+    "postcss-import": "16.1.1",
+    "postcss-media-minmax": "5.0.0",
+    "postcss-nesting": "13.0.2",
+    "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "next": "15.4.6",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "scripts": {
+    "build": "NEXT_TELEMETRY_DISABLED=1 && pnpm noTel && next build",
+    "build:start": "next start",
+    "noTel": "next telemetry disable",
+    "lint": "next lint",
+    "repack": "del -f .next node_modules package-lock.json pnpm-lock.yaml && pnpm install",
+    "start": "next dev --turbopack"
+  }
+}

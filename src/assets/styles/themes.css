@@ -1,0 +1,61 @@
+@import url('@Styles/mediaQueries.css');
+
+
+/* Dark theme as the default */
+:root {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* color primitives */
+  --gray-rgb: 255, 255, 255;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+}
+
+/* Light theme if the user prefers it */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --background: #ffffff;
+    --foreground: #171717;
+
+    /* Component-specific variables */
+    --gray-rgb: 0, 0, 0;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+  }
+}
+
+/* Manual override with a data-theme attribute: toggle theme */
+/* These rules have higher specificity than :root so they will always override the system preference. */
+[data-theme="light"] {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* color primitives */
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* color primitives */
+  --gray-rgb: 255, 255, 255;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+}
+
+@layer themes {
+  body {
+    color:      var(--foreground);
+    background: var(--background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

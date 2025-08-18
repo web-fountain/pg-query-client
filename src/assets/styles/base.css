@@ -1,0 +1,55 @@
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  img, picture, video, canvas, svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  input, button, textarea, select {
+    font: inherit;
+  }
+
+  a,
+  a:active,
+  a:visited {
+    text-decoration: none;
+    color: var(--text-white);
+  }
+
+  button {
+    border-style: none;
+  }
+
+  fieldset {
+    padding: 0;
+    border: none;
+    border-width: 0;
+  }
+  legend {
+    padding: 0;
+  }
+
+  ul, ol, dd {
+    list-style: none;
+  }
+
+  /* TODO: modify this */
+  #root, #__next {
+    isolation: isolate;
+  }
+}

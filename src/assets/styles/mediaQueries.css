@@ -1,0 +1,9 @@
+/* These media queries are defined mobile-first.
+   They are applied for screen sizes *greater than* the specified width.
+   Default styles should target mobile devices, and these queries should be used to enhance the layout for larger screens.
+*/
+
+@custom-media --from-tablet  (min-width: 30.0625rem);   /* > 480px */
+@custom-media --from-laptop  (min-width: 48.0625rem);   /* > 768px */
+@custom-media --from-desktop (min-width: 64.0625rem);   /* > 1024px */
+@custom-media --from-wide    (min-width: 90.0625rem);   /* > 1440px */

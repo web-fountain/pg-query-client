@@ -1,0 +1,31 @@
+@layer scale {
+  :root {
+    /* PX to REM */
+    --2px: 0.125rem;
+    --4px: 0.25rem;
+    --8px: 0.5rem;
+    --12px: 0.75rem;
+    --14px: 0.875rem;
+    --16px: 1rem;
+    --18px: 1.125rem;
+    --20px: 1.25rem;
+    --22px: 1.375rem;
+    --24px: 1.5rem;
+    --28px: 1.75rem;
+    --32px: 2rem;
+    --36px: 2.25rem;
+    --40px: 2.5rem;
+    --44px: 2.75rem;
+    --48px: 3rem;
+    --52px: 3.25rem;
+    --56px: 3.5rem;
+    --60px: 3.75rem;
+    --64px: 4rem;
+    --80px: 5rem;
+    --96px: 6rem;
+    --112px: 7rem;
+    --128px: 8rem;
+    --144px: 9rem;
+    --160px: 10rem;
+  }
+}
