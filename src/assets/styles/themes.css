@@ -1,6 +1,4 @@
-@import url('@Styles/mediaQueries.css');
-
-
+/* desktop-only project: no mobile-first imports needed */
 /* Dark theme as the default */
 :root {
   color-scheme: dark;

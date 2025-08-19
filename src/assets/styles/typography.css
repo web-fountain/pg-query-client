@@ -1,6 +1,4 @@
-@import url('@Styles/mediaQueries.css');
-
-
+/* desktop-only project: no mobile-first imports needed */
 :root {
   /* font-weight */
   --thin:         100;
