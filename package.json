@@ -1,7 +1,12 @@
 {
-  "name": "template-nextjs",
+  "name": "pg-query-client",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.6.0"
+  },
+  "packageManager": "pnpm@9.15.4",
   "devDependencies": {
     "@types/node": "24.3.0",
     "@types/react": "19.1.10",
@@ -14,12 +19,20 @@
     "postcss-import": "16.1.1",
     "postcss-media-minmax": "5.0.0",
     "postcss-nesting": "13.0.2",
+    "server-only": "0.0.1",
     "typescript": "5.9.2"
   },
   "dependencies": {
-    "next": "15.4.6",
+    "@ai-sdk/openai": "2.0.16",
+    "@ai-sdk/react": "2.0.17",
+    "@ai-sdk/rsc": "1.0.17",
+    "@modelcontextprotocol/sdk": "1.17.3",
+    "@reduxjs/toolkit": "2.8.2",
+    "ai": "5.0.17",
+    "next": "15.4.7",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "react-redux": "9.2.0"
   },
   "scripts": {
     "build": "NEXT_TELEMETRY_DISABLED=1 && pnpm noTel && next build",
