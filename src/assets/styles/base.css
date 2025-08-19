@@ -1,4 +1,7 @@
 @layer base {
+  /* Respect user default font size; do not shrink root */
+  html { font-size: 100%; }
+
   *,
   *::before,
   *::after {
@@ -11,8 +14,11 @@
   }
 
   body {
+    color: var(--text-primary);
+    background-color: var(--bg-color);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   img, picture, video, canvas, svg {
@@ -28,7 +34,7 @@
   a:active,
   a:visited {
     text-decoration: none;
-    color: var(--text-white);
+    color: var(--link-color);
   }
 
   button {
@@ -51,5 +57,21 @@
   /* TODO: modify this */
   #root, #__next {
     isolation: isolate;
+  }
+
+  /* Accessible focus ring */
+  :where(:focus-visible) {
+    outline: var(--border-2) solid color-mix(in oklch, var(--foreground) 60%, transparent);
+    outline-offset: 2px;
+  }
+
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

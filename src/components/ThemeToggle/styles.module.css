@@ -1,0 +1,9 @@
+.toggle {
+  padding-block: var(--8px);
+  padding-inline: var(--px-12);
+  border: var(--border-1) solid var(--border-color);
+  border-radius: var(--radius-8);
+  background: var(--bg-color);
+  color: var(--text-primary);
+  transition: background-color var(--duration-150) var(--ease-standard);
+}

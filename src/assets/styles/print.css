@@ -1,0 +1,18 @@
+@layer print {
+  @media print {
+    * {
+      box-shadow:   none !important;
+      text-shadow:  none !important;
+    }
+    a::after {
+      content: ' (' attr(href) ')';
+    }
+    nav, aside {
+      display: none !important;
+    }
+    body {
+      background: #fff !important;
+      color: #000 !important;
+    }
+  }
+}

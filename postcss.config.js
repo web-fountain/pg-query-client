@@ -1,4 +1,4 @@
-const path = require('path');
+import path from 'path';
 
 
 function resolveAlias(id, basedir, importOptions) {
@@ -18,7 +18,7 @@ function resolveAlias(id, basedir, importOptions) {
 }
 
 
-module.exports = {
+export default {
   plugins: [
     ['postcss-import', {
       root: 'src',

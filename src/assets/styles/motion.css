@@ -1,0 +1,24 @@
+@layer motion {
+  /* motion tokens are defined in scale.css; keyframes/utilities live here */
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from {
+      transform:  scale(0.98);
+      opacity:    0;
+    }
+    to {
+      transform:  scale(1);
+      opacity:    1;
+    }
+  }
+
+  .anim-fade-in {
+    animation: fade-in var(--duration-150) var(--ease-standard);
+  }
+  .anim-scale-in {
+    animation: scale-in var(--duration-250) var(--ease-standard);
+  }
+}

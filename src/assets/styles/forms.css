@@ -1,0 +1,27 @@
+@layer forms {
+  /* unified form control sizing and focus */
+  :where(input, select, textarea) {
+    padding-block:  var(--8px);
+    padding-inline: var(--px-12);
+    border:         var(--border-1) solid var(--border-color);
+    border-radius:  var(--radius-8);
+    background:     var(--bg-color);
+    color:          var(--text-primary);
+    min-height:     2.5rem;
+  }
+
+  :where(input, select, textarea):focus-visible {
+    outline:        var(--border-2) solid color-mix(in oklch, var(--foreground) 60%, transparent);
+    outline-offset: 2px;
+  }
+
+  button {
+    padding-block:  var(--8px);
+    padding-inline: var(--px-12);
+    border:         var(--border-1) solid var(--border-color);
+    border-radius:  var(--radius-8);
+    background:     var(--bg-color);
+    color:          var(--text-primary);
+    cursor:         pointer;
+  }
+}

@@ -27,5 +27,36 @@
     --128px: 8rem;
     --144px: 9rem;
     --160px: 10rem;
+
+    /* actual pixel values */
+    --px-4:  4px;
+    --px-8:  8px;
+    --px-12: 12px;
+    --px-16: 16px;
+    --px-24: 24px;
+    --px-32: 32px;
+    --px-48: 48px;
+    --px-80: 80px;
+
+    /* visual constants that should not scale with text size */
+    --border-1: 1px;
+    --border-2: 2px;
+    --radius-4: 4px;
+    --radius-8: 8px;
+    --radius-12: 12px;
+
+    /* motion tokens (keep durations/easing here) */
+    --ease-standard: cubic-bezier(.2,.8,.2,1);
+    --duration-150: 150ms;
+    --duration-250: 250ms;
+
+    /* elevation tokens; color is theme-derived via --shadow-color-* */
+    --shadow-1: 0 1px 2px var(--shadow-color-1);
+    --shadow-2: 0 4px 12px var(--shadow-color-2);
+
+    /* layers */
+    --z-drawer: 800;
+    --z-modal: 900;
+    --z-toast: 1000;
   }
 }

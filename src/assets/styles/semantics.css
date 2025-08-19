@@ -1,0 +1,19 @@
+@layer semantics {
+  /* Semantic color roles mapped to current theme tokens */
+  :root {
+    /* brand/status roles */
+    --color-primary: oklch(69% 0.15 258);
+    --color-success: oklch(76% 0.12 150);
+    --color-warning: oklch(86% 0.13 95);
+    --color-danger:  oklch(64% 0.17 25);
+
+    /* foreground roles */
+    --text-muted:   color-mix(in oklch, var(--foreground) 65%, transparent);
+    --text-subtle:  color-mix(in oklch, var(--foreground) 45%, transparent);
+
+    /* surface roles (neutrals derived from theme) */
+    --surface-1: var(--bg-color);
+    --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--bg-color));
+    --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--bg-color));
+  }
+}

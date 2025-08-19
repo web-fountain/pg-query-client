@@ -1,0 +1,10 @@
+@layer prose {
+  .prose {
+    max-width: 65ch;
+    line-height: var(--leading-relaxed);
+  }
+  .prose p { margin-block: var(--16px); }
+  .prose h1 { margin-block: var(--24px); }
+  .prose h2 { margin-block: var(--20px); }
+  .prose ul { list-style: disc; padding-inline-start: var(--24px); }
+}

@@ -1,1 +1,11 @@
-@layer layouts {}
+@layer layouts {
+  /* AIDEV-NOTE: container queries for component-driven layouts */
+  .container {
+    container-type: inline-size;
+    container-name: content;
+  }
+
+  @container content (min-width: 48rem) {
+    /* AIDEV-TODO: enhance component layouts at container >= 48rem */
+  }
+}

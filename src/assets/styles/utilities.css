@@ -1,1 +1,25 @@
-@layer utilities {}
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .rounded-8 {
+    border-radius: var(--radius-8);
+  }
+  .shadow-1 {
+    box-shadow: var(--shadow-1);
+  }
+  .bordered {
+    border: var(--border-1) solid var(--border-color);
+  }
+  .btn-guard {
+    min-height: 2.5rem; max-width: 100%; }
+}
