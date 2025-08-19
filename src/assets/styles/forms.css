@@ -1,11 +1,11 @@
 @layer forms {
   /* unified form control sizing and focus */
   :where(input, select, textarea) {
-    padding-block:  var(--8px);
-    padding-inline: var(--px-12);
+    padding-block:  var(--space-2);
+    padding-inline: var(--space-3);
     border:         var(--border-1) solid var(--border-color);
     border-radius:  var(--radius-8);
-    background:     var(--bg-color);
+    background:     var(--surface-1);
     color:          var(--text-primary);
     min-height:     2.5rem;
   }
@@ -16,11 +16,11 @@
   }
 
   button {
-    padding-block:  var(--8px);
-    padding-inline: var(--px-12);
+    padding-block:  var(--space-2);
+    padding-inline: var(--space-3);
     border:         var(--border-1) solid var(--border-color);
     border-radius:  var(--radius-8);
-    background:     var(--bg-color);
+    background:     var(--surface-1);
     color:          var(--text-primary);
     cursor:         pointer;
   }

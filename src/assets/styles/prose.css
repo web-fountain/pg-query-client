@@ -3,8 +3,8 @@
     max-width: 65ch;
     line-height: var(--leading-relaxed);
   }
-  .prose p { margin-block: var(--16px); }
-  .prose h1 { margin-block: var(--24px); }
-  .prose h2 { margin-block: var(--20px); }
-  .prose ul { list-style: disc; padding-inline-start: var(--24px); }
+  .prose p { margin-block: var(--space-4); }
+  .prose h1 { margin-block: var(--space-6); }
+  .prose h2 { margin-block: var(--space-5); }
+  .prose ul { list-style: disc; padding-inline-start: var(--space-6); }
 }

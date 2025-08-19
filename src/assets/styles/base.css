@@ -15,7 +15,7 @@
 
   body {
     color: var(--text-primary);
-    background-color: var(--bg-color);
+    background-color: var(--surface-1);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

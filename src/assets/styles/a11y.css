@@ -4,8 +4,8 @@
     position:           absolute;
     inset-inline-start: 0;
     inset-block-start:  0;
-    padding:            var(--8px) var(--px-12);
-    background:         var(--bg-color);
+    padding:            var(--space-2) var(--space-3);
+    background:         var(--surface-1);
     border:             var(--border-1) solid var(--border-color);
     transform:          translateY(-120%);
     z-index:            var(--z-toast);

@@ -2,18 +2,39 @@
   /* Semantic color roles mapped to current theme tokens */
   :root {
     /* brand/status roles */
-    --color-primary: oklch(69% 0.15 258);
-    --color-success: oklch(76% 0.12 150);
-    --color-warning: oklch(86% 0.13 95);
-    --color-danger:  oklch(64% 0.17 25);
+    --color-primary:        #326AAC;
+    --color-primary-hover:  #5189CB;
+    --color-primary-muted:  #7393E4;
+    --color-success:        #6FAA75;
+    --color-warning:        #E79961;
+    --color-danger:         #C74D4D;
+    --color-info:           #6DA2F1;
+    --color-highlight:      #ECF671;
+    --color-pink:           #F05DB0;
 
     /* foreground roles */
-    --text-muted:   color-mix(in oklch, var(--foreground) 65%, transparent);
-    --text-subtle:  color-mix(in oklch, var(--foreground) 45%, transparent);
+    --text-muted:     color-mix(in oklch, var(--foreground) 65%, transparent);
+    --text-subtle:    color-mix(in oklch, var(--foreground) 45%, transparent);
+    --text-secondary: var(--text-subtle);
+    --text-tertiary:  color-mix(in oklch, var(--foreground) 30%, transparent);
+    --text-disabled:  color-mix(in oklch, var(--foreground) 20%, transparent);
 
-    /* surface roles (neutrals derived from theme) */
-    --surface-1: var(--bg-color);
-    --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--bg-color));
-    --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--bg-color));
+    /* borders */
+    --border-primary:   var(--gray-alpha-200);
+    --border-secondary: color-mix(in oklch, var(--foreground) 10%, transparent);
+    --border-tertiary:  var(--gray-alpha-100);
+    --border-tree-item: var(--gray-alpha-100);
+
+    /* component roles: buttons */
+    --button-primary:         var(--color-primary);
+    --button-hover:           var(--color-primary-hover);
+    --button-active:        #335075;
+    --button-border-primary:  color-mix(in oklch, var(--button-primary) 30%, transparent);
+
+    /* component roles: icons */
+    --icon-fill:   color-mix(in oklch, var(--foreground) 80%, transparent);
+    --icon-hover:  color-mix(in oklch, var(--foreground) 95%, transparent);
+    --icon-active: var(--foreground);
+    --icon-blue:   #5189CB;
   }
 }

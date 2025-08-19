@@ -2,8 +2,10 @@
 /* Dark theme as the default */
 :root {
   color-scheme: dark;
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --surface-1: #14151D;
+  --surface-2: #181921;
+  --surface-3: #1D1E29;
+  --foreground: #DFDFDF;
 
   /* color primitives */
   --gray-rgb: 255, 255, 255;
@@ -12,8 +14,7 @@
 
   /* Aliases that follow the px/rem policy. These reference theme primitives and update with theme. */
   --text-primary: var(--foreground);
-  --bg-color:     var(--background);
-  --link-color:   var(--foreground);
+  --link-color:   var(--color-primary); /* defers to semantics */
 
   /* shadow colors used by scale shadow tokens */
   --shadow-color-1: var(--gray-alpha-100);
@@ -27,8 +28,11 @@
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --background: #ffffff;
+    --surface-1: #ffffff;
+    /* derive higher surfaces from base in light mode */
     --foreground: #171717;
+    --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--surface-1));
+    --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--surface-1));
 
     /* component-specific variables */
     --gray-rgb: 0, 0, 0;
@@ -41,8 +45,10 @@
 /* These rules have higher specificity than :root so they will always override the system preference. */
 [data-theme="light"] {
   color-scheme: light;
-  --background: #ffffff;
+  --surface-1: #ffffff;
   --foreground: #171717;
+  --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--surface-1));
+  --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--surface-1));
 
   /* color primitives */
   --gray-rgb: 0, 0, 0;
@@ -52,8 +58,10 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --surface-1: #14151D;
+  --surface-2: #181921;
+  --surface-3: #1D1E29;
+  --foreground: #DFDFDF;
 
   /* color primitives */
   --gray-rgb: 255, 255, 255;

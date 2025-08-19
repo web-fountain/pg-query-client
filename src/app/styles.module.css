@@ -5,17 +5,17 @@
   align-items: center;
 
   min-height: 100svh;
-  gap: var(--64px);
-  padding-block: var(--48px);
-  padding-inline: var(--px-80);
+  gap: var(--space-16);
+  padding-block: var(--space-12);
+  padding-inline: var(--space-20);
 }
 
 .main {
   display: flex;
   flex-direction: column;
-  gap: var(--32px);
-  padding-block: var(--48px);
-  padding-inline: var(--px-48);
+  gap: var(--space-8);
+  padding-block: var(--space-12);
+  padding-inline: var(--space-12);
   border-radius: var(--radius-12);
   border: var(--border-1) solid var(--border-color);
 }

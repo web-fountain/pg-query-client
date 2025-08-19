@@ -13,7 +13,8 @@
 
   /* line-height */
   --leading-none:     1    ;
-  --leading-packed:   1.25 ;
+  --leading-compact:  1.25 ;
+  --leading-packed:   1.30 ;
   --leading-tight:    1.375;
   --leading-snug:     1.45 ;
   --leading-normal:   1.5  ;
@@ -33,7 +34,7 @@
   body {
     font-family:  var(--font-inter-variable);
     font-weight:  var(--regular);
-    font-size:    var(--16px);
+    font-size:    var(--space-4);
     line-height:  var(--leading-normal);
   }
 
@@ -42,23 +43,23 @@
   }
 
   h1 {
-    font-size:      clamp(var(--32px), 3vw + var(--16px), var(--64px));
+    font-size:      clamp(var(--space-8), 3vw + var(--space-4), var(--space-16));
     font-weight:    var(--medium);
     letter-spacing: var(--tracking-tight);
     line-height:    var(--leading-packed);
-    margin-block:   var(--24px);
+    margin-block:   var(--space-6);
   }
   h2 {
-    font-size:    clamp(var(--24px), 1.5vw + var(--14px), var(--32px));
+    font-size:    clamp(var(--space-6), 1.5vw + var(--space-3_5), var(--space-8));
     font-weight:  var(--regular);
     line-height:  var(--leading-normal);
-    margin-block: var(--20px);
+    margin-block: var(--space-5);
   }
   h3 {
-    font-size:    var(--20px);
+    font-size:    var(--space-5);
     font-weight:  var(--regular);
     line-height:  var(--leading-normal);
-    margin-block: var(--16px);
+    margin-block: var(--space-4);
   }
 
 }
