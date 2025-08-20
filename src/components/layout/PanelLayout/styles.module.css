@@ -1,0 +1,92 @@
+.panel-layout {
+  /* AIDEV-NOTE: panels do not scroll; inner content containers should; grid area controls layout */
+
+  /* defaults; provider may override on :root */
+  --main-layout-left-panel-width:   320px;
+  --main-layout-right-panel-width:  360px;
+  --main-layout-gap:                var(--space-4);
+  --main-layout-panel-min-width:    200px;
+  --main-layout-panel-max-width:    600px;
+  --main-layout-resizer-width:      8px;
+
+  display: grid;
+  grid-template-columns:
+    var(--main-layout-left-panel-width)
+    var(--main-layout-resizer-width)
+    minmax(0, 1fr)
+    var(--main-layout-resizer-width)
+    var(--main-layout-right-panel-width);
+  grid-template-areas:
+    'left handle-left center handle-right right';
+
+  gap: var(--main-layout-gap);
+  height: 100%;
+  min-height: 0; /* allow grid item to shrink within 1fr row to avoid page overflow */
+  padding: var(--main-layout-gap);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  transition: grid-template-columns var(--duration-250) var(--ease-standard);
+}
+
+.panel-layout .left {
+  grid-area: left;
+  min-width: var(--main-layout-panel-min-width);
+  overflow: hidden;
+  height: 100%;
+}
+.panel-layout .center {
+  grid-area: center;
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
+}
+.panel-layout .right {
+  grid-area: right;
+  min-width: var(--main-layout-panel-min-width);
+  overflow: hidden;
+  height: 100%;
+}
+.panel-layout .handle-left {
+  grid-area: handle-left;
+  inline-size: var(--main-layout-resizer-width);
+  cursor: col-resize;
+}
+.panel-layout .handle-right {
+  grid-area: handle-right;
+  inline-size: var(--main-layout-resizer-width);
+  cursor: col-resize;
+}
+
+/* Swap: mirror grid areas so right shows on the left side */
+.panel-layout[data-swapped] {
+  grid-template-areas:
+    'right handle-right center handle-left left';
+}
+
+/* Collapse: zero a panel column and its adjacent handle */
+.panel-layout[data-left-collapsed] {
+  grid-template-columns:
+    0
+    0
+    minmax(0, 1fr)
+    var(--main-layout-resizer-width)
+    var(--main-layout-right-panel-width);
+}
+.panel-layout[data-right-collapsed] {
+  grid-template-columns:
+    var(--main-layout-left-panel-width)
+    var(--main-layout-resizer-width)
+    minmax(0, 1fr)
+    0
+    0;
+}
+
+/* Optional visuals */
+.panel-layout .left,
+.panel-layout .right {
+  border:     var(--border-1) solid var(--border-color, #2a2a2a);
+  background: var(--surface-2, #13141a);
+}
+.panel-layout .center {
+  background: var(--surface-1, #0f1016);
+}

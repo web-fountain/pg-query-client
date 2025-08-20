@@ -1,0 +1,11 @@
+.left-panel {
+  display:        flex;
+  flex-direction: column;
+  /* AIDEV-NOTE: panels do not own height; grid area controls layout */
+  gap:            var(--space-3);
+  padding:        var(--space-4);
+}
+
+.placeholder {
+  opacity: 0.7;
+}

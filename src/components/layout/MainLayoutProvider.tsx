@@ -1,0 +1,102 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+
+
+type LayoutCtx = {
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  swapped: boolean;
+
+  setLeftCollapsed(v: boolean): void;
+  setRightCollapsed(v: boolean): void;
+  setSwapped(v: boolean): void;
+
+  // convenient toggles
+  toggleLeft(): void;
+  toggleRight(): void;
+  toggleSwap(): void;
+
+  // width controls
+  setLeftWidth(px: number): void;
+  setRightWidth(px: number): void;
+  resetWidths(): void;
+};
+
+const LayoutContext = createContext<LayoutCtx | null>(null);
+
+function MainLayoutProvider({ children }: { children: ReactNode }) {
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [swapped, setSwapped] = useState(false);
+
+  // restore from localStorage
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('mainLayout.panels') || '{}');
+    setLeftCollapsed(!!saved.lc);
+    setRightCollapsed(!!saved.rc);
+    setSwapped(!!saved.sw);
+
+    if (saved.lw) document.documentElement.style.setProperty('--main-layout-left-panel-width', `${saved.lw}px`);
+    if (saved.rw) document.documentElement.style.setProperty('--main-layout-right-panel-width', `${saved.rw}px`);
+
+    // sensible defaults if unset
+    const cs = getComputedStyle(document.documentElement);
+    if (!cs.getPropertyValue('--main-layout-left-panel-width').trim())
+      document.documentElement.style.setProperty('--main-layout-left-panel-width', '320px');
+    if (!cs.getPropertyValue('--main-layout-right-panel-width').trim())
+      document.documentElement.style.setProperty('--main-layout-right-panel-width', '360px');
+    if (!cs.getPropertyValue('--main-layout-panel-min-width').trim())
+      document.documentElement.style.setProperty('--main-layout-panel-min-width', '200px');
+    if (!cs.getPropertyValue('--main-layout-panel-max-width').trim())
+      document.documentElement.style.setProperty('--main-layout-panel-max-width', '600px');
+    if (!cs.getPropertyValue('--main-layout-resizer-width').trim())
+      document.documentElement.style.setProperty('--main-layout-resizer-width', '8px');
+  }, []);
+
+  // persist to localStorage
+  useEffect(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const lw = parseInt(cs.getPropertyValue('--main-layout-left-panel-width')) || 320;
+    const rw = parseInt(cs.getPropertyValue('--main-layout-right-panel-width')) || 360;
+    localStorage.setItem('mainLayout.panels', JSON.stringify({
+      lc: leftCollapsed, rc: rightCollapsed, sw: swapped, lw, rw
+    }));
+  }, [leftCollapsed, rightCollapsed, swapped]);
+
+  const setLeftWidth  = (px: number) =>
+    document.documentElement.style.setProperty('--main-layout-left-panel-width', `${px}px`);
+  const setRightWidth = (px: number) =>
+    document.documentElement.style.setProperty('--main-layout-right-panel-width', `${px}px`);
+
+  const resetWidths = () => {
+    setLeftWidth(320);
+    setRightWidth(360);
+  };
+
+  const toggleLeft  = () => setLeftCollapsed(v => !v);
+  const toggleRight = () => setRightCollapsed(v => !v);
+  const toggleSwap  = () => setSwapped(v => !v);
+
+  return (
+    <LayoutContext.Provider value={{
+      leftCollapsed, rightCollapsed, swapped,
+      setLeftCollapsed, setRightCollapsed, setSwapped,
+      toggleLeft, toggleRight, toggleSwap,
+      setLeftWidth, setRightWidth, resetWidths
+    }}>
+      {children}
+    </LayoutContext.Provider>
+  );
+}
+
+const useMainLayout = () => {
+  const ctx = useContext(LayoutContext);
+  if (!ctx) throw new Error('useMainLayout must be used inside MainLayoutProvider');
+  return ctx;
+};
+
+
+export { useMainLayout };
+export default MainLayoutProvider;

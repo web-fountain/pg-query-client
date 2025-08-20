@@ -22,12 +22,13 @@
   --leading-loose:    2    ;
 
   /* letter-spacing */
-  --tracking-tighter: -0.05em ;
-  --tracking-tight:   -0.025em;
-  --tracking-normal:  0em     ;
-  --tracking-wide:    0.025em ;
-  --tracking-wider:   0.05em  ;
-  --tracking-widest:  0.1em   ;
+  --tracking-tighter: -0.05em ;  /* -0.8px at 16px */
+  --tracking-tight:   -0.025em;  /* -0.4px at 16px */
+  --tracking-normal:  0em     ;  /* 0px */
+  --tracking-wide:    0.0125em;  /* 0.2px at 16px */
+  --tracking-wider:   0.025em ;  /* 0.4px at 16px */
+  --tracking-widest:  0.05em  ;  /* 0.8px at 16px */
+  --tracking-maximum: 0.1em   ;  /* 1.6px at 16px */
 }
 
 @layer typography {

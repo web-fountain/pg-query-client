@@ -17,6 +17,8 @@ import '@Styles/scrollbars.css';
 import '@Styles/prose.css';
 import '@Styles/print.css';
 
+import MainLayout from '@Components/layout/MainLayout';
+
 
 const metadata: Metadata = {
   title: 'PG Query Client',
@@ -59,7 +61,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
       </head>
 
       <body>
-        {children}
+        <MainLayout>{children}</MainLayout>
       </body>
 
     </html>
