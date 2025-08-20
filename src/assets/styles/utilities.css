@@ -18,7 +18,7 @@
     box-shadow: var(--shadow-1);
   }
   .bordered {
-    border: var(--border-1) solid var(--border-color);
+    border: var(--border-1) solid var(--border-primary);
   }
   .btn-guard {
     min-height: 2.5rem; max-width: 100%; }

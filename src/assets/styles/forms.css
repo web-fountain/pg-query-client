@@ -3,9 +3,9 @@
   :where(input, select, textarea) {
     padding-block:  var(--space-2);
     padding-inline: var(--space-3);
-    border:         var(--border-1) solid var(--border-color);
+    border:         var(--border-1) solid var(--border-primary);
     border-radius:  var(--radius-8);
-    background:     var(--surface-1);
+    background:     var(--surface-input);
     color:          var(--text-primary);
     min-height:     2.5rem;
   }
@@ -18,10 +18,16 @@
   button {
     padding-block:  var(--space-2);
     padding-inline: var(--space-3);
-    border:         var(--border-1) solid var(--border-color);
+    border:         var(--border-1) solid var(--button-border-primary);
     border-radius:  var(--radius-8);
-    background:     var(--surface-1);
-    color:          var(--text-primary);
+    background:     var(--button-primary);
+    color:          var(--button-text);
     cursor:         pointer;
+  }
+  button:hover { background: var(--button-hover); }
+  button:disabled {
+    background: var(--button-disabled);
+    color:      var(--button-text-disabled);
+    cursor:     not-allowed;
   }
 }

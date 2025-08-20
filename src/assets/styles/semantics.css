@@ -1,38 +1,45 @@
 @layer semantics {
-  /* Semantic color roles mapped to current theme tokens */
+  /* Semantic roles map component usage to theme primitives in themes.css */
   :root {
     /* brand/status roles */
-    --color-primary:        #326AAC;
-    --color-primary-hover:  #5189CB;
-    --color-primary-muted:  #7393E4;
-    --color-success:        #6FAA75;
-    --color-warning:        #E79961;
-    --color-danger:         #C74D4D;
-    --color-info:           #6DA2F1;
-    --color-highlight:      #ECF671;
-    --color-pink:           #F05DB0;
+    --color-primary:        #5189cb;
+    --color-primary-hover:  #326aac;
+    --color-primary-muted:  #335075;
+    /* optional alias */
+    --accent: var(--color-primary);
 
     /* foreground roles */
+    --text-secondary: #888995;
+    --text-disabled:  #585967;
     --text-muted:     color-mix(in oklch, var(--foreground) 65%, transparent);
     --text-subtle:    color-mix(in oklch, var(--foreground) 45%, transparent);
-    --text-secondary: var(--text-subtle);
     --text-tertiary:  color-mix(in oklch, var(--foreground) 30%, transparent);
-    --text-disabled:  color-mix(in oklch, var(--foreground) 20%, transparent);
 
     /* borders */
-    --border-primary:   var(--gray-alpha-200);
-    --border-secondary: color-mix(in oklch, var(--foreground) 10%, transparent);
-    --border-tertiary:  var(--gray-alpha-100);
-    --border-tree-item: var(--gray-alpha-100);
+    --border-primary:   #2a2b36;
+    --border-secondary: #32333e;
+    --border-tertiary:  color-mix(in oklch, var(--foreground) 15%, transparent);
+    --border-tree-item: var(--border-tertiary);
+
+    /* surfaces: helpers */
+    --surface-canvas:   var(--surface-0);
+    --surface-sidebar:  var(--surface-1);
+    --surface-modal:    var(--surface-1);
+    --surface-hover:    var(--surface-2);
+    --surface-input:    var(--surface-3);
+    --surface-control:  var(--surface-1);
+    --surface-disabled: color-mix(in oklch, var(--surface-1) 92%, black);
 
     /* component roles: buttons */
-    --button-primary:         var(--color-primary);
-    --button-hover:           var(--color-primary-hover);
-    --button-active:        #335075;
-    --button-border-primary:  color-mix(in oklch, var(--button-primary) 30%, transparent);
+    --button-primary:        var(--color-primary);
+    --button-hover:          var(--color-primary-hover);
+    --button-disabled:       var(--color-primary-muted);
+    --button-border-primary: transparent;
+    --button-text:           var(--text-primary);
+    --button-text-disabled:  #aeb2b8;
 
     /* component roles: icons */
-    --icon-fill:   color-mix(in oklch, var(--foreground) 80%, transparent);
+    --icon-fill:   #888995;
     --icon-hover:  color-mix(in oklch, var(--foreground) 95%, transparent);
     --icon-active: var(--foreground);
     --icon-blue:   #5189CB;

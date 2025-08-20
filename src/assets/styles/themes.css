@@ -1,27 +1,28 @@
-/* desktop-only project: no mobile-first imports needed */
 /* Dark theme as the default */
+/* Theme primitives live here (surfaces, foreground, constants). Semantic roles live in semantics.css. */
 :root {
   color-scheme: dark;
-  --surface-1: #14151D;
-  --surface-2: #181921;
-  --surface-3: #1D1E29;
-  --foreground: #DFDFDF;
 
-  /* color primitives */
-  --gray-rgb: 255, 255, 255;
-  --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
-  --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+  /* primitives: surfaces */
+  --surface-0: #181921; /* canvas/page background */
+  --surface-1: #1d1e29;
+  --surface-2: #2a2b36;
+  --surface-3: #32333e;
 
-  /* Aliases that follow the px/rem policy. These reference theme primitives and update with theme. */
+  /* primitives: foreground */
+  --foreground: #dbdee1;
+
+  /* primitives: constants */
+  --white: #ffffff;
+
+  /* aliases */
   --text-primary: var(--foreground);
-  --link-color:   var(--color-primary); /* defers to semantics */
+  --link-color:   var(--color-primary);  /* defers to semantics */
+  --border-color: var(--border-primary); /* defers to semantics */
 
-  /* shadow colors used by scale shadow tokens */
-  --shadow-color-1: var(--gray-alpha-100);
-  --shadow-color-2: var(--gray-alpha-200);
-
-  /* Derived color tokens */
-  --border-color: var(--gray-alpha-200);
+  /* elevation colors consumed by scale tokens */
+  --shadow-color-1: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --shadow-color-2: color-mix(in oklch, var(--foreground) 18%, transparent);
 }
 
 /* Light theme if the user prefers it */
@@ -31,13 +32,13 @@
     --surface-1: #ffffff;
     /* derive higher surfaces from base in light mode */
     --foreground: #171717;
+    --surface-0: var(--surface-1);
     --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--surface-1));
     --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--surface-1));
 
-    /* component-specific variables */
-    --gray-rgb: 0, 0, 0;
-    --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
-    --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+    /* elevation colors for light */
+    --shadow-color-1: color-mix(in oklch, var(--foreground) 20%, transparent);
+    --shadow-color-2: color-mix(in oklch, var(--foreground) 30%, transparent);
   }
 }
 
@@ -47,24 +48,24 @@
   color-scheme: light;
   --surface-1: #ffffff;
   --foreground: #171717;
+  --surface-0: var(--surface-1);
   --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--surface-1));
   --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--surface-1));
 
-  /* color primitives */
-  --gray-rgb: 0, 0, 0;
-  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
-  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+  /* elevation colors for light */
+  --shadow-color-1: color-mix(in oklch, var(--foreground) 20%, transparent);
+  --shadow-color-2: color-mix(in oklch, var(--foreground) 30%, transparent);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --surface-1: #14151D;
-  --surface-2: #181921;
-  --surface-3: #1D1E29;
-  --foreground: #DFDFDF;
+  --surface-0: #181921;
+  --surface-1: #1d1e29;
+  --surface-2: #2a2b36;
+  --surface-3: #32333e;
+  --foreground: #dbdee1;
 
-  /* color primitives */
-  --gray-rgb: 255, 255, 255;
-  --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
-  --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+  /* elevation colors for dark */
+  --shadow-color-1: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --shadow-color-2: color-mix(in oklch, var(--foreground) 18%, transparent);
 }

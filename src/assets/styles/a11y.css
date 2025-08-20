@@ -5,8 +5,8 @@
     inset-inline-start: 0;
     inset-block-start:  0;
     padding:            var(--space-2) var(--space-3);
-    background:         var(--surface-1);
-    border:             var(--border-1) solid var(--border-color);
+    background:         var(--surface-control);
+    border:             var(--border-1) solid var(--border-primary);
     transform:          translateY(-120%);
     z-index:            var(--z-toast);
   }

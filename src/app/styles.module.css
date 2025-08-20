@@ -17,5 +17,5 @@
   padding-block: var(--space-12);
   padding-inline: var(--space-12);
   border-radius: var(--radius-12);
-  border: var(--border-1) solid var(--border-color);
+  border: var(--border-1) solid var(--border-primary);
 }
