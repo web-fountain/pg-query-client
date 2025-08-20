@@ -15,6 +15,25 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactMaxHeadersLength: 1000,
 
+  typedRoutes: true,
+  images: {
+    // qualities: [75, 100], // Explicitly allow quality={100},
+    // localPatterns: [
+    //   {
+    //     pathname: '/photo.jpg', // allow exact path
+    //     // omitting "search" will allow all query parameters
+    //   },
+    //   {
+    //     pathname: '/photo.jpg', // allow exact path
+    //     search: '?v=1', // allow exact query parameters
+    //   },
+    //   {
+    //     pathname: '/assets/**', // allow wildcard path
+    //     search: '', // empty search will block all query parameters
+    //   }
+    // ]
+  },
+
   logging: {
     fetches: {
       fullUrl: true,
