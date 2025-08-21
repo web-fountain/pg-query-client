@@ -1,14 +1,14 @@
 'use client';
 
-import { useMainLayout } from '../MainLayoutProvider';
+import { useOpSpaceLayout } from '../OpSpaceProvider';
 import styles from './styles.module.css';
 
 
-function LeftPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
-  const { expandSide } = useMainLayout();
+function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
+  const { expandSide } = useOpSpaceLayout();
 
   return (
-    <div className={styles['left-panel']} data-collapsed={collapsed || undefined}>
+    <div className={styles['chat-panel']} data-collapsed={collapsed || undefined}>
       {collapsed ? (
         <div className={styles['collapsed-icon']} onClick={() => expandSide(side)}>
           {/* AIDEV-NOTE: Icon-only view when collapsed to 40px width */}
@@ -17,11 +17,11 @@ function LeftPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
           </svg>
         </div>
       ) : (
-        <div className={styles['placeholder']}>Left Panel</div>
+        <div className={styles['placeholder']}>Chat Panel</div>
       )}
     </div>
   );
 }
 
 
-export default LeftPanel;
+export default ChatPanel;

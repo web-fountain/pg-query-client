@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState }  from 'react';
-import { useMainLayout }      from '../MainLayoutProvider';
-import styles                 from './styles.module.css';
+import { useOpSpaceLayout }             from '../OpSpaceProvider';
+import styles                           from './styles.module.css';
 
 
 type Props = { side: 'left' | 'right' };
 
 function ResizableHandle({ side }: Props) {
-  const { getConfig, setSideWidth, expandSide } = useMainLayout();
+  const { getConfig, setSideWidth, expandSide } = useOpSpaceLayout();
   const ref                                     = useRef<HTMLDivElement>(null);
   const [ariaMin, setAriaMin] = useState<number | undefined>(undefined);
   const [ariaMax, setAriaMax] = useState<number | undefined>(undefined);
   const [ariaNow, setAriaNow] = useState<number | undefined>(undefined);
+  const actualDragOccurred = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -23,16 +24,18 @@ function ResizableHandle({ side }: Props) {
     let dragging = false;
     let frameRequested = false;
     let pendingDelta = 0;
+    let lastWidth = 0;
+    let hasMoved = false;  // AIDEV-NOTE: Track if real movement occurred
 
     const getWidths = () => {
       const cs = getComputedStyle(document.documentElement);
       const raw = cs.getPropertyValue(
-        side === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
+        side === 'left' ? '--op-space-layout-left-panel-width' : '--op-space-layout-right-panel-width'
       );
       const parsed = parseInt(raw);
       const cur = isNaN(parsed) ? 300 : parsed;
-      const minRaw = cs.getPropertyValue('--main-layout-panel-min-width');
-      const maxRaw = cs.getPropertyValue('--main-layout-panel-max-width');
+      const minRaw = cs.getPropertyValue('--op-space-layout-panel-min-width');
+      const maxRaw = cs.getPropertyValue('--op-space-layout-panel-max-width');
       const min = parseInt(minRaw) || 170;
       const max = parseInt(maxRaw) || 600;
       // AIDEV-NOTE: keep local ARIA state aligned with CSS vars on read
@@ -42,10 +45,20 @@ function ResizableHandle({ side }: Props) {
       return { cur, min, max };
     };
 
-    const setWidth = (px: number) => {
-      const { min, max } = getWidths();
-      const clamped = Math.max(min, Math.min(max, px));
-      setSideWidth(side, clamped);
+    // Replace the setCssWidth function to always use fresh limits
+    const setCssWidth = (px: number) => {
+      // AIDEV-NOTE: Always read fresh CSS values to avoid stale cache after swaps
+      const cs = getComputedStyle(document.documentElement);
+      const minStr = cs.getPropertyValue('--op-space-layout-panel-min-width').trim();
+      const maxStr = cs.getPropertyValue('--op-space-layout-panel-max-width').trim();
+      const freshMin = parseInt(minStr) || 170;
+      const freshMax = parseInt(maxStr) || 600;
+
+      const clamped = Math.max(freshMin, Math.min(freshMax, px));
+      lastWidth = clamped;
+      const widthVar = side === 'left' ? '--op-space-layout-left-panel-width' : '--op-space-layout-right-panel-width';
+      document.documentElement.style.setProperty(widthVar, `${clamped}px`);
+      setAriaNow(clamped);
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -54,11 +67,15 @@ function ResizableHandle({ side }: Props) {
       startX = e.clientX;
       startWidth = cur;
       dragging = true;
+      hasMoved = false;  // AIDEV-NOTE: Reset movement flag
+      actualDragOccurred.current = false;
 
       try {
         // AIDEV-NOTE: Capture pointer to ensure consistent move events during drag
         el.setPointerCapture(e.pointerId);
       } catch {}
+      // AIDEV-NOTE: Disable grid transition during active drag for responsiveness
+      document.documentElement.setAttribute('data-op-space-layout-dragging', 'true');
       document.documentElement.style.cursor = 'col-resize';
       document.documentElement.style.userSelect = 'none';
       const supportsPointer = 'PointerEvent' in window;
@@ -76,12 +93,21 @@ function ResizableHandle({ side }: Props) {
     const onPointerMove = (e: PointerEvent) => {
       if (!dragging) return;
       pendingDelta = e.clientX - startX;
+
+      // AIDEV-NOTE: Only start writing widths after 5px movement threshold
+      if (!hasMoved && Math.abs(pendingDelta) < 5) {
+        return;  // Don't write any widths yet
+      }
+
+      hasMoved = true;
+      actualDragOccurred.current = true;
+
       if (!frameRequested) {
         frameRequested = true;
         requestAnimationFrame(() => {
           frameRequested = false;
           const next = side === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
-          setWidth(next);
+          setCssWidth(next);
         });
       }
     };
@@ -94,7 +120,7 @@ function ResizableHandle({ side }: Props) {
         requestAnimationFrame(() => {
           frameRequested = false;
           const next = side === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
-          setWidth(next);
+          setCssWidth(next);
         });
       }
     };
@@ -110,23 +136,32 @@ function ResizableHandle({ side }: Props) {
       window.removeEventListener('pointercancel', onPointerUp as EventListener);
       window.removeEventListener('keydown', onKeyCancel);
       dragging = false;
+      document.documentElement.removeAttribute('data-op-space-layout-dragging');
       document.documentElement.style.cursor = '';
       document.documentElement.style.userSelect = '';
+      // AIDEV-NOTE: Only commit width if actual movement occurred
+      if (hasMoved && lastWidth > 0) {
+        setSideWidth(side, lastWidth);
+      }
     };
 
     const onMouseUp = () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('keydown', onKeyCancel);
       dragging = false;
+      document.documentElement.removeAttribute('data-op-space-layout-dragging');
       document.documentElement.style.cursor = '';
       document.documentElement.style.userSelect = '';
+      if (lastWidth > 0) {
+        setSideWidth(side, lastWidth);
+      }
     };
 
     const onKeyCancel = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // AIDEV-NOTE: Escape cancels in-progress drag and restores start width.
       if (!dragging) return;
-      setWidth(startWidth);
+      setCssWidth(startWidth);
       onPointerUp();
     };
 
@@ -143,7 +178,7 @@ function ResizableHandle({ side }: Props) {
       setAriaMin(min);
       setAriaMax(max);
     };
-    window.addEventListener('main-layout-widths', onWidthsEvent as EventListener);
+    window.addEventListener('op-space-layout-widths', onWidthsEvent as EventListener);
     return () => {
       el.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
@@ -152,7 +187,7 @@ function ResizableHandle({ side }: Props) {
       window.removeEventListener('pointercancel', onPointerUp as EventListener);
       window.removeEventListener('mouseup', onMouseUp as EventListener);
       window.removeEventListener('keydown', onKeyCancel);
-      window.removeEventListener('main-layout-widths', onWidthsEvent as EventListener);
+      window.removeEventListener('op-space-layout-widths', onWidthsEvent as EventListener);
     };
   }, [setSideWidth, side]);
 
@@ -162,10 +197,10 @@ function ResizableHandle({ side }: Props) {
     const step = e.shiftKey ? 50 : 10;
     const cs = getComputedStyle(document.documentElement);
     const cur = parseInt(cs.getPropertyValue(
-      side === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
+      side === 'left' ? '--op-space-layout-left-panel-width' : '--op-space-layout-right-panel-width'
     ));
-    const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width'));
-    const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width'));
+    const min = parseInt(cs.getPropertyValue('--op-space-layout-panel-min-width'));
+    const max = parseInt(cs.getPropertyValue('--op-space-layout-panel-max-width'));
 
     let next = cur;
     if (e.key === 'Home') next = min;
@@ -203,7 +238,9 @@ function ResizableHandle({ side }: Props) {
       aria-valuenow={ariaNow}
       aria-label={side === 'left' ? 'Resize left panel' : 'Resize right panel'}
       onDoubleClick={() => {
-        // AIDEV-NOTE: Double-click to expand collapsed panels or reset only this panel to default if already expanded.
+        // Don't reset if user was actually dragging
+        if (actualDragOccurred.current) return;
+
         if (isCollapsed) {
           expandSide(side);
         } else {

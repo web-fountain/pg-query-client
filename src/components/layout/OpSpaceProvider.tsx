@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+
 type Side = 'left' | 'right';
 type SideConfig = {
   width: number;
@@ -31,27 +32,27 @@ type LayoutCtx = {
   isContentSwapped()                  : boolean;
 };
 
-const STORAGE_KEY = 'pg-query-client-mainLayout.panels';
+const STORAGE_KEY = 'pg-query-client/panel-layout';
 
 const LayoutContext = createContext<LayoutCtx | null>(null);
 
 function clampToPanelLimits(px: number): number {
   const cs = getComputedStyle(document.documentElement);
-  const minStr = cs.getPropertyValue('--main-layout-panel-min-width').trim();
-  const maxStr = cs.getPropertyValue('--main-layout-panel-max-width').trim();
+  const minStr = cs.getPropertyValue('--op-space-layout-panel-min-width').trim();
+  const maxStr = cs.getPropertyValue('--op-space-layout-panel-max-width').trim();
   const min = parseInt(minStr) || 170;
   const max = parseInt(maxStr) || 600;
   return Math.max(min, Math.min(max, px));
 }
 
 function applyCssWidths(leftWidth: number, rightWidth: number) {
-  document.documentElement.style.setProperty('--main-layout-left-panel-width', `${leftWidth}px`);
-  document.documentElement.style.setProperty('--main-layout-right-panel-width', `${rightWidth}px`);
+  document.documentElement.style.setProperty('--op-space-layout-left-panel-width', `${leftWidth}px`);
+  document.documentElement.style.setProperty('--op-space-layout-right-panel-width', `${rightWidth}px`);
   // AIDEV-NOTE: Broadcast widths so handles can update ARIA without DOM reads in render
-  window.dispatchEvent(new CustomEvent('main-layout-widths', { detail: { lw: leftWidth, rw: rightWidth } }));
+  window.dispatchEvent(new CustomEvent('op-space-layout-widths', { detail: { lw: leftWidth, rw: rightWidth } }));
 }
 
-function MainLayoutProvider({ children }: { children: ReactNode }) {
+function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
   const defaults: LayoutState = useMemo(() => ({
     left:  { width: 300, collapsed: false, initialWidth: 300 },
     right: { width: 300, collapsed: false, initialWidth: 300 },
@@ -192,11 +193,11 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const useMainLayout = () => {
+const useOpSpaceLayout = () => {
   const ctx = useContext(LayoutContext);
-  if (!ctx) throw new Error('useMainLayout must be used inside MainLayoutProvider');
+  if (!ctx) throw new Error('useOpSpaceLayout must be used inside OpSpaceProvider');
   return ctx;
 };
 
-export { useMainLayout };
-export default MainLayoutProvider;
+export { useOpSpaceLayout };
+export default OpSpaceLayoutProvider;

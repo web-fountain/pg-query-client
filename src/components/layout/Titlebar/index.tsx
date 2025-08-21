@@ -1,18 +1,18 @@
 'use client';
 
-import { useMainLayout } from '../MainLayoutProvider';
-import styles from './styles.module.css';
+import { useOpSpaceLayout }  from '../OpSpaceProvider';
+import styles             from './styles.module.css';
 
 
-function Header() {
-  const { getConfig, toggleCollapseSide, swapSides, resetBothSides, isContentSwapped } = useMainLayout();
+function TitleBar() {
+  const { getConfig, toggleCollapseSide, swapSides, resetBothSides, isContentSwapped } = useOpSpaceLayout();
   // AIDEV-NOTE: Direct side controls; no visual remap
   const left    = getConfig('left');
   const right   = getConfig('right');
   const swapped = isContentSwapped();
 
   return (
-    <header className={styles['header']}>
+    <header className={styles['titlebar']}>
       <div className={styles['title']}>PG Query Client</div>
 
       <div className={styles['controls']}>
@@ -58,4 +58,4 @@ function Header() {
 }
 
 
-export default Header;
+export default TitleBar;

@@ -1,14 +1,14 @@
 'use client';
 
-import { useMainLayout } from '../MainLayoutProvider';
-import styles from './styles.module.css';
+import { useOpSpaceLayout }  from '../OpSpaceProvider';
+import styles             from './styles.module.css';
 
 
-function RightPanel({ collapsed, side = 'right' }: { collapsed: boolean; side?: 'left' | 'right' }) {
-  const { expandSide } = useMainLayout();
+function DirectoryPanel({ collapsed, side = 'right' }: { collapsed: boolean; side?: 'left' | 'right' }) {
+  const { expandSide } = useOpSpaceLayout();
 
   return (
-    <div className={styles['right-panel']} data-collapsed={collapsed || undefined}>
+    <div className={styles['directory-panel']} data-collapsed={collapsed || undefined}>
       {collapsed ? (
         <div className={styles['collapsed-icon']} onClick={() => expandSide(side)}>
           {/* AIDEV-NOTE: Icon-only view when collapsed to 40px width */}
@@ -17,11 +17,11 @@ function RightPanel({ collapsed, side = 'right' }: { collapsed: boolean; side?: 
           </svg>
         </div>
       ) : (
-        <div className={styles['placeholder']}>Right Panel</div>
+        <div className={styles['placeholder']}>Directory Panel</div>
       )}
     </div>
   );
 }
 
 
-export default RightPanel;
+export default DirectoryPanel;

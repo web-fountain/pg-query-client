@@ -17,7 +17,7 @@ import '@Styles/scrollbars.css';
 import '@Styles/prose.css';
 import '@Styles/print.css';
 
-import MainLayout from '@Components/layout/MainLayout';
+import OpSpaceLayout from '@/components/layout/OpSpaceLayout';
 
 
 const metadata: Metadata = {
@@ -61,7 +61,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
       </head>
 
       <body>
-        <MainLayout>{children}</MainLayout>
+        <OpSpaceLayout>{children}</OpSpaceLayout>
       </body>
 
     </html>

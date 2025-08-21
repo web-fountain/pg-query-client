@@ -1,4 +1,4 @@
-.left-panel {
+.directory-panel {
   display:        flex;
   flex-direction: column;
   /* AIDEV-NOTE: panels do not own height; grid area controls layout */
@@ -6,7 +6,7 @@
   padding:        var(--space-4);
 }
 
-.left-panel[data-collapsed] {
+.directory-panel[data-collapsed] {
   /* AIDEV-NOTE: Collapsed state shows only icon centered in 40px width */
   padding: var(--space-2);
   justify-content: flex-start;

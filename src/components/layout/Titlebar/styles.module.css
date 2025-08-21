@@ -1,8 +1,8 @@
-.header {
+.titlebar {
   display:        flex;
   align-items:    center;
   gap:            var(--space-4);
-  padding:        var(--space-3) var(--space-4);
+  padding-inline: var(--px-24) var(--px-8);
   background:     var(--surface-1);
   border-bottom:  var(--border-1) solid var(--border-color);
 }

@@ -17,29 +17,25 @@
     --screen-height: tan(atan2(var(--screenHeight), 1px));
 
     /* Layout constants - Fixed heights/widths */
-    --header-height:                        56px;  /* Header with padding */
-    --footer-height:                        48px;  /* Footer height */
-    --titlebar-height:                      36px;  /* OS titlebar (if applicable) */
-    --operationsbar-width:                  48px;  /* Side operations bar */
-    --service-path-operation-editor-height: 48px;  /* Service path editor */
-    --bottombar-height:                     20px;  /* Bottom status bar */
+    --titlebar-height:  36px;  /* Titlebar with padding */
+    --bottombar-height: 22px;  /* Bottombar status bar */
 
     /* Panel constraints */
-    --panel-min-width:                      200px; /* Minimum panel width */
-    --panel-max-width:                      600px; /* Maximum panel width */
-    --panel-collapsed-width:                40px;  /* Collapsed panel width */
-    --minPanelWidth:                        200px; /* Reduced to allow side resizing */
+    --panel-min-width:        200px; /* Minimum panel width */
+    --panel-max-width:        600px; /* Maximum panel width */
+    --panel-collapsed-width:  48px;  /* Collapsed panel width */
+    --minPanelWidth:          200px; /* Reduced to allow side resizing */
 
     /* Calculated available space */
-    --available-height: calc(var(--screen-height) * 1px - var(--header-height) - var(--footer-height));
-    --available-width: calc(var(--screen-width) * 1px - var(--operationsbar-width));
+    --available-height: calc(var(--screen-height) * 1px - var(--titlebar-height) - var(--bottombar-height));
+    --available-width: calc(var(--screen-width) * 1px);
 
-    /* AIDEV-NOTE: Main layout defaults for static grid; JS will override as user resizes */
-    --main-layout-left-panel-width:   300px;
-    --main-layout-right-panel-width:  300px;
-    --main-layout-panel-min-width:    170px;
-    --main-layout-panel-max-width:    600px;
-    --main-layout-resizer-width:      4px;
+    /* AIDEV-NOTE: OpSpace layout defaults for static grid; JS will override as user resizes */
+    --op-space-layout-left-panel-width:   300px;
+    --op-space-layout-right-panel-width:  300px;
+    --op-space-layout-panel-min-width:    170px;
+    --op-space-layout-panel-max-width:    600px;
+    --op-space-layout-resizer-width:      4px;
   }
 
   /* AIDEV-NOTE: container queries for component-driven layouts */

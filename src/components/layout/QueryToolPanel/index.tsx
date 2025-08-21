@@ -4,13 +4,13 @@ import type { ReactNode } from 'react';
 import styles             from './styles.module.css';
 
 
-function CenterPanel({ children }: { children: ReactNode }) {
+function QueryToolPanel({ children }: { children: ReactNode }) {
   return (
-    <div className={styles['center-panel']}>
+    <div className={styles['query-tool-panel']}>
       {children}
     </div>
   );
 }
 
 
-export default CenterPanel;
+export default QueryToolPanel;
