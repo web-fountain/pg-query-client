@@ -28,11 +28,18 @@
     --panel-min-width:                      200px; /* Minimum panel width */
     --panel-max-width:                      600px; /* Maximum panel width */
     --panel-collapsed-width:                40px;  /* Collapsed panel width */
-    --minPanelWidth:                        591px; /* Legacy - consider deprecating */
+    --minPanelWidth:                        200px; /* Reduced to allow side resizing */
 
     /* Calculated available space */
     --available-height: calc(var(--screen-height) * 1px - var(--header-height) - var(--footer-height));
     --available-width: calc(var(--screen-width) * 1px - var(--operationsbar-width));
+
+    /* AIDEV-NOTE: Main layout defaults for static grid; JS will override as user resizes */
+    --main-layout-left-panel-width:   300px;
+    --main-layout-right-panel-width:  300px;
+    --main-layout-panel-min-width:    170px;
+    --main-layout-panel-max-width:    600px;
+    --main-layout-resizer-width:      4px;
   }
 
   /* AIDEV-NOTE: container queries for component-driven layouts */

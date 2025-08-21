@@ -8,19 +8,11 @@ import styles                 from './styles.module.css';
 type Props = { side: 'left' | 'right' };
 
 function ResizableHandle({ side }: Props) {
-  const {
-    setLeftWidth, setRightWidth, resetWidths, leftCollapsed,
-    rightCollapsed, expandLeft, expandRight, swapped
-  } = useMainLayout();
-  const ref = useRef<HTMLDivElement>(null);
+  const { getConfig, setSideWidth, expandSide } = useMainLayout();
+  const ref                                     = useRef<HTMLDivElement>(null);
   const [ariaMin, setAriaMin] = useState<number | undefined>(undefined);
   const [ariaMax, setAriaMax] = useState<number | undefined>(undefined);
   const [ariaNow, setAriaNow] = useState<number | undefined>(undefined);
-
-  // AIDEV-NOTE: Determine which panel this handle actually controls based on swap state
-  const effectiveSide = swapped
-    ? (side === 'left' ? 'right' : 'left')
-    : side;
 
   useEffect(() => {
     const el = ref.current;
@@ -35,12 +27,14 @@ function ResizableHandle({ side }: Props) {
     const getWidths = () => {
       const cs = getComputedStyle(document.documentElement);
       const raw = cs.getPropertyValue(
-        effectiveSide === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
+        side === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
       );
       const parsed = parseInt(raw);
-      const cur = parsed;
-      const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width'));
-      const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width'));
+      const cur = isNaN(parsed) ? 300 : parsed;
+      const minRaw = cs.getPropertyValue('--main-layout-panel-min-width');
+      const maxRaw = cs.getPropertyValue('--main-layout-panel-max-width');
+      const min = parseInt(minRaw) || 170;
+      const max = parseInt(maxRaw) || 600;
       // AIDEV-NOTE: keep local ARIA state aligned with CSS vars on read
       setAriaMin(min);
       setAriaMax(max);
@@ -51,8 +45,7 @@ function ResizableHandle({ side }: Props) {
     const setWidth = (px: number) => {
       const { min, max } = getWidths();
       const clamped = Math.max(min, Math.min(max, px));
-      if (effectiveSide === 'left') setLeftWidth(clamped);
-      else setRightWidth(clamped);
+      setSideWidth(side, clamped);
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -61,12 +54,18 @@ function ResizableHandle({ side }: Props) {
       startX = e.clientX;
       startWidth = cur;
       dragging = true;
+
+      try {
+        // AIDEV-NOTE: Capture pointer to ensure consistent move events during drag
+        el.setPointerCapture(e.pointerId);
+      } catch {}
       document.documentElement.style.cursor = 'col-resize';
       document.documentElement.style.userSelect = 'none';
       const supportsPointer = 'PointerEvent' in window;
       if (supportsPointer) {
         window.addEventListener('pointermove', onPointerMove);
         window.addEventListener('pointerup', onPointerUp as EventListener, { once: true });
+        window.addEventListener('pointercancel', onPointerUp as EventListener, { once: true });
       } else {
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp as EventListener, { once: true });
@@ -81,7 +80,7 @@ function ResizableHandle({ side }: Props) {
         frameRequested = true;
         requestAnimationFrame(() => {
           frameRequested = false;
-          const next = effectiveSide === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
+          const next = side === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
           setWidth(next);
         });
       }
@@ -94,15 +93,21 @@ function ResizableHandle({ side }: Props) {
         frameRequested = true;
         requestAnimationFrame(() => {
           frameRequested = false;
-          const next = effectiveSide === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
+          const next = side === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
           setWidth(next);
         });
       }
     };
 
     const onPointerUp = (e?: PointerEvent) => {
+      if (e) {
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {}
+      }
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('pointercancel', onPointerUp as EventListener);
       window.removeEventListener('keydown', onKeyCancel);
       dragging = false;
       document.documentElement.style.cursor = '';
@@ -133,7 +138,7 @@ function ResizableHandle({ side }: Props) {
     const onWidthsEvent = (evt: Event) => {
       const detail = (evt as CustomEvent<{ lw: number; rw: number }>).detail;
       if (!detail) return;
-      setAriaNow(effectiveSide === 'left' ? detail.lw : detail.rw);
+      setAriaNow(side === 'left' ? detail.lw : detail.rw);
       const { min, max } = getWidths();
       setAriaMin(min);
       setAriaMax(max);
@@ -144,11 +149,12 @@ function ResizableHandle({ side }: Props) {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('pointerup', onPointerUp as EventListener);
+      window.removeEventListener('pointercancel', onPointerUp as EventListener);
       window.removeEventListener('mouseup', onMouseUp as EventListener);
       window.removeEventListener('keydown', onKeyCancel);
       window.removeEventListener('main-layout-widths', onWidthsEvent as EventListener);
     };
-  }, [setLeftWidth, setRightWidth, effectiveSide, leftCollapsed, rightCollapsed, expandLeft, expandRight]);
+  }, [setSideWidth, side]);
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     const allowed = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -156,7 +162,7 @@ function ResizableHandle({ side }: Props) {
     const step = e.shiftKey ? 50 : 10;
     const cs = getComputedStyle(document.documentElement);
     const cur = parseInt(cs.getPropertyValue(
-      effectiveSide === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
+      side === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
     ));
     const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width'));
     const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width'));
@@ -165,26 +171,22 @@ function ResizableHandle({ side }: Props) {
     if (e.key === 'Home') next = min;
     else if (e.key === 'End') next = max;
     else {
-      const delta = (e.key === 'ArrowRight' ? (effectiveSide === 'left' ? +step : -step)
-                                            : (effectiveSide === 'left' ? -step : +step));
+      const delta = (e.key === 'ArrowRight' ? (side === 'left' ? +step : -step)
+                                            : (side === 'left' ? -step : +step));
       next = Math.max(min, Math.min(max, cur + delta));
     }
-    if (effectiveSide === 'left') setLeftWidth(next);
-    else setRightWidth(next);
+    setSideWidth(side, next);
     e.preventDefault();
   };
 
-  // AIDEV-NOTE: Determine which collapse state and expand function to use based on effective side
-  const isCollapsed = effectiveSide === 'left' ? leftCollapsed : rightCollapsed;
-  const expandFunction = effectiveSide === 'left' ? expandLeft : expandRight;
+  // AIDEV-NOTE: Handles own a fixed side; expand that side if currently collapsed
+  const isCollapsed = getConfig(side).collapsed;
 
   // AIDEV-NOTE: Reset only the specific panel this handle controls
   const resetThisPanel = () => {
-    if (effectiveSide === 'left') {
-      setLeftWidth(320); // Default left panel width
-    } else {
-      setRightWidth(360); // Default right panel width
-    }
+    // Reset to the initial width for this side
+    const cfg = getConfig(side);
+    setSideWidth(side, cfg.initialWidth);
   };
 
   return (
@@ -199,11 +201,11 @@ function ResizableHandle({ side }: Props) {
       aria-valuemin={ariaMin}
       aria-valuemax={ariaMax}
       aria-valuenow={ariaNow}
-      aria-label={effectiveSide === 'left' ? 'Resize left panel' : 'Resize right panel'}
+      aria-label={side === 'left' ? 'Resize left panel' : 'Resize right panel'}
       onDoubleClick={() => {
         // AIDEV-NOTE: Double-click to expand collapsed panels or reset only this panel to default if already expanded.
         if (isCollapsed) {
-          expandFunction();
+          expandSide(side);
         } else {
           resetThisPanel();
         }

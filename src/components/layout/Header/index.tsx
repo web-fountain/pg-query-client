@@ -5,17 +5,11 @@ import styles from './styles.module.css';
 
 
 function Header() {
-  const {
-    leftCollapsed, rightCollapsed, swapped,
-    toggleLeft, toggleRight, toggleSwap, resetWidths
-  } = useMainLayout();
-
-  // AIDEV-NOTE: When swapped, the visual left side shows the right panel and vice versa
-  // So we need to adjust button states and actions to match the visual layout
-  const visualLeftCollapsed = swapped ? rightCollapsed : leftCollapsed;
-  const visualRightCollapsed = swapped ? leftCollapsed : rightCollapsed;
-  const visualToggleLeft = swapped ? toggleRight : toggleLeft;
-  const visualToggleRight = swapped ? toggleLeft : toggleRight;
+  const { getConfig, toggleCollapseSide, swapSides, resetBothSides, isContentSwapped } = useMainLayout();
+  // AIDEV-NOTE: Direct side controls; no visual remap
+  const left    = getConfig('left');
+  const right   = getConfig('right');
+  const swapped = isContentSwapped();
 
   return (
     <header className={styles['header']}>
@@ -24,17 +18,17 @@ function Header() {
       <div className={styles['controls']}>
         <button
           className={styles['button']}
-          aria-pressed={visualLeftCollapsed}
-          onClick={visualToggleLeft}
-          title={visualLeftCollapsed ? 'Expand left panel' : 'Collapse left panel'}
+          aria-pressed={left.collapsed}
+          onClick={() => toggleCollapseSide('left')}
+          title={left.collapsed ? 'Expand left panel' : 'Collapse left panel'}
         >
-          {visualLeftCollapsed ? '⟨⟩' : '⟨|' }
+          {left.collapsed ? '⟨⟩' : '⟨|' }
         </button>
 
         <button
           className={styles['button']}
           aria-pressed={swapped}
-          onClick={toggleSwap}
+          onClick={swapSides}
           title={swapped ? 'Unswap panels' : 'Swap left/right panels'}
         >
           ⇄
@@ -42,18 +36,18 @@ function Header() {
 
         <button
           className={styles['button']}
-          aria-pressed={visualRightCollapsed}
-          onClick={visualToggleRight}
-          title={visualRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+          aria-pressed={right.collapsed}
+          onClick={() => toggleCollapseSide('right')}
+          title={right.collapsed ? 'Expand right panel' : 'Collapse right panel'}
         >
-          {visualRightCollapsed ? '⟨⟩' : '|⟩'}
+          {right.collapsed ? '⟨⟩' : '|⟩'}
         </button>
 
         <div className={styles['divider']} aria-hidden />
 
         <button
           className={styles['button']}
-          onClick={resetWidths}
+          onClick={resetBothSides}
           title="Reset panel widths"
         >
           ⤾

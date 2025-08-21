@@ -2,10 +2,7 @@
   /* AIDEV-NOTE: panels do not scroll; inner content containers should; grid area controls layout */
   /* AIDEV-NOTE: Width custom properties are controlled on :root by the provider; do NOT set here or updates won't propagate */
   --main-layout-gap:                   var(--space-4);
-  --main-layout-panel-min-width:       200px;
-  --main-layout-panel-max-width:       600px;
   --main-layout-panel-collapsed-width: 40px;
-  --main-layout-resizer-width:         8px;
 
   /* AIDEV-NOTE: Screen-aware layout calculations using screen dimension variables */
   --calculated-panel-max-width: min(
@@ -84,10 +81,7 @@
 }
 
 /* Swap: mirror grid areas so right shows on the left side */
-.panel-layout[data-swapped] {
-  grid-template-areas:
-    'right handle-right center handle-left left';
-}
+/* AIDEV-NOTE: Static grid; content swap is state-only and handled in React */
 
 /* Collapse: minimum panel column but keep handle visible */
 .panel-layout[data-left-collapsed] {
@@ -128,26 +122,10 @@
 }
 
 /* AIDEV-NOTE: Collapses under swapped layout must mirror to correct columns */
-.panel-layout[data-swapped][data-left-collapsed] {
-  grid-template-columns:
-    var(--main-layout-right-panel-width)
-    var(--main-layout-resizer-width)
-    minmax(0, 1fr)
-    var(--main-layout-resizer-width)
-    var(--main-layout-panel-collapsed-width);
-}
-.panel-layout[data-swapped][data-right-collapsed] {
-  grid-template-columns:
-    var(--main-layout-panel-collapsed-width)
-    var(--main-layout-resizer-width)
-    minmax(0, 1fr)
-    var(--main-layout-resizer-width)
-    var(--main-layout-left-panel-width);
-}
+/* AIDEV-NOTE: Swapped-specific track rules removed; grid does not mirror */
 
 /* AIDEV-NOTE: When both sides are collapsed, keep both handles visible for user interaction */
-.panel-layout[data-left-collapsed][data-right-collapsed],
-.panel-layout[data-swapped][data-left-collapsed][data-right-collapsed] {
+.panel-layout[data-left-collapsed][data-right-collapsed] {
   grid-template-columns:
     var(--main-layout-panel-collapsed-width)
     var(--main-layout-resizer-width)

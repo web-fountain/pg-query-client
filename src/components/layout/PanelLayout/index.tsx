@@ -11,18 +11,23 @@ import ResizableHandle    from '../ResizableHandle';
 
 
 function PanelLayout({ children }: { children: ReactNode }) {
-  const { leftCollapsed, rightCollapsed, swapped } = useMainLayout();
+  // AIDEV-NOTE: Static grid; content mapping flips via provider. Handles are side-fixed.
+  const { getConfig, isContentSwapped } = useMainLayout();
+  const left = getConfig('left');
+  const right = getConfig('right');
+  const contentSwapped = isContentSwapped();
 
   return (
     <div
       className={styles['panel-layout']}
-      data-left-collapsed={leftCollapsed || undefined}
-      data-right-collapsed={rightCollapsed || undefined}
-      data-swapped={swapped || undefined}
+      data-left-collapsed={left.collapsed || undefined}
+      data-right-collapsed={right.collapsed || undefined}
     >
       {/* Left block */}
       <aside className={styles['left']}>
-        <LeftPanel collapsed={leftCollapsed} />
+        {contentSwapped
+          ? <RightPanel collapsed={left.collapsed} side="left" />
+          : <LeftPanel  collapsed={left.collapsed}  side="left" />}
       </aside>
       <div className={styles['handle-left']}>
         <ResizableHandle side="left" />
@@ -38,7 +43,9 @@ function PanelLayout({ children }: { children: ReactNode }) {
         <ResizableHandle side="right" />
       </div>
       <aside className={styles['right']}>
-        <RightPanel collapsed={rightCollapsed} />
+        {contentSwapped
+          ? <LeftPanel  collapsed={right.collapsed} side="right" />
+          : <RightPanel collapsed={right.collapsed} side="right" />}
       </aside>
     </div>
   );
