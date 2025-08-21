@@ -1,27 +1,52 @@
 .panel-layout {
   /* AIDEV-NOTE: panels do not scroll; inner content containers should; grid area controls layout */
   /* AIDEV-NOTE: Width custom properties are controlled on :root by the provider; do NOT set here or updates won't propagate */
-  --main-layout-gap:                var(--space-4);
-  --main-layout-panel-min-width:    200px;
-  --main-layout-panel-max-width:    600px;
+  --main-layout-gap:                   var(--space-4);
+  --main-layout-panel-min-width:       200px;
+  --main-layout-panel-max-width:       600px;
   --main-layout-panel-collapsed-width: 40px;
-  --main-layout-resizer-width:      8px;
+  --main-layout-resizer-width:         8px;
+
+  /* AIDEV-NOTE: Screen-aware layout calculations using screen dimension variables */
+  --calculated-panel-max-width: min(
+    var(--main-layout-panel-max-width),
+    calc(var(--screen-width) * 1px * 0.35) /* max 35% of screen width */
+  );
+  --calculated-center-min-width: max(
+    var(--minPanelWidth),
+    calc(var(--screen-width) * 1px * 0.3) /* min 30% of screen width */
+  );
+
+  /* AIDEV-NOTE: Enable container queries for component-scoped responsiveness */
+  container-type: inline-size;
+  container-name: panel-layout;
 
   display: grid;
-  /* AIDEV-NOTE: Clamp panel columns in CSS to enforce min/max without JS; center stays flexible. */
+  /* AIDEV-NOTE: Enhanced clamp with screen-aware max widths */
   grid-template-columns:
-    clamp(var(--main-layout-panel-min-width), var(--main-layout-left-panel-width), var(--main-layout-panel-max-width))
+    clamp(
+      var(--main-layout-panel-min-width),
+      var(--main-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    )
     var(--main-layout-resizer-width)
-    minmax(0, 1fr)
+    minmax(var(--calculated-center-min-width), 1fr)
     var(--main-layout-resizer-width)
-    clamp(var(--main-layout-panel-min-width), var(--main-layout-right-panel-width), var(--main-layout-panel-max-width));
+    clamp(
+      var(--main-layout-panel-min-width),
+      var(--main-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    );
+
   grid-template-areas:
     'left handle-left center handle-right right';
 
+  /* AIDEV-NOTE: Fill the grid area allocated by MainLayout (1fr row) */
+  height: 100%;
+  min-height: 0;
+
   /* AIDEV-NOTE: Avoid using grid gap as clickable gutter; resizer columns are explicit elements */
   gap: 0;
-  height: 100%;
-  min-height: 0; /* allow grid item to shrink within 1fr row to avoid page overflow */
   padding: var(--main-layout-gap);
   background: var(--surface-1);
   color: var(--text-primary);
@@ -69,15 +94,23 @@
   grid-template-columns:
     var(--main-layout-panel-collapsed-width)
     var(--main-layout-resizer-width)
-    minmax(0, 1fr)
+    minmax(var(--calculated-center-min-width), 1fr)
     var(--main-layout-resizer-width)
-    var(--main-layout-right-panel-width);
+    clamp(
+      var(--main-layout-panel-min-width),
+      var(--main-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    );
 }
 .panel-layout[data-right-collapsed] {
   grid-template-columns:
-    var(--main-layout-left-panel-width)
+    clamp(
+      var(--main-layout-panel-min-width),
+      var(--main-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    )
     var(--main-layout-resizer-width)
-    minmax(0, 1fr)
+    minmax(var(--calculated-center-min-width), 1fr)
     var(--main-layout-resizer-width)
     var(--main-layout-panel-collapsed-width);
 }
@@ -121,4 +154,28 @@
     minmax(0, 1fr)
     var(--main-layout-resizer-width)
     var(--main-layout-panel-collapsed-width);
+}
+
+/* AIDEV-NOTE: Container queries for component-scoped responsive behavior */
+@container panel-layout (max-width: 768px) {
+  .panel-layout {
+    --calculated-panel-max-width: calc(100cqi - 100px);
+    --calculated-center-min-width: 200px;
+    /* Force mobile layout on small container */
+    grid-template-columns: 1fr !important;
+    grid-template-areas: 'center' !important;
+  }
+
+  .panel-layout .left,
+  .panel-layout .right,
+  .panel-layout .handle-left,
+  .panel-layout .handle-right {
+    display: none;
+  }
+}
+
+@container panel-layout (min-width: 1920px) {
+  .panel-layout {
+    --calculated-panel-max-width: min(800px, 40cqi);
+  }
 }

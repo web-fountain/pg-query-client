@@ -45,7 +45,7 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
     if (saved.lw) document.documentElement.style.setProperty('--main-layout-left-panel-width', `${saved.lw}px`);
     if (saved.rw) document.documentElement.style.setProperty('--main-layout-right-panel-width', `${saved.rw}px`);
 
-    // sensible defaults if unset
+    // Set defaults if unset
     const cs = getComputedStyle(document.documentElement);
     if (!cs.getPropertyValue('--main-layout-left-panel-width').trim())
       document.documentElement.style.setProperty('--main-layout-left-panel-width', '320px');
@@ -62,8 +62,8 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
   // persist to localStorage
   useEffect(() => {
     const cs = getComputedStyle(document.documentElement);
-    const lw = parseInt(cs.getPropertyValue('--main-layout-left-panel-width')) || 320;
-    const rw = parseInt(cs.getPropertyValue('--main-layout-right-panel-width')) || 360;
+    const lw = parseInt(cs.getPropertyValue('--main-layout-left-panel-width'));
+    const rw = parseInt(cs.getPropertyValue('--main-layout-right-panel-width'));
     localStorage.setItem('pg-query-client-mainLayout.panels', JSON.stringify({
       lc: leftCollapsed, rc: rightCollapsed, sw: swapped, lw, rw
     }));
@@ -72,8 +72,8 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
   // AIDEV-NOTE: Persist widths immediately on change to survive reloads between interactions
   const persist = (lwOverride?: number, rwOverride?: number) => {
     const cs = getComputedStyle(document.documentElement);
-    const lw = lwOverride ?? (parseInt(cs.getPropertyValue('--main-layout-left-panel-width')) || 320);
-    const rw = rwOverride ?? (parseInt(cs.getPropertyValue('--main-layout-right-panel-width')) || 360);
+    const lw = lwOverride ?? parseInt(cs.getPropertyValue('--main-layout-left-panel-width'));
+    const rw = rwOverride ?? parseInt(cs.getPropertyValue('--main-layout-right-panel-width'));
     localStorage.setItem('pg-query-client-mainLayout.panels', JSON.stringify({
       lc: leftCollapsed, rc: rightCollapsed, sw: swapped, lw, rw
     }));

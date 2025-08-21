@@ -9,13 +9,18 @@ type Props = { side: 'left' | 'right' };
 
 function ResizableHandle({ side }: Props) {
   const {
-    setLeftWidth, setRightWidth, resetWidths,
-    leftCollapsed, rightCollapsed, expandLeft, expandRight
+    setLeftWidth, setRightWidth, resetWidths, leftCollapsed,
+    rightCollapsed, expandLeft, expandRight, swapped
   } = useMainLayout();
   const ref = useRef<HTMLDivElement>(null);
   const [ariaMin, setAriaMin] = useState<number | undefined>(undefined);
   const [ariaMax, setAriaMax] = useState<number | undefined>(undefined);
   const [ariaNow, setAriaNow] = useState<number | undefined>(undefined);
+
+  // AIDEV-NOTE: Determine which panel this handle actually controls based on swap state
+  const effectiveSide = swapped
+    ? (side === 'left' ? 'right' : 'left')
+    : side;
 
   useEffect(() => {
     const el = ref.current;
@@ -30,13 +35,12 @@ function ResizableHandle({ side }: Props) {
     const getWidths = () => {
       const cs = getComputedStyle(document.documentElement);
       const raw = cs.getPropertyValue(
-        side === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
+        effectiveSide === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
       );
       const parsed = parseInt(raw);
-      const fallback = side === 'left' ? 320 : 360;
-      const cur = Number.isFinite(parsed) ? parsed : fallback;
-      const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width')) || 200;
-      const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width')) || 600;
+      const cur = parsed;
+      const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width'));
+      const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width'));
       // AIDEV-NOTE: keep local ARIA state aligned with CSS vars on read
       setAriaMin(min);
       setAriaMax(max);
@@ -47,7 +51,7 @@ function ResizableHandle({ side }: Props) {
     const setWidth = (px: number) => {
       const { min, max } = getWidths();
       const clamped = Math.max(min, Math.min(max, px));
-      if (side === 'left') setLeftWidth(clamped);
+      if (effectiveSide === 'left') setLeftWidth(clamped);
       else setRightWidth(clamped);
     };
 
@@ -77,7 +81,7 @@ function ResizableHandle({ side }: Props) {
         frameRequested = true;
         requestAnimationFrame(() => {
           frameRequested = false;
-          const next = side === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
+          const next = effectiveSide === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
           setWidth(next);
         });
       }
@@ -90,7 +94,7 @@ function ResizableHandle({ side }: Props) {
         frameRequested = true;
         requestAnimationFrame(() => {
           frameRequested = false;
-          const next = side === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
+          const next = effectiveSide === 'left' ? startWidth + pendingDelta : startWidth - pendingDelta;
           setWidth(next);
         });
       }
@@ -129,7 +133,7 @@ function ResizableHandle({ side }: Props) {
     const onWidthsEvent = (evt: Event) => {
       const detail = (evt as CustomEvent<{ lw: number; rw: number }>).detail;
       if (!detail) return;
-      setAriaNow(side === 'left' ? detail.lw : detail.rw);
+      setAriaNow(effectiveSide === 'left' ? detail.lw : detail.rw);
       const { min, max } = getWidths();
       setAriaMin(min);
       setAriaMax(max);
@@ -144,7 +148,7 @@ function ResizableHandle({ side }: Props) {
       window.removeEventListener('keydown', onKeyCancel);
       window.removeEventListener('main-layout-widths', onWidthsEvent as EventListener);
     };
-  }, [setLeftWidth, setRightWidth, side, leftCollapsed, rightCollapsed, expandLeft, expandRight]);
+  }, [setLeftWidth, setRightWidth, effectiveSide, leftCollapsed, rightCollapsed, expandLeft, expandRight]);
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     const allowed = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -152,22 +156,35 @@ function ResizableHandle({ side }: Props) {
     const step = e.shiftKey ? 50 : 10;
     const cs = getComputedStyle(document.documentElement);
     const cur = parseInt(cs.getPropertyValue(
-      side === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
+      effectiveSide === 'left' ? '--main-layout-left-panel-width' : '--main-layout-right-panel-width'
     ));
-    const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width')) || 200;
-    const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width')) || 600;
+    const min = parseInt(cs.getPropertyValue('--main-layout-panel-min-width'));
+    const max = parseInt(cs.getPropertyValue('--main-layout-panel-max-width'));
 
     let next = cur;
     if (e.key === 'Home') next = min;
     else if (e.key === 'End') next = max;
     else {
-      const delta = (e.key === 'ArrowRight' ? (side === 'left' ? +step : -step)
-                                            : (side === 'left' ? -step : +step));
+      const delta = (e.key === 'ArrowRight' ? (effectiveSide === 'left' ? +step : -step)
+                                            : (effectiveSide === 'left' ? -step : +step));
       next = Math.max(min, Math.min(max, cur + delta));
     }
-    if (side === 'left') setLeftWidth(next);
+    if (effectiveSide === 'left') setLeftWidth(next);
     else setRightWidth(next);
     e.preventDefault();
+  };
+
+  // AIDEV-NOTE: Determine which collapse state and expand function to use based on effective side
+  const isCollapsed = effectiveSide === 'left' ? leftCollapsed : rightCollapsed;
+  const expandFunction = effectiveSide === 'left' ? expandLeft : expandRight;
+
+  // AIDEV-NOTE: Reset only the specific panel this handle controls
+  const resetThisPanel = () => {
+    if (effectiveSide === 'left') {
+      setLeftWidth(320); // Default left panel width
+    } else {
+      setRightWidth(360); // Default right panel width
+    }
   };
 
   return (
@@ -182,15 +199,13 @@ function ResizableHandle({ side }: Props) {
       aria-valuemin={ariaMin}
       aria-valuemax={ariaMax}
       aria-valuenow={ariaNow}
-      aria-label={side === 'left' ? 'Resize left panel' : 'Resize right panel'}
+      aria-label={effectiveSide === 'left' ? 'Resize left panel' : 'Resize right panel'}
       onDoubleClick={() => {
-        // AIDEV-NOTE: Double-click to expand collapsed panels or reset to defaults if already expanded.
-        const isCollapsed = side === 'left' ? leftCollapsed : rightCollapsed;
+        // AIDEV-NOTE: Double-click to expand collapsed panels or reset only this panel to default if already expanded.
         if (isCollapsed) {
-          if (side === 'left') expandLeft();
-          else expandRight();
+          expandFunction();
         } else {
-          resetWidths();
+          resetThisPanel();
         }
       }}
     />

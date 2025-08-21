@@ -1,4 +1,40 @@
 @layer layouts {
+  /* Modern screen dimension calculation */
+  @property --screenWidth {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 100vw;
+  }
+  @property --screenHeight {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 100vh;
+  }
+
+  :root {
+    /* Screen dimensions as unitless numbers */
+    --screen-width: tan(atan2(var(--screenWidth), 1px));
+    --screen-height: tan(atan2(var(--screenHeight), 1px));
+
+    /* Layout constants - Fixed heights/widths */
+    --header-height:                        56px;  /* Header with padding */
+    --footer-height:                        48px;  /* Footer height */
+    --titlebar-height:                      36px;  /* OS titlebar (if applicable) */
+    --operationsbar-width:                  48px;  /* Side operations bar */
+    --service-path-operation-editor-height: 48px;  /* Service path editor */
+    --bottombar-height:                     20px;  /* Bottom status bar */
+
+    /* Panel constraints */
+    --panel-min-width:                      200px; /* Minimum panel width */
+    --panel-max-width:                      600px; /* Maximum panel width */
+    --panel-collapsed-width:                40px;  /* Collapsed panel width */
+    --minPanelWidth:                        591px; /* Legacy - consider deprecating */
+
+    /* Calculated available space */
+    --available-height: calc(var(--screen-height) * 1px - var(--header-height) - var(--footer-height));
+    --available-width: calc(var(--screen-width) * 1px - var(--operationsbar-width));
+  }
+
   /* AIDEV-NOTE: container queries for component-driven layouts */
   .container {
     container-type: inline-size;
