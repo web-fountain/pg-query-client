@@ -10,6 +10,13 @@ function Header() {
     toggleLeft, toggleRight, toggleSwap, resetWidths
   } = useMainLayout();
 
+  // AIDEV-NOTE: When swapped, the visual left side shows the right panel and vice versa
+  // So we need to adjust button states and actions to match the visual layout
+  const visualLeftCollapsed = swapped ? rightCollapsed : leftCollapsed;
+  const visualRightCollapsed = swapped ? leftCollapsed : rightCollapsed;
+  const visualToggleLeft = swapped ? toggleRight : toggleLeft;
+  const visualToggleRight = swapped ? toggleLeft : toggleRight;
+
   return (
     <header className={styles['header']}>
       <div className={styles['title']}>PG Query Client</div>
@@ -17,11 +24,11 @@ function Header() {
       <div className={styles['controls']}>
         <button
           className={styles['button']}
-          aria-pressed={leftCollapsed}
-          onClick={toggleLeft}
-          title={leftCollapsed ? 'Expand left panel' : 'Collapse left panel'}
+          aria-pressed={visualLeftCollapsed}
+          onClick={visualToggleLeft}
+          title={visualLeftCollapsed ? 'Expand left panel' : 'Collapse left panel'}
         >
-          {leftCollapsed ? '⟨⟩' : '⟨|' }
+          {visualLeftCollapsed ? '⟨⟩' : '⟨|' }
         </button>
 
         <button
@@ -35,11 +42,11 @@ function Header() {
 
         <button
           className={styles['button']}
-          aria-pressed={rightCollapsed}
-          onClick={toggleRight}
-          title={rightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+          aria-pressed={visualRightCollapsed}
+          onClick={visualToggleRight}
+          title={visualRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
         >
-          {rightCollapsed ? '⟨⟩' : '|⟩'}
+          {visualRightCollapsed ? '⟨⟩' : '|⟩'}
         </button>
 
         <div className={styles['divider']} aria-hidden />

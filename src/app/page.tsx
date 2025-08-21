@@ -1,13 +1,18 @@
-import styles from './styles.module.css';
+import SQLEditor    from '../components/SQLEditor';
+import QueryResults from '../components/QueryResults';
+import styles       from './styles.module.css';
 
 
 function Home() {
   return (
-    <div className={styles['page']}>
-      <main className={styles['main']}>
-        <h1>ok.<br />Let&apos;s get to work!</h1>
-      </main>
-    </div>
+    <>
+      <div className={styles['sql-editor-section']}>
+        <SQLEditor />
+      </div>
+      <div className={styles['query-results-section']}>
+        <QueryResults />
+      </div>
+    </>
   );
 }
 

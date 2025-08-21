@@ -21,7 +21,9 @@ function PanelLayout({ children }: { children: ReactNode }) {
       data-swapped={swapped || undefined}
     >
       {/* Left block */}
-      <aside className={styles['left']}><LeftPanel /></aside>
+      <aside className={styles['left']}>
+        <LeftPanel collapsed={leftCollapsed} />
+      </aside>
       <div className={styles['handle-left']}>
         <ResizableHandle side="left" />
       </div>
@@ -35,7 +37,9 @@ function PanelLayout({ children }: { children: ReactNode }) {
       <div className={styles['handle-right']}>
         <ResizableHandle side="right" />
       </div>
-      <aside className={styles['right']}><RightPanel /></aside>
+      <aside className={styles['right']}>
+        <RightPanel collapsed={rightCollapsed} />
+      </aside>
     </div>
   );
 }

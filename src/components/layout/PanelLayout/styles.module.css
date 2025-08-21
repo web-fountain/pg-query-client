@@ -1,25 +1,25 @@
 .panel-layout {
   /* AIDEV-NOTE: panels do not scroll; inner content containers should; grid area controls layout */
-
-  /* defaults; provider may override on :root */
-  --main-layout-left-panel-width:   320px;
-  --main-layout-right-panel-width:  360px;
+  /* AIDEV-NOTE: Width custom properties are controlled on :root by the provider; do NOT set here or updates won't propagate */
   --main-layout-gap:                var(--space-4);
   --main-layout-panel-min-width:    200px;
   --main-layout-panel-max-width:    600px;
+  --main-layout-panel-collapsed-width: 40px;
   --main-layout-resizer-width:      8px;
 
   display: grid;
+  /* AIDEV-NOTE: Clamp panel columns in CSS to enforce min/max without JS; center stays flexible. */
   grid-template-columns:
-    var(--main-layout-left-panel-width)
+    clamp(var(--main-layout-panel-min-width), var(--main-layout-left-panel-width), var(--main-layout-panel-max-width))
     var(--main-layout-resizer-width)
     minmax(0, 1fr)
     var(--main-layout-resizer-width)
-    var(--main-layout-right-panel-width);
+    clamp(var(--main-layout-panel-min-width), var(--main-layout-right-panel-width), var(--main-layout-panel-max-width));
   grid-template-areas:
     'left handle-left center handle-right right';
 
-  gap: var(--main-layout-gap);
+  /* AIDEV-NOTE: Avoid using grid gap as clickable gutter; resizer columns are explicit elements */
+  gap: 0;
   height: 100%;
   min-height: 0; /* allow grid item to shrink within 1fr row to avoid page overflow */
   padding: var(--main-layout-gap);
@@ -28,33 +28,34 @@
   transition: grid-template-columns var(--duration-250) var(--ease-standard);
 }
 
-.panel-layout .left {
-  grid-area: left;
-  min-width: var(--main-layout-panel-min-width);
-  overflow: hidden;
-  height: 100%;
-}
-.panel-layout .center {
-  grid-area: center;
+.panel-layout .left,
+.panel-layout .center,
+.panel-layout .right {
+  /* AIDEV-NOTE: Let track sizing enforce min/max; collapsed tracks can be 0 without overflow */
   min-width: 0;
   overflow: hidden;
   height: 100%;
 }
+.panel-layout .left {
+  grid-area: left;
+}
+.panel-layout .center {
+  grid-area: center;
+}
 .panel-layout .right {
   grid-area: right;
-  min-width: var(--main-layout-panel-min-width);
-  overflow: hidden;
-  height: 100%;
+}
+.panel-layout .handle-left,
+.panel-layout .handle-right {
+  inline-size: var(--main-layout-resizer-width);
+  block-size: 100%;
+  cursor: col-resize;
 }
 .panel-layout .handle-left {
   grid-area: handle-left;
-  inline-size: var(--main-layout-resizer-width);
-  cursor: col-resize;
 }
 .panel-layout .handle-right {
   grid-area: handle-right;
-  inline-size: var(--main-layout-resizer-width);
-  cursor: col-resize;
 }
 
 /* Swap: mirror grid areas so right shows on the left side */
@@ -63,11 +64,11 @@
     'right handle-right center handle-left left';
 }
 
-/* Collapse: zero a panel column and its adjacent handle */
+/* Collapse: minimum panel column but keep handle visible */
 .panel-layout[data-left-collapsed] {
   grid-template-columns:
-    0
-    0
+    var(--main-layout-panel-collapsed-width)
+    var(--main-layout-resizer-width)
     minmax(0, 1fr)
     var(--main-layout-resizer-width)
     var(--main-layout-right-panel-width);
@@ -77,16 +78,47 @@
     var(--main-layout-left-panel-width)
     var(--main-layout-resizer-width)
     minmax(0, 1fr)
-    0
-    0;
+    var(--main-layout-resizer-width)
+    var(--main-layout-panel-collapsed-width);
 }
+
+/* AIDEV-NOTE: Collapsed panels now show at 40px width with icon-only content */
 
 /* Optional visuals */
 .panel-layout .left,
 .panel-layout .right {
-  border:     var(--border-1) solid var(--border-color, #2a2a2a);
-  background: var(--surface-2, #13141a);
+  border:     var(--border-1) solid var(--border-color);
+  background: var(--surface-2);
 }
 .panel-layout .center {
-  background: var(--surface-1, #0f1016);
+  background: var(--surface-1);
+}
+
+/* AIDEV-NOTE: Collapses under swapped layout must mirror to correct columns */
+.panel-layout[data-swapped][data-left-collapsed] {
+  grid-template-columns:
+    var(--main-layout-right-panel-width)
+    var(--main-layout-resizer-width)
+    minmax(0, 1fr)
+    var(--main-layout-resizer-width)
+    var(--main-layout-panel-collapsed-width);
+}
+.panel-layout[data-swapped][data-right-collapsed] {
+  grid-template-columns:
+    var(--main-layout-panel-collapsed-width)
+    var(--main-layout-resizer-width)
+    minmax(0, 1fr)
+    var(--main-layout-resizer-width)
+    var(--main-layout-left-panel-width);
+}
+
+/* AIDEV-NOTE: When both sides are collapsed, keep both handles visible for user interaction */
+.panel-layout[data-left-collapsed][data-right-collapsed],
+.panel-layout[data-swapped][data-left-collapsed][data-right-collapsed] {
+  grid-template-columns:
+    var(--main-layout-panel-collapsed-width)
+    var(--main-layout-resizer-width)
+    minmax(0, 1fr)
+    var(--main-layout-resizer-width)
+    var(--main-layout-panel-collapsed-width);
 }

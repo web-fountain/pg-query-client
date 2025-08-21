@@ -22,6 +22,10 @@ type LayoutCtx = {
   setLeftWidth(px: number): void;
   setRightWidth(px: number): void;
   resetWidths(): void;
+
+  // expand collapsed panels
+  expandLeft(): void;
+  expandRight(): void;
 };
 
 const LayoutContext = createContext<LayoutCtx | null>(null);
@@ -33,7 +37,7 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
 
   // restore from localStorage
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('mainLayout.panels') || '{}');
+    const saved = JSON.parse(localStorage.getItem('pg-query-client-mainLayout.panels') || '{}');
     setLeftCollapsed(!!saved.lc);
     setRightCollapsed(!!saved.rc);
     setSwapped(!!saved.sw);
@@ -60,15 +64,31 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
     const cs = getComputedStyle(document.documentElement);
     const lw = parseInt(cs.getPropertyValue('--main-layout-left-panel-width')) || 320;
     const rw = parseInt(cs.getPropertyValue('--main-layout-right-panel-width')) || 360;
-    localStorage.setItem('mainLayout.panels', JSON.stringify({
+    localStorage.setItem('pg-query-client-mainLayout.panels', JSON.stringify({
       lc: leftCollapsed, rc: rightCollapsed, sw: swapped, lw, rw
     }));
   }, [leftCollapsed, rightCollapsed, swapped]);
 
-  const setLeftWidth  = (px: number) =>
+  // AIDEV-NOTE: Persist widths immediately on change to survive reloads between interactions
+  const persist = (lwOverride?: number, rwOverride?: number) => {
+    const cs = getComputedStyle(document.documentElement);
+    const lw = lwOverride ?? (parseInt(cs.getPropertyValue('--main-layout-left-panel-width')) || 320);
+    const rw = rwOverride ?? (parseInt(cs.getPropertyValue('--main-layout-right-panel-width')) || 360);
+    localStorage.setItem('pg-query-client-mainLayout.panels', JSON.stringify({
+      lc: leftCollapsed, rc: rightCollapsed, sw: swapped, lw, rw
+    }));
+    // AIDEV-NOTE: Broadcast widths so handles can update ARIA without DOM reads in render
+    window.dispatchEvent(new CustomEvent('main-layout-widths', { detail: { lw, rw } }));
+  };
+
+  const setLeftWidth  = (px: number) => {
     document.documentElement.style.setProperty('--main-layout-left-panel-width', `${px}px`);
-  const setRightWidth = (px: number) =>
+    persist(px, undefined);
+  };
+  const setRightWidth = (px: number) => {
     document.documentElement.style.setProperty('--main-layout-right-panel-width', `${px}px`);
+    persist(undefined, px);
+  };
 
   const resetWidths = () => {
     setLeftWidth(320);
@@ -79,12 +99,16 @@ function MainLayoutProvider({ children }: { children: ReactNode }) {
   const toggleRight = () => setRightCollapsed(v => !v);
   const toggleSwap  = () => setSwapped(v => !v);
 
+  const expandLeft  = () => setLeftCollapsed(false);
+  const expandRight = () => setRightCollapsed(false);
+
   return (
     <LayoutContext.Provider value={{
       leftCollapsed, rightCollapsed, swapped,
       setLeftCollapsed, setRightCollapsed, setSwapped,
       toggleLeft, toggleRight, toggleSwap,
-      setLeftWidth, setRightWidth, resetWidths
+      setLeftWidth, setRightWidth, resetWidths,
+      expandLeft, expandRight
     }}>
       {children}
     </LayoutContext.Provider>
