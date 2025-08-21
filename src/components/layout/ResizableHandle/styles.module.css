@@ -15,3 +15,11 @@
 .handle:focus {
   background: var(--text-secondary);
 }
+
+.collapsed-left {
+  cursor: e-resize;
+}
+
+.collapsed-right {
+  cursor: w-resize;
+}

@@ -227,7 +227,9 @@ function ResizableHandle({ side }: Props) {
   return (
     <div
       ref={ref}
-      className={styles['handle']}
+      className={`${styles['handle']} ${
+        isCollapsed ? (side === 'left' ? styles['collapsed-left'] : styles['collapsed-right']) : ''
+      }`}
       role="separator"
       aria-orientation="vertical"
       tabIndex={0}
