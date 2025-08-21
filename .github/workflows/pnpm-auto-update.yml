@@ -108,25 +108,28 @@ jobs:
         id: prbody
         shell: bash
         run: |
-          cat > pr_body.md <<EOF
-          Automated dependency update via \`pnpm update -L\`.
-
-          - Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          - Log artifact: pnpm-update-log-${{ steps.run.outputs.ts }}
-
-          **package.json diff summary**
-          ---
-          EOF
-          files=$(git diff --name-only | grep -E '(^|/)package\.json$' || true)
-          if [ -z "$files" ]; then
-            echo "No package.json changes." >> pr_body.md
-          else
-            for f in $files; do
-              echo "### $f" >> pr_body.md
-              git --no-pager diff --unified=0 --no-color -- "$f" >> pr_body.md || true
-              echo >> pr_body.md
-            done
-          fi
+          # AIDEV-NOTE: Build PR body content in output variable instead of temporary file
+          {
+            echo "body<<EOF"
+            echo "Automated dependency update via \`pnpm update -L\`."
+            echo ""
+            echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- Log artifact: pnpm-update-log-${{ steps.run.outputs.ts }}"
+            echo ""
+            echo "**package.json diff summary**"
+            echo "---"
+            files=$(git diff --name-only | grep -E '(^|/)package\.json$' || true)
+            if [ -z "$files" ]; then
+              echo "No package.json changes."
+            else
+              for f in $files; do
+                echo "### $f"
+                git --no-pager diff --unified=0 --no-color -- "$f" || true
+                echo
+              done
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       # Create PR on success + changes using the default GITHUB_TOKEN
       - name: Create PR (GITHUB_TOKEN)
@@ -136,7 +139,7 @@ jobs:
         with:
           commit-message: "chore(deps): update packages to latest"
           title: "chore(deps): update packages to latest"
-          body-path: pr_body.md
+          body: ${{ steps.prbody.outputs.body }}
           branch: chore/pnpm-update-${{ steps.run.outputs.ts }}
           delete-branch: true
           labels: |
