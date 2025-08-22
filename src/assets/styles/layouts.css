@@ -30,15 +30,19 @@
     --available-height: calc(var(--screen-height) * 1px - var(--titlebar-height) - var(--bottombar-height));
     --available-width: calc(var(--screen-width) * 1px);
 
-    /* AIDEV-NOTE: OpSpace layout defaults for static grid; JS will override as user resizes */
+    /* OpSpace layout defaults for static grid; JS will override as user resizes */
     --op-space-layout-left-panel-width:   300px;
     --op-space-layout-right-panel-width:  300px;
     --op-space-layout-panel-min-width:    170px;
     --op-space-layout-panel-max-width:    600px;
     --op-space-layout-resizer-width:      4px;
+
+    /* Snap thresholds for drag-to-open/close panels */
+    --op-space-layout-snap-open-threshold:  113px;
+    --op-space-layout-snap-close-threshold: 113px;
   }
 
-  /* AIDEV-NOTE: container queries for component-driven layouts */
+  /* container queries for component-driven layouts */
   .container {
     container-type: inline-size;
     container-name: content;

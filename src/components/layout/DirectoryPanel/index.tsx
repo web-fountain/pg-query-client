@@ -8,7 +8,11 @@ function DirectoryPanel({ collapsed, side = 'right' }: { collapsed: boolean; sid
   const { expandSide } = useOpSpaceLayout();
 
   return (
-    <div className={styles['directory-panel']} data-collapsed={collapsed || undefined}>
+    <div
+      className={styles['directory-panel']}
+      data-collapsed={collapsed || undefined}
+      data-panel-side={side}
+    >
       {collapsed ? (
         <div className={styles['collapsed-icon']} onClick={() => expandSide(side)}>
           {/* AIDEV-NOTE: Icon-only view when collapsed to 40px width */}

@@ -8,7 +8,11 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
   const { expandSide } = useOpSpaceLayout();
 
   return (
-    <div className={styles['chat-panel']} data-collapsed={collapsed || undefined}>
+    <div
+      className={styles['chat-panel']}
+      data-collapsed={collapsed || undefined}
+      data-panel-side={side}
+    >
       {collapsed ? (
         <div className={styles['collapsed-icon']} onClick={() => expandSide(side)}>
           {/* AIDEV-NOTE: Icon-only view when collapsed to 40px width */}
