@@ -42,6 +42,12 @@
     --icon-fill:   #888995;
     --icon-hover:  color-mix(in oklch, var(--foreground) 95%, transparent);
     --icon-active: var(--foreground);
-    --icon-blue:   #5189CB;
+    --icon-blue:   #5189cb;
+
+    /* icon sizing tokens (semantic mapping to scale) */
+    --icon-size:    1em;             /* default: scale with text */
+    --icon-size-sm: var(--space-3);  /* 12px */
+    --icon-size-md: var(--space-4);  /* 16px */
+    --icon-size-lg: var(--space-5);  /* 20px */
   }
 }

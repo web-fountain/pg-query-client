@@ -17,8 +17,8 @@
     --screen-height: tan(atan2(var(--screenHeight), 1px));
 
     /* Layout constants - Fixed heights/widths */
-    --titlebar-height:  36px;  /* Titlebar with padding */
-    --bottombar-height: 22px;  /* Bottombar status bar */
+    --titlebar-height:  36px;  /* Titlebar */
+    --bottombar-height: 22px;  /* Bottombar */
 
     /* Panel constraints */
     --panel-min-width:        200px; /* Minimum panel width */

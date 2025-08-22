@@ -2,10 +2,11 @@
 
 import { useOpSpaceLayout }  from '../OpSpaceProvider';
 import styles             from './styles.module.css';
+import Icon               from '../../Icons';
 
 
-function TitleBar() {
-  const { getConfig, toggleCollapseSide, swapSides, resetBothSides, isContentSwapped } = useOpSpaceLayout();
+function Titlebar() {
+  const { getConfig, toggleCollapseSide, swapSides, isContentSwapped } = useOpSpaceLayout();
   // AIDEV-NOTE: Direct side controls; no visual remap
   const left    = getConfig('left');
   const right   = getConfig('right');
@@ -19,38 +20,37 @@ function TitleBar() {
         <button
           className={styles['button']}
           aria-pressed={left.collapsed}
+          aria-label={left.collapsed ? 'Expand left panel' : 'Collapse left panel'}
           onClick={() => toggleCollapseSide('left')}
           title={left.collapsed ? 'Expand left panel' : 'Collapse left panel'}
         >
-          {left.collapsed ? '⟨⟩' : '⟨|' }
+          <Icon
+            name={left.collapsed ? 'panel-layout-left' : 'panel-layout-left-solid'}
+            aria-hidden="true"
+          />
         </button>
 
         <button
           className={styles['button']}
           aria-pressed={swapped}
+          aria-label={swapped ? 'Unswap panels' : 'Swap left/right panels'}
           onClick={swapSides}
           title={swapped ? 'Unswap panels' : 'Swap left/right panels'}
         >
-          ⇄
+          <Icon name="arrows-left-right" aria-hidden="true" />
         </button>
 
         <button
           className={styles['button']}
           aria-pressed={right.collapsed}
+          aria-label={right.collapsed ? 'Expand right panel' : 'Collapse right panel'}
           onClick={() => toggleCollapseSide('right')}
           title={right.collapsed ? 'Expand right panel' : 'Collapse right panel'}
         >
-          {right.collapsed ? '⟨⟩' : '|⟩'}
-        </button>
-
-        <div className={styles['divider']} aria-hidden />
-
-        <button
-          className={styles['button']}
-          onClick={resetBothSides}
-          title="Reset panel widths"
-        >
-          ⤾
+          <Icon
+            name={right.collapsed ? 'panel-layout-right' : 'panel-layout-right-solid'}
+            aria-hidden="true"
+          />
         </button>
       </div>
     </header>
@@ -58,4 +58,4 @@ function TitleBar() {
 }
 
 
-export default TitleBar;
+export default Titlebar;

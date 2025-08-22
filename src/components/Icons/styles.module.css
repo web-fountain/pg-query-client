@@ -1,0 +1,13 @@
+/* Icon sizing and alignment. Icons inherit color via currentColor.
+ * Use --icon-size tokens from semantics.css; defaults to 1em for text-scaling.
+ */
+
+.icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: inline-block;
+  vertical-align: text-bottom;
+  color: inherit;
+  pointer-events: none;
+  flex-shrink: 0;
+}
