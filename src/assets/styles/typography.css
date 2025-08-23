@@ -1,5 +1,22 @@
 /* desktop-only project: no mobile-first imports needed */
 :root {
+  /* font-size */
+  --text-xxs:   var(--space-2_5); /* 0.625rem (10px) */
+  --text-xs:    var(--space-3);   /* 0.75rem  (12px) */
+  --text-sm:    var(--space-3_5); /* 0.875rem (14px) */
+  --text-base:  var(--space-4);   /* 1rem     (16px) */
+  --text-lg:    var(--space-4_5); /* 1.125rem (18px) */
+  --text-xl:    var(--space-5);   /* 1.25rem  (20px) */
+  --text-2xl:   var(--space-6);   /* 1.5rem   (24px) */
+  --text-3xl:   1.875rem;         /* 1.875rem (30px) */
+  --text-3xl_5: var(--space-8);   /* 2rem     (32px) */
+  --text-4xl:   var(--space-9);   /* 2.25rem  (36px) */
+  --text-5xl:   var(--space-12);  /* 3rem     (48px) */
+  --text-6xl:   var(--space-15);  /* 3.75rem  (60px) */
+  --text-7xl:   4.5rem;           /* 4.5rem   (72px) */
+  --text-8xl:   var(--space-24);  /* 6rem     (96px) */
+  --text-9xl:   var(--space-32);  /* 8rem     (128px) */
+
   /* font-weight */
   --thin:         100;
   --extra-light:  200;
@@ -29,6 +46,21 @@
   --tracking-wider:   0.025em ;  /* 0.4px at 16px */
   --tracking-widest:  0.05em  ;  /* 0.8px at 16px */
   --tracking-maximum: 0.1em   ;  /* 1.6px at 16px */
+
+  /* AIDEV-NOTE: Default line-height ratios (unitless) for each text size */
+  --text-xs--line-height:   calc(1 / 0.75);       /* 1.333… → 1rem on 0.75rem */
+  --text-sm--line-height:   calc(1.25 / 0.875);   /* 1.428… → 1.25rem on 0.875rem */
+  --text-base--line-height: calc(1.5 / 1);        /* 1.5 → 1.5rem on 1rem */
+  --text-lg--line-height:   calc(1.75 / 1.125);   /* 1.555… → 1.75rem on 1.125rem */
+  --text-xl--line-height:   calc(1.75 / 1.25);    /* 1.4 → 1.75rem on 1.25rem */
+  --text-2xl--line-height:  calc(2 / 1.5);        /* 1.333… → 2rem on 1.5rem */
+  --text-3xl--line-height:  calc(2.25 / 1.875);   /* 1.2 → 2.25rem on 1.875rem */
+  --text-4xl--line-height:  calc(2.5 / 2.25);     /* 1.111… → 2.5rem on 2.25rem */
+  --text-5xl--line-height:  1;                    /* 3rem */
+  --text-6xl--line-height:  1;                    /* 3.75rem */
+  --text-7xl--line-height:  1;                    /* 4.5rem */
+  --text-8xl--line-height:  1;                    /* 6rem */
+  --text-9xl--line-height:  1;                    /* 8rem */
 }
 
 @layer typography {
