@@ -8,12 +8,14 @@
   --surface-1: #1d1e29;
   --surface-2: #2a2b36;
   --surface-3: #32333e;
+  --surface-4: #14151d;
 
   /* primitives: foreground */
   --foreground: #dbdee1;
 
   /* primitives: constants */
   --white: #ffffff;
+  --neutral-600: #434343;
 
   /* aliases */
   --text-primary: var(--foreground);
@@ -23,6 +25,11 @@
   /* elevation colors consumed by scale tokens */
   --shadow-color-1: color-mix(in oklch, var(--foreground) 12%, transparent);
   --shadow-color-2: color-mix(in oklch, var(--foreground) 18%, transparent);
+
+  /* scrollbar tokens consumed by CodeMirror */
+  --scrollbar-size:                 var(--px-12);
+  --scrollbar-thumb-color-visible:  color-mix(in oklch, var(--neutral-600) 100%, transparent);
+  --scrollbar-track-color-visible:  color-mix(in oklch, var(--surface-sql-editor) 100%, transparent);
 }
 
 /* Light theme if the user prefers it */
@@ -35,6 +42,7 @@
     --surface-0: var(--surface-1);
     --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--surface-1));
     --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--surface-1));
+    --surface-4: var(--surface-2);
 
     /* elevation colors for light */
     --shadow-color-1: color-mix(in oklch, var(--foreground) 20%, transparent);
@@ -51,6 +59,7 @@
   --surface-0: var(--surface-1);
   --surface-2: color-mix(in oklch, var(--foreground) 6%, var(--surface-1));
   --surface-3: color-mix(in oklch, var(--foreground) 12%, var(--surface-1));
+  --surface-4: var(--surface-2);
 
   /* elevation colors for light */
   --shadow-color-1: color-mix(in oklch, var(--foreground) 20%, transparent);
@@ -63,6 +72,7 @@
   --surface-1: #1d1e29;
   --surface-2: #2a2b36;
   --surface-3: #32333e;
+  --surface-4: #14151d;
   --foreground: #dbdee1;
 
   /* elevation colors for dark */
