@@ -22,13 +22,14 @@
     --border-tree-item: var(--border-tertiary);
 
     /* surfaces: helpers */
-    --surface-canvas:   var(--surface-0);
-    --surface-sidebar:  var(--surface-1);
-    --surface-modal:    var(--surface-1);
-    --surface-hover:    var(--surface-2);
-    --surface-input:    var(--surface-3);
-    --surface-control:  var(--surface-1);
-    --surface-disabled: color-mix(in oklch, var(--surface-1) 92%, black);
+    --surface-canvas:     var(--surface-0);
+    --surface-sidebar:    var(--surface-1);
+    --surface-modal:      var(--surface-1);
+    --surface-hover:      var(--surface-2);
+    --surface-input:      var(--surface-3);
+    --surface-control:    var(--surface-1);
+    --surface-disabled:   color-mix(in oklch, var(--surface-1) 92%, black);
+    --surface-sql-editor: var(--surface-4);
 
     /* component roles: buttons */
     --button-primary:        var(--color-primary);
