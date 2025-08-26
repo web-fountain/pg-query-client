@@ -1,18 +1,12 @@
-import SQLEditor    from '../components/SQLEditor';
-import QueryResults from '../components/QueryResults';
-import styles       from './styles.module.css';
+import QueryWorkspace         from '@Components/QueryWorkspace';
+import { SQLRunnerProvider }  from '@Components/providers/SQLRunnerProvider';
 
 
 function Home() {
   return (
-    <>
-      <div className={styles['sql-editor-section']}>
-        <SQLEditor />
-      </div>
-      <div className={styles['query-results-section']}>
-        <QueryResults />
-      </div>
-    </>
+    <SQLRunnerProvider>
+      <QueryWorkspace />
+    </SQLRunnerProvider>
   );
 }
 

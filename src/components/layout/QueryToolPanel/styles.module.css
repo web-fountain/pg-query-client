@@ -1,5 +1,5 @@
 .query-tool-panel {
   /* AIDEV-NOTE: panels do not own height; grid area controls layout */
-  padding-block:  var(--space-6);
+  /* padding-block:  var(--space-6); */
   padding-inline: var(--px-24);
 }

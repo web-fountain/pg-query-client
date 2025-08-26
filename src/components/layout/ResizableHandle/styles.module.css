@@ -13,7 +13,7 @@
 }
 .handle:hover,
 .handle:focus {
-  background: var(--text-secondary);
+  background: var(--resizer-hover);
 }
 
 .collapsed-left {

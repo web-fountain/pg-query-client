@@ -44,7 +44,6 @@
 
   /* AIDEV-NOTE: Avoid using grid gap as clickable gutter; resizer columns are explicit elements */
   gap: 0;
-  padding: var(--op-space-layout-gap);
   background: var(--surface-1);
   color: var(--text-primary);
   transition: grid-template-columns var(--duration-250) var(--ease-standard);

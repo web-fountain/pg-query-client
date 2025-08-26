@@ -1,7 +1,7 @@
 'use client';
 
-import { useOpSpaceLayout }  from '../OpSpaceProvider';
-import styles             from './styles.module.css';
+import { useOpSpaceLayout } from '../OpSpaceProvider';
+import styles               from './styles.module.css';
 
 
 function DirectoryPanel({ collapsed, side = 'right' }: { collapsed: boolean; side?: 'left' | 'right' }) {

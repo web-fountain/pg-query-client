@@ -3,7 +3,8 @@
 import type { ReactNode } from 'react';
 
 import OpSpaceLayoutProvider  from '../OpSpaceProvider';
-import TitleBar               from '../Titlebar';
+import { SQLValidatorProvider } from '@Components/providers/SQLValidatorProvider';
+import Titlebar               from '../Titlebar';
 import PanelLayout            from '../PanelLayout';
 
 import styles                 from './styles.module.css';
@@ -12,10 +13,12 @@ import styles                 from './styles.module.css';
 function OpSpaceLayout({ children }: { children: ReactNode }) {
   return (
     <OpSpaceLayoutProvider>
-      <div className={styles['op-space-layout']}>
-        <TitleBar />
-        <PanelLayout>{children}</PanelLayout>
-      </div>
+      <SQLValidatorProvider>
+        <div className={styles['op-space-layout']}>
+          <Titlebar />
+          <PanelLayout>{children}</PanelLayout>
+        </div>
+      </SQLValidatorProvider>
     </OpSpaceLayoutProvider>
   );
 }

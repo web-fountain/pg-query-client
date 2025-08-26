@@ -1,22 +1,22 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactNode }   from 'react';
 
-import { useOpSpaceLayout }  from '../OpSpaceProvider';
-import ChatPanel          from '../ChatPanel';
-import QueryToolPanel     from '../QueryToolPanel';
-import DirectoryPanel     from '../DirectoryPanel';
-import ResizableHandle    from '../ResizableHandle';
+import { useOpSpaceLayout } from '../OpSpaceProvider';
+import ChatPanel            from '../ChatPanel';
+import QueryToolPanel       from '../QueryToolPanel';
+import DirectoryPanel       from '../DirectoryPanel';
+import ResizableHandle      from '../ResizableHandle';
 
-import styles             from './styles.module.css';
+import styles               from './styles.module.css';
 
 
 function PanelLayout({ children }: { children: ReactNode }) {
   // AIDEV-NOTE: Static grid; content mapping flips via provider. Handles are side-fixed.
   const { getConfig, isContentSwapped } = useOpSpaceLayout();
-  const left = getConfig('left');
-  const right = getConfig('right');
-  const contentSwapped = isContentSwapped();
+  const left                            = getConfig('left');
+  const right                           = getConfig('right');
+  const contentSwapped                  = isContentSwapped();
 
   return (
     <div
@@ -28,7 +28,7 @@ function PanelLayout({ children }: { children: ReactNode }) {
       <aside className={styles['left-side']}>
         {contentSwapped
           ? <DirectoryPanel collapsed={left.collapsed} side="left" />
-          : <ChatPanel  collapsed={left.collapsed}  side="left" />}
+          : <ChatPanel collapsed={left.collapsed}  side="left" />}
       </aside>
       <div className={styles['handle-left']}>
         <ResizableHandle side="left" />
@@ -45,7 +45,7 @@ function PanelLayout({ children }: { children: ReactNode }) {
       </div>
       <aside className={styles['right-side']}>
         {contentSwapped
-          ? <ChatPanel  collapsed={right.collapsed} side="right" />
+          ? <ChatPanel collapsed={right.collapsed} side="right" />
           : <DirectoryPanel collapsed={right.collapsed} side="right" />}
       </aside>
     </div>
