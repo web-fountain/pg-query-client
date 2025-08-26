@@ -39,7 +39,7 @@
   color: var(--tabs-foreground);
   font-size: var(--text-xs);
   border: none;
-  cursor: default;
+  cursor: pointer;
   background: transparent;
   flex: 0 0 auto; /* prevent shrinking; allow horizontal scroll */
 }
