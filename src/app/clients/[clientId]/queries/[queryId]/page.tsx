@@ -1,5 +1,7 @@
 import type { ClientTabsState, QueryWorkspaceProps } from '@Types/workspace';
 import { getClientTabsState, openQuery as saOpen, activateQuery as saActivate } from '@/app/_actions/queries';
+import { notFound } from 'next/navigation';
+import { isUuidV4 } from '@Utils/uuid';
 
 import { redirect }   from 'next/navigation';
 import QueryWorkspace from '@Components/QueryWorkspace';
@@ -10,6 +12,9 @@ const DEFAULT_QUERY_ID  = '4793e07f-7055-47d3-9a43-5255b6469a1d';
 
 async function Page({ params }: { params: Promise<{ clientId: string; queryId: string }> }) {
   const { clientId, queryId } = await params;
+
+  // AIDEV-NOTE: Guard against devtools source map and other invalid path segments creating tabs
+  if (!isUuidV4(clientId) || !isUuidV4(queryId)) return notFound();
 
   // Ensure the requested query is recorded as open/active before rendering
   try {

@@ -2,17 +2,31 @@
 
 import { useRef }  from 'react';
 
-import { useOpSpaceLayout }                 from '../OpSpaceProvider';
+import { useReduxDispatch }                 from '@Redux/storeHooks';
+import {
+  collapseSide as collapseSideAction,
+  expandSide as expandSideAction,
+  setSideWidth as setSideWidthAction,
+  selectPanelLeft,
+  selectPanelRight
+}                                           from '@Redux/records/layout';
+import { useReduxSelector }                 from '@Redux/storeHooks';
 import { useDragResize, useSeparatorAria }  from './hooks';
 import { clamp }                            from './utils/math';
 import styles                               from './styles.module.css';
 
 
 function ResizableHandle({ side }: { side: 'left' | 'right' }) {
-  const { getConfig, setSideWidth, expandSide, collapseSide }   = useOpSpaceLayout();
+  const dispatch = useReduxDispatch();
+  const leftCfg  = useReduxSelector(selectPanelLeft);
+  const rightCfg = useReduxSelector(selectPanelRight);
   const { ariaMin, ariaMax, ariaNow, setAriaNow, controlledId } = useSeparatorAria(side);
   const actualDragOccurred  = useRef(false);
   const ref                 = useRef<HTMLDivElement>(null);
+
+  const setSideWidth = (s: 'left' | 'right', px: number) => dispatch(setSideWidthAction({ side: s, px }));
+  const expandSide   = (s: 'left' | 'right') => dispatch(expandSideAction(s));
+  const collapseSide = (s: 'left' | 'right') => dispatch(collapseSideAction(s));
 
   useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setAriaNow, controlledId });
 
@@ -43,11 +57,11 @@ function ResizableHandle({ side }: { side: 'left' | 'right' }) {
     evt.preventDefault();
   };
 
-  const isCollapsed = getConfig(side).collapsed;
+  const isCollapsed = (side === 'left' ? leftCfg : rightCfg).collapsed;
 
   // Reset to the initial width for this side
   const resetThisPanel = () => {
-    const cfg = getConfig(side);
+    const cfg = side === 'left' ? leftCfg : rightCfg;
     setSideWidth(side, cfg.initialWidth);
   };
 

@@ -199,5 +199,11 @@ const useOpSpaceLayout = () => {
   return ctx;
 };
 
-export { useOpSpaceLayout };
+// AIDEV-NOTE: Optional hook for consumers that might render outside the provider.
+// Returns null when no provider is present instead of throwing.
+const useOptionalOpSpaceLayout = () => {
+  return useContext(LayoutContext);
+};
+
+export { useOpSpaceLayout, useOptionalOpSpaceLayout };
 export default OpSpaceLayoutProvider;

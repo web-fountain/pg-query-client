@@ -1,4 +1,5 @@
 import type { UUID, ClientTabsState, QueryTab } from '@/types/workspace';
+import { isUuidV4 } from '@/utils/uuid';
 
 type Store = Map<UUID, ClientTabsState>;
 
@@ -24,6 +25,7 @@ export function createQuery(clientId: UUID, name?: string, initialSql?: string):
 }
 
 export function openQuery(clientId: UUID, queryId: UUID, name?: string): void {
+  if (!isUuidV4(clientId) || !isUuidV4(queryId)) return;
   const now = getNow();
   const state = store.get(clientId) || { clientId, openTabs: [], lastActiveId: queryId };
   if (!state.openTabs.find(t => t.id === queryId)) {
@@ -34,6 +36,7 @@ export function openQuery(clientId: UUID, queryId: UUID, name?: string): void {
 }
 
 export function closeQuery(clientId: UUID, queryId: UUID): void {
+  if (!isUuidV4(clientId) || !isUuidV4(queryId)) return;
   const state = store.get(clientId);
   if (!state) return;
   state.openTabs = state.openTabs.filter(t => t.id !== queryId);
@@ -44,12 +47,14 @@ export function closeQuery(clientId: UUID, queryId: UUID): void {
 }
 
 export function activateQuery(clientId: UUID, queryId: UUID): void {
+  if (!isUuidV4(clientId) || !isUuidV4(queryId)) return;
   const state = store.get(clientId) || { clientId, openTabs: [], lastActiveId: queryId };
   state.lastActiveId = queryId;
   store.set(clientId, state);
 }
 
 export function saveQuery(clientId: UUID, queryId: UUID, name: string, sql: string): void {
+  if (!isUuidV4(clientId) || !isUuidV4(queryId)) return;
   const state = store.get(clientId);
   if (!state) return;
   const tab = state.openTabs.find(t => t.id === queryId);

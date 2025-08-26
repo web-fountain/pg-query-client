@@ -3,10 +3,28 @@
 import type { SQLEditorHandle }     from '@Components/SQLEditor';
 import type { QueryWorkspaceProps } from '@Types/workspace';
 
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter }                from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 
-import { activateQuery, closeQuery, saveQueryContent } from '@/app/_actions/queries';
+import { rehydrateRoute }           from '@Redux/records/route';
+import {
+  rehydrateFromServer,
+  mergeFromLocal,
+  addTab            as addTabAction,
+  closeTab          as closeTabAction,
+  activateTab       as activateTabAction,
+  focusTabIndex     as focusTabIndexAction,
+  setNameDraft      as setNameDraftAction,
+  setSqlDraft       as setSqlDraftAction,
+  commitSaveActive  as commitSaveActiveAction,
+  selectTabs,
+  selectActiveTabId,
+  selectFocusedTabIndex,
+  selectDrafts
+}                                    from '@Redux/records/tabs';
+
+import { createNewQuery, openQuery, activateQuery, closeQuery, saveQueryContent } from '@/app/_actions/queries';
 // AIDEV-NOTE: SQLEditor is large; if initial TTI needs improvement, consider next/dynamic.
 import SQLEditor from '@Components/SQLEditor';
 import QueryResults from '@Components/QueryResults';
@@ -16,15 +34,15 @@ import SplitPane from './SplitPane';
 import { useSqlRunner } from '@Components/providers/SQLRunnerProvider';
 
 import { STORAGE_KEY_SPLIT } from './constants';
-import { useSplitRatio } from './hooks/useSplitRatio';
+import { selectSplitRatio, setSplitRatio } from '@Redux/records/layout';
 import { useEvent } from './hooks/useEvent';
-import { useTabs } from './hooks/useTabs';
 import { useDebouncedCallback } from '@Hooks/useDebounce';
 
 import styles from './styles.module.css';
 
 
 function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspaceProps) {
+  const dispatch = useReduxDispatch();
   // AIDEV-NOTE: Editor handle for external run trigger from toolbar and shortcuts.
   const router                    = useRouter();
   const { isRunning, setSqlText } = useSqlRunner();
@@ -33,32 +51,53 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
   const topPanelRef               = useRef<HTMLDivElement | null>(null);
   const bottomPanelRef            = useRef<HTMLDivElement | null>(null);
 
-  // AIDEV-NOTE: Split ratio via hook (includes persistence and clamping)
-  const { ratio: topRatio, setRatio: setTopRatio } = useSplitRatio();
+  // AIDEV-NOTE: Split ratio via Redux (commit-only)
+  const topRatio = useReduxSelector(selectSplitRatio);
 
-  // AIDEV-NOTE: Tabs state via hook (persistence, name draft, roving tabindex)
-  const {
-    tabs,
-    setTabs,
-    tabButtonRefs,
-    activeTabId,
-    setActiveTabId,
-    focusedTabIndex,
-    setFocusedTabIndex,
-    activeIndex,
-    focusTabByIndex,
-    activateTabByIndex,
-    addTab: addTabHook,
-    nameDraft,
-    setNameDraft
-  } = useTabs({ clientId, initialTabs, initialActiveId });
-  const [sqlDraftByTab, setSqlDraftByTab] = useState<Record<string, string>>({});
+  // AIDEV-NOTE: Tabs via Redux records (drafts in store)
+  const tabs            = useReduxSelector(selectTabs);
+  const activeTabId     = useReduxSelector(selectActiveTabId);
+  const focusedTabIndex = useReduxSelector(selectFocusedTabIndex);
+  const drafts          = useReduxSelector(selectDrafts);
+  const tabButtonRefs   = useRef<Array<HTMLButtonElement | null>>([]);
+  const nameDraft       = (activeTabId && drafts[activeTabId]?.nameDraft) ?? (tabs.find((t: { id: string; name: string }) => t.id === activeTabId)?.name ?? 'Untitled');
+
+  // AIDEV-NOTE: Precompute saveDisabled and editor onChange to keep hooks order stable
+  const saveDisabled = useMemo(() => {
+    const active = (tabs as Array<{ id: string; name?: string; sql?: string }>).find((t) => t.id === activeTabId);
+    const savedName = active?.name ?? '';
+    const savedSql = active?.sql ?? '';
+    const draftSql = activeTabId ? (drafts[activeTabId]?.sqlDraft ?? savedSql) : savedSql;
+    return (nameDraft === savedName) && (draftSql === savedSql);
+  }, [tabs, activeTabId, nameDraft, drafts]);
+
+  const editorOnChange = useEvent(
+    useDebouncedCallback((text: string) => {
+      if (activeTabId) dispatch(setSqlDraftAction({ id: activeTabId, sql: text }));
+    }, 150)
+  );
 
   const runFromToolbar = useCallback(() => {
     editorRef.current?.runCurrentQuery();
   }, []);
 
   // AIDEV-NOTE: Keyboard shortcuts for run/save.
+  useEffect(() => {
+    // Rehydrate route and server tabs into Redux on first mount
+    dispatch(rehydrateRoute({ clientId, queryId: initialActiveId }));
+    if (Array.isArray(initialTabs) && initialTabs.length > 0 && initialActiveId) {
+      dispatch(rehydrateFromServer({ tabs: initialTabs, activeTabId: initialActiveId }));
+    }
+    // Client-only merge from localStorage (names/active tab)
+    try {
+      const raw = window.localStorage.getItem('pg-query-client/query-workspace/tabs' + `/${clientId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        dispatch(mergeFromLocal({ tabs: Array.isArray(parsed?.tabs) ? parsed.tabs : undefined, activeTabId: parsed?.activeTabId }));
+      }
+    } catch {}
+  }, [dispatch, clientId, initialActiveId, initialTabs]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
@@ -70,13 +109,13 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
         e.preventDefault();
         // AIDEV-NOTE: Save stub for now — will integrate with persistence later.
         // eslint-disable-next-line no-console
-        const active = tabs.find(t => t.id === activeTabId);
+        const active = (tabs as Array<{ id: string; name?: string }>).find((t) => t.id === activeTabId);
         console.log('AIDEV-NOTE: saveQuery is not implemented yet. name=', active?.name);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [tabs, activeTabId]);
+  }, [tabs as Array<{ id: string; name?: string }>, activeTabId]);
 
   // AIDEV-NOTE: Helpers for tabs behavior and editor sync.
   const getCurrentEditorText = useCallback(() => {
@@ -86,93 +125,104 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
   // AIDEV-NOTE: Snapshot current editor text into draft store (not committing to saved tabs)
   const snapshotCurrentEditorDraft = useCallback(() => {
     const text = getCurrentEditorText();
-    setSqlDraftByTab(prev => ({ ...prev, [activeTabId]: text }));
-  }, [activeTabId, getCurrentEditorText]);
+    if (activeTabId) dispatch(setSqlDraftAction({ id: activeTabId, sql: text }));
+  }, [activeTabId, getCurrentEditorText, dispatch]);
 
   useEffect(() => {
     // AIDEV-NOTE: When active tab changes, load draft-or-saved SQL into provider for editor hydration
-    const active = tabs[activeIndex];
-    if (active) {
-      const draft = sqlDraftByTab[active.id];
-      setSqlText(draft != null ? draft : active.sql || '');
+    const idx = Math.max(0, tabs.findIndex((t: { id: string }) => t.id === activeTabId));
+    const active = tabs[idx];
+    if (active && activeTabId) {
+      const draftSql = drafts[activeTabId]?.sqlDraft;
+      setSqlText(draftSql != null ? draftSql : active.sql || '');
     }
-  }, [activeIndex, tabs, sqlDraftByTab, setSqlText]);
+  }, [activeTabId, tabs, drafts, setSqlText]);
 
   const handleAddTab = useCallback(async () => {
     snapshotCurrentEditorDraft();
-    const newId = await addTabHook();
+    const id: string = crypto.randomUUID();
+    const now = Date.now();
+    dispatch(addTabAction({ id, name: 'Untitled', createdAt: now, updatedAt: now }));
     setSqlText('');
-    // Ensure local state reflects new active tab immediately
-    setActiveTabId(newId);
-    setFocusedTabIndex(tabs.length);
-    router.replace(`/clients/${clientId}/queries/${newId}`);
-  }, [snapshotCurrentEditorDraft, addTabHook, setSqlText, router, clientId]);
+    router.replace(`/clients/${clientId}/queries/${id}`);
+    // Fire-and-forget server calls
+    Promise.resolve().then(async () => {
+      try {
+        await createNewQuery({ clientId, name: 'Untitled', initialSql: '', queryId: id });
+        await openQuery({ clientId, queryId: id, name: 'Untitled' });
+        await activateQuery({ clientId, queryId: id });
+      } catch {}
+    });
+  }, [snapshotCurrentEditorDraft, dispatch, setSqlText, router, clientId]);
 
   const renameActiveTab = useCallback((nextName: string) => {
-    setNameDraft(nextName);
-  }, [setNameDraft]);
+    if (activeTabId) dispatch(setNameDraftAction({ id: activeTabId, name: nextName }));
+  }, [dispatch, activeTabId]);
 
   // AIDEV-NOTE: Do not push nameDraft to saved tabs until explicit Save is clicked
   const handleTabClick = useCallback((index: number, id: string) => {
     // Manual activation: clicking activates; save current tab first.
     snapshotCurrentEditorDraft();
-    setActiveTabId(id);
-    setFocusedTabIndex(index);
-    // Navigate immediately for snappy UX
-    router.replace(`/clients/${clientId}/queries/${id}`);
-    // Fire-and-forget server update; do not block UI or navigation
-    Promise.resolve().then(() => activateQuery({ clientId, queryId: id }).catch(() => {}));
-  }, [snapshotCurrentEditorDraft, clientId, router]);
+    dispatch(activateTabAction({ id }));
+    dispatch(focusTabIndexAction({ index }));
+    // Defer navigation by one frame to allow Redux state to render before route remount
+    requestAnimationFrame(() => {
+      router.replace(`/clients/${clientId}/queries/${id}`);
+      // Fire-and-forget server update; do not block UI or navigation
+      Promise.resolve().then(() => activateQuery({ clientId, queryId: id }).catch(() => {}));
+    });
+  }, [snapshotCurrentEditorDraft, clientId, router, dispatch]);
 
   const handleTablistKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (tabs.length === 0) return;
     const key = e.key;
     if (key === 'ArrowRight') {
       e.preventDefault();
-      focusTabByIndex(focusedTabIndex + 1);
+      dispatch(focusTabIndexAction({ index: focusedTabIndex + 1 }));
     } else if (key === 'ArrowLeft') {
       e.preventDefault();
-      focusTabByIndex(focusedTabIndex - 1);
+      dispatch(focusTabIndexAction({ index: focusedTabIndex - 1 }));
     } else if (key === 'Home') {
       e.preventDefault();
-      focusTabByIndex(0);
+      dispatch(focusTabIndexAction({ index: 0 }));
     } else if (key === 'End') {
       e.preventDefault();
-      focusTabByIndex(tabs.length - 1);
+      dispatch(focusTabIndexAction({ index: tabs.length - 1 }));
     } else if (key === 'Enter' || key === ' ') {
       e.preventDefault();
       // Activate the focused tab; snapshot current editor draft first.
       snapshotCurrentEditorDraft();
-      const nextId = tabs[(focusedTabIndex + tabs.length) % tabs.length]?.id;
+      const nextId = tabs[(focusedTabIndex + tabs.length) % tabs.length]?.id as string | undefined;
       if (nextId) {
-        setActiveTabId(nextId);
+        dispatch(activateTabAction({ id: nextId }));
         router.replace(`/clients/${clientId}/queries/${nextId}`);
         Promise.resolve().then(() => activateQuery({ clientId, queryId: nextId }).catch(() => {}));
       }
     }
-  }, [tabs.length, focusedTabIndex, focusTabByIndex, snapshotCurrentEditorDraft, activateTabByIndex]);
+  }, [tabs.length, focusedTabIndex, dispatch, snapshotCurrentEditorDraft, clientId, router]);
 
   // AIDEV-NOTE: Removed legacy, unused local drag logic; `SplitPane` manages resizing.
 
   const topStyle = useMemo(() => ({ height: `${Math.round(topRatio * 100)}%` }), [topRatio]);
   const bottomStyle = useMemo(() => ({ height: `${Math.round((1 - topRatio) * 100)}%` }), [topRatio]);
 
+  const activeIndex = Math.max(0, (tabs as Array<{ id: string }>).findIndex((t) => t.id === (activeTabId || '')));
   const activeTab = tabs[activeIndex] || tabs[0];
 
   return (
     <div className={styles['query-workspace']} ref={containerRef}>
       {/* Tabs bar */}
       <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
+        tabs={tabs as Array<{ id: string; name: string }>}
+        activeTabId={(activeTabId || '') as string}
         focusedTabIndex={focusedTabIndex}
         onKeyDown={handleTablistKeyDown}
         onTabClick={handleTabClick}
         setTabRef={(idx, el) => { tabButtonRefs.current[idx] = el; }}
         onAddTab={handleAddTab}
-        onCloseTab={async (index, id) => {
+        onCloseTab={async (index: number, id: string) => {
           // AIDEV-NOTE: Remove tab; adjust active/focus; preserve drafts
-          const next = tabs.filter(t => t.id !== id);
+          const next = (tabs as Array<{ id: string }>).filter((t) => t.id !== id);
           if (next.length === 0) return; // keep at least one tab (no-op)
 
           let navigateToId: string | null = null;
@@ -181,19 +231,14 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
             navigateToId = next[Math.min(fallbackIndex, next.length - 1)].id;
           }
 
-          setTabs(next);
-          try {
-            // AIDEV-NOTE: Immediately persist new tabs list to avoid rehydrating closed tab
-            const payload = JSON.stringify({ tabs: next, activeTabId: navigateToId || activeTabId });
-            window.localStorage.setItem('pg-query-client/query-workspace/tabs' + `/${clientId}`, payload);
-          } catch {}
+          dispatch(closeTabAction({ id }));
           if (navigateToId) {
-            setActiveTabId(navigateToId);
-            setFocusedTabIndex(Math.min(index - 1, next.length - 1));
+            dispatch(activateTabAction({ id: navigateToId }));
+            dispatch(focusTabIndexAction({ index: Math.min(index - 1, next.length - 1) }));
             try { await closeQuery({ clientId, queryId: id }); } catch {}
             router.replace(`/clients/${clientId}/queries/${navigateToId}`);
           } else if (focusedTabIndex >= next.length) {
-            setFocusedTabIndex(next.length - 1);
+            dispatch(focusTabIndexAction({ index: next.length - 1 }));
           }
 
           if (!navigateToId) {
@@ -218,35 +263,23 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
             onRun={runFromToolbar}
             onSave={async () => {
               const latestText = getCurrentEditorText();
-              const nextTabs = tabs.map(t => t.id === activeTabId ? { ...t, name: nameDraft, sql: latestText } : t);
-              setTabs(nextTabs);
-              try {
-                const payload = JSON.stringify({ tabs: nextTabs, activeTabId });
-                window.localStorage.setItem('pg-query-client/query-workspace/tabs' + `/${clientId}`, payload);
-              } catch {}
-              setSqlDraftByTab(prev => ({ ...prev, [activeTabId]: latestText }));
-              try {
-                await saveQueryContent({ clientId, queryId: activeTabId, name: nameDraft, sql: latestText });
-              } catch {}
+              if (activeTabId) {
+                // push latest draft to store then commit
+                dispatch(setSqlDraftAction({ id: activeTabId, sql: latestText }));
+                dispatch(commitSaveActiveAction());
+                try {
+                  await saveQueryContent({ clientId, queryId: activeTabId, name: nameDraft, sql: latestText });
+                } catch {}
+              }
             }}
-            saveDisabled={useMemo(() => {
-              const active = tabs.find(t => t.id === activeTabId);
-              const savedName = active?.name ?? '';
-              const savedSql = active?.sql ?? '';
-              const draftSql = sqlDraftByTab[activeTabId] ?? savedSql;
-              return (nameDraft === savedName) && (draftSql === savedSql);
-            }, [tabs, activeTabId, nameDraft, sqlDraftByTab])}
+            saveDisabled={saveDisabled}
           />
 
           <SplitPane
             top={(
               <SQLEditor
                 editorRef={editorRef}
-                onChange={useEvent(
-                  useDebouncedCallback((text: string) => {
-                    setSqlDraftByTab(prev => ({ ...prev, [activeTabId]: text }));
-                  }, 150)
-                )}
+                onChange={editorOnChange}
               />
             )}
             bottom={<QueryResults />}
@@ -265,7 +298,7 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
               if (botEl) botEl.style.height = `${bottomPct}%`;
             }}
             onCommit={(r) => {
-              setTopRatio(r);
+              dispatch(setSplitRatio(r));
               try { window.localStorage.setItem(STORAGE_KEY_SPLIT, JSON.stringify({ ratio: r })); } catch {}
             }}
           />

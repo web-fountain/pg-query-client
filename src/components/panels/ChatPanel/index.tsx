@@ -1,13 +1,14 @@
 'use client';
 
-import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
+import { useReduxDispatch } from '@Redux/storeHooks';
+import { expandSide }       from '@Redux/records/layout';
 import { useClientRoute }   from '@Components/providers/ClientRouteProvider';
 import styles               from './styles.module.css';
 
 
 function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
-  const { expandSide } = useOpSpaceLayout();
-  const { clientId }   = useClientRoute();
+  const dispatch      = useReduxDispatch();
+  const { clientId }  = useClientRoute();
 
   return (
     <div
@@ -16,7 +17,7 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
       data-panel-side={side}
     >
       {collapsed ? (
-        <div className={styles['collapsed-icon']} onClick={() => expandSide(side)}>
+        <div className={styles['collapsed-icon']} onClick={() => dispatch(expandSide(side))}>
           {/* AIDEV-NOTE: Icon-only view when collapsed to 40px width */}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>

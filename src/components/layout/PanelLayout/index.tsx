@@ -1,23 +1,28 @@
 'use client';
 
-import React, { type ReactNode, type ReactElement }   from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
-import { useOpSpaceLayout } from '../OpSpaceProvider';
-import QueryToolPanel       from '../QueryToolPanel';
-import ResizableHandle      from '../ResizableHandle';
+import React                            from 'react';
+import { useReduxSelector }             from '@Redux/storeHooks';
+import {
+  selectPanelLeft,
+  selectPanelRight,
+  selectContentSwapped
+}                                       from '@Redux/records/layout';
+import QueryToolPanel                   from '../QueryToolPanel';
+import ResizableHandle                  from '../ResizableHandle';
 
-import styles               from './styles.module.css';
+import styles                           from './styles.module.css';
 
 
 type Side = 'left' | 'right';
 type PanelChild = ReactElement<{ collapsed: boolean; side?: Side }>;
 
 function PanelLayout({ children, left, right }: { children: ReactNode; left?: PanelChild; right?: PanelChild }) {
-  // AIDEV-NOTE: Side content is provided via slots; layout owns placement and collapse state.
-  const { getConfig, isContentSwapped } = useOpSpaceLayout();
-  const leftCfg                         = getConfig('left');
-  const rightCfg                        = getConfig('right');
-  const contentSwapped                  = isContentSwapped();
+  // AIDEV-NOTE: Side content is provided via slots; layout owns placement and collapse state via Redux.
+  const leftCfg         = useReduxSelector(selectPanelLeft);
+  const rightCfg        = useReduxSelector(selectPanelRight);
+  const contentSwapped  = useReduxSelector(selectContentSwapped);
 
   const leftSlot  = contentSwapped ? right : left;
   const rightSlot = contentSwapped ? left  : right;

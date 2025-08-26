@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { interVariable, interDisplay } from '@Lib/fonts';
+import StoreProvider from '@Redux/StoreProvider';
 
 import '@Styles/scale.css';
 import '@Styles/normalize.css';
@@ -17,7 +18,6 @@ import '@Styles/scrollbars.css';
 import '@Styles/prose.css';
 import '@Styles/print.css';
 
-import Titlebar from '@Components/layout/Titlebar';
 
 
 const metadata: Metadata = {
@@ -58,11 +58,41 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
         />
 
         <style>@layer normalize, base, scale, themes, semantics, typography, motion, layouts, forms, a11y, scrollbars, prose, print, utilities;</style>
+
+        {/* AIDEV-NOTE: Pre-hydration layout bootstrap - set panel widths/collapsed from localStorage before paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var raw = localStorage.getItem('pg-query-client/layout');
+                  if (!raw) return;
+                  var parsed = JSON.parse(raw) || {};
+                  var left  = parsed.left  || {};
+                  var right = parsed.right || {};
+                  if (typeof left.width === 'number') {
+                    document.documentElement.style.setProperty('--op-space-layout-left-panel-width', left.width + 'px');
+                  }
+                  if (typeof right.width === 'number') {
+                    document.documentElement.style.setProperty('--op-space-layout-right-panel-width', right.width + 'px');
+                  }
+                  if (left.collapsed) {
+                    document.documentElement.setAttribute('data-op-space-left-collapsed', '');
+                  }
+                  if (right.collapsed) {
+                    document.documentElement.setAttribute('data-op-space-right-collapsed', '');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
 
       <body>
-        <Titlebar />
-        {children}
+        <StoreProvider>
+          {children}
+        </StoreProvider>
       </body>
 
     </html>

@@ -100,7 +100,31 @@
       var(--calculated-panel-max-width)
     );
 }
+:root[data-op-space-left-collapsed] .panel-layout:not([data-left-collapsed]) {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    var(--op-space-layout-resizer-width)
+    minmax(var(--calculated-center-min-width), 1fr)
+    var(--op-space-layout-resizer-width)
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    );
+}
 .panel-layout[data-right-collapsed] {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    var(--op-space-layout-resizer-width)
+    minmax(var(--calculated-center-min-width), 1fr)
+    var(--op-space-layout-resizer-width)
+    var(--op-space-layout-panel-collapsed-width);
+}
+:root[data-op-space-right-collapsed] .panel-layout:not([data-right-collapsed]) {
   grid-template-columns:
     clamp(
       var(--op-space-layout-panel-min-width),

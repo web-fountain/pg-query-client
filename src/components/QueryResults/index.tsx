@@ -1,19 +1,20 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import JSONEditor from '@Components/JSONEditor';
-import { useSqlRunner } from '@Components/providers/SQLRunnerProvider';
-import type { DataQueryExecutionRecord } from './types';
-import styles from './styles.module.css';
+import type { DataQueryExecutionRecord }                from './types';
 
+import { useMemo }                                      from 'react';
+import { useReduxDispatch, useReduxSelector }           from '@Redux/storeHooks';
+import { selectResultsActiveTab, setResultsActiveTab }  from '@Redux/records/layout';
+import JSONEditor                                       from '@Components/JSONEditor';
+import { useSqlRunner }                                 from '@Components/providers/SQLRunnerProvider';
 
-type TabKey = 'data-output' | 'messages';
+import styles                                           from './styles.module.css';
+
 
 function QueryResults() {
   const { lastResult, lastError, sqlText } = useSqlRunner();
-
-  // AIDEV-NOTE: Compact tabs for results area. Default to data-output.
-  const [activeTab, setActiveTab] = useState<TabKey>('data-output');
+  const activeTab = useReduxSelector(selectResultsActiveTab);
+  const dispatch = useReduxDispatch();
 
   // AIDEV-NOTE: Shape current provider results into the requested DataQueryExecutionRecord.
   const executionPayload = useMemo<DataQueryExecutionRecord | null>(() => {
@@ -70,7 +71,7 @@ function QueryResults() {
             aria-selected={activeTab === 'data-output'}
             className={styles['tab']}
             tabIndex={activeTab === 'data-output' ? 0 : -1}
-            onClick={() => setActiveTab('data-output')}
+            onClick={() => dispatch(setResultsActiveTab('data-output'))}
           >
             Data Output
           </button>
@@ -81,7 +82,7 @@ function QueryResults() {
             aria-selected={activeTab === 'messages'}
             className={styles['tab']}
             tabIndex={activeTab === 'messages' ? 0 : -1}
-            onClick={() => setActiveTab('messages')}
+            onClick={() => dispatch(setResultsActiveTab('messages'))}
           >
             Messages
           </button>
