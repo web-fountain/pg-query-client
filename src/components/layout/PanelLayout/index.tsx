@@ -1,53 +1,58 @@
 'use client';
 
-import type { ReactNode }   from 'react';
+import React, { type ReactNode, type ReactElement }   from 'react';
 
 import { useOpSpaceLayout } from '../OpSpaceProvider';
-import ChatPanel            from '../ChatPanel';
 import QueryToolPanel       from '../QueryToolPanel';
-import DirectoryPanel       from '../DirectoryPanel';
 import ResizableHandle      from '../ResizableHandle';
 
 import styles               from './styles.module.css';
 
 
-function PanelLayout({ children }: { children: ReactNode }) {
-  // AIDEV-NOTE: Static grid; content mapping flips via provider. Handles are side-fixed.
+type Side = 'left' | 'right';
+type PanelChild = ReactElement<{ collapsed: boolean; side?: Side }>;
+
+function PanelLayout({ children, left, right }: { children: ReactNode; left?: PanelChild; right?: PanelChild }) {
+  // AIDEV-NOTE: Side content is provided via slots; layout owns placement and collapse state.
   const { getConfig, isContentSwapped } = useOpSpaceLayout();
-  const left                            = getConfig('left');
-  const right                           = getConfig('right');
+  const leftCfg                         = getConfig('left');
+  const rightCfg                        = getConfig('right');
   const contentSwapped                  = isContentSwapped();
+
+  const leftSlot  = contentSwapped ? right : left;
+  const rightSlot = contentSwapped ? left  : right;
 
   return (
     <div
       className={styles['panel-layout']}
-      data-left-collapsed={left.collapsed || undefined}
-      data-right-collapsed={right.collapsed || undefined}
+      data-left-collapsed={leftCfg.collapsed || undefined}
+      data-right-collapsed={rightCfg.collapsed || undefined}
     >
-      {/* Left block */}
-      <aside className={styles['left-side']}>
-        {contentSwapped
-          ? <DirectoryPanel collapsed={left.collapsed} side="left" />
-          : <ChatPanel collapsed={left.collapsed}  side="left" />}
-      </aside>
-      <div className={styles['handle-left']}>
-        <ResizableHandle side="left" />
-      </div>
+      {leftSlot ? (
+        <>
+          <aside className={styles['left-side']}>
+            {React.cloneElement(leftSlot, { collapsed: leftCfg.collapsed, side: 'left' })}
+          </aside>
+          <div className={styles['handle-left']}>
+            <ResizableHandle side="left" />
+          </div>
+        </>
+      ) : null}
 
-      {/* Center content */}
       <main className={styles['center']}>
         <QueryToolPanel>{children}</QueryToolPanel>
       </main>
 
-      {/* Right block */}
-      <div className={styles['handle-right']}>
-        <ResizableHandle side="right" />
-      </div>
-      <aside className={styles['right-side']}>
-        {contentSwapped
-          ? <ChatPanel collapsed={right.collapsed} side="right" />
-          : <DirectoryPanel collapsed={right.collapsed} side="right" />}
-      </aside>
+      {rightSlot ? (
+        <>
+          <div className={styles['handle-right']}>
+            <ResizableHandle side="right" />
+          </div>
+          <aside className={styles['right-side']}>
+            {React.cloneElement(rightSlot, { collapsed: rightCfg.collapsed, side: 'right' })}
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }

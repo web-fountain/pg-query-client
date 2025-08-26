@@ -1,11 +1,13 @@
 'use client';
 
-import { useOpSpaceLayout } from '../OpSpaceProvider';
-import styles from './styles.module.css';
+import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
+import { useClientRoute }   from '@Components/providers/ClientRouteProvider';
+import styles               from './styles.module.css';
 
 
 function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
   const { expandSide } = useOpSpaceLayout();
+  const { clientId }   = useClientRoute();
 
   return (
     <div
@@ -21,7 +23,7 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
           </svg>
         </div>
       ) : (
-        <div className={styles['placeholder']}>Chat Panel</div>
+        <div className={styles['placeholder']}>Chat Panel (client {clientId.slice(0, 8)}…)</div>
       )}
     </div>
   );

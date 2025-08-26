@@ -2,12 +2,12 @@
 
 import type { ReactNode } from 'react';
 
-import OpSpaceLayoutProvider  from '../OpSpaceProvider';
 import { SQLValidatorProvider } from '@Components/providers/SQLValidatorProvider';
-import Titlebar               from '../Titlebar';
-import PanelLayout            from '../PanelLayout';
+import OpSpaceLayoutProvider    from '../OpSpaceProvider';
+import Titlebar                 from '../Titlebar';
+import PanelLayout              from '../PanelLayout';
 
-import styles                 from './styles.module.css';
+import styles                   from './styles.module.css';
 
 
 function OpSpaceLayout({ children }: { children: ReactNode }) {

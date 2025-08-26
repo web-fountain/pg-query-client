@@ -1,8 +1,12 @@
 'use client';
 
-import type { SQLEditorHandle } from '@Components/SQLEditor';
+import type { SQLEditorHandle }     from '@Components/SQLEditor';
+import type { QueryWorkspaceProps } from '@Types/workspace';
 
+import { useRouter }                from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { activateQuery, closeQuery, saveQueryContent } from '@/app/_actions/queries';
 // AIDEV-NOTE: SQLEditor is large; if initial TTI needs improvement, consider next/dynamic.
 import SQLEditor from '@Components/SQLEditor';
 import QueryResults from '@Components/QueryResults';
@@ -19,15 +23,15 @@ import { useDebouncedCallback } from '@Hooks/useDebounce';
 
 import styles from './styles.module.css';
 
-// AIDEV-NOTE: Resizer is fully handled by `ResizableHandle/VerticalHandle` inside `SplitPane`.
 
-function QueryWorkspace() {
+function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspaceProps) {
   // AIDEV-NOTE: Editor handle for external run trigger from toolbar and shortcuts.
-  const editorRef = useRef<SQLEditorHandle | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const topPanelRef = useRef<HTMLDivElement | null>(null);
-  const bottomPanelRef = useRef<HTMLDivElement | null>(null);
+  const router                    = useRouter();
   const { isRunning, setSqlText } = useSqlRunner();
+  const editorRef                 = useRef<SQLEditorHandle | null>(null);
+  const containerRef              = useRef<HTMLDivElement | null>(null);
+  const topPanelRef               = useRef<HTMLDivElement | null>(null);
+  const bottomPanelRef            = useRef<HTMLDivElement | null>(null);
 
   // AIDEV-NOTE: Split ratio via hook (includes persistence and clamping)
   const { ratio: topRatio, setRatio: setTopRatio } = useSplitRatio();
@@ -47,7 +51,7 @@ function QueryWorkspace() {
     addTab: addTabHook,
     nameDraft,
     setNameDraft
-  } = useTabs();
+  } = useTabs({ clientId, initialTabs, initialActiveId });
   const [sqlDraftByTab, setSqlDraftByTab] = useState<Record<string, string>>({});
 
   const runFromToolbar = useCallback(() => {
@@ -94,11 +98,15 @@ function QueryWorkspace() {
     }
   }, [activeIndex, tabs, sqlDraftByTab, setSqlText]);
 
-  const handleAddTab = useCallback(() => {
+  const handleAddTab = useCallback(async () => {
     snapshotCurrentEditorDraft();
-    addTabHook();
+    const newId = await addTabHook();
     setSqlText('');
-  }, [snapshotCurrentEditorDraft, addTabHook, setSqlText]);
+    // Ensure local state reflects new active tab immediately
+    setActiveTabId(newId);
+    setFocusedTabIndex(tabs.length);
+    router.replace(`/clients/${clientId}/queries/${newId}`);
+  }, [snapshotCurrentEditorDraft, addTabHook, setSqlText, router, clientId]);
 
   const renameActiveTab = useCallback((nextName: string) => {
     setNameDraft(nextName);
@@ -110,7 +118,11 @@ function QueryWorkspace() {
     snapshotCurrentEditorDraft();
     setActiveTabId(id);
     setFocusedTabIndex(index);
-  }, [snapshotCurrentEditorDraft]);
+    // Navigate immediately for snappy UX
+    router.replace(`/clients/${clientId}/queries/${id}`);
+    // Fire-and-forget server update; do not block UI or navigation
+    Promise.resolve().then(() => activateQuery({ clientId, queryId: id }).catch(() => {}));
+  }, [snapshotCurrentEditorDraft, clientId, router]);
 
   const handleTablistKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (tabs.length === 0) return;
@@ -131,7 +143,12 @@ function QueryWorkspace() {
       e.preventDefault();
       // Activate the focused tab; snapshot current editor draft first.
       snapshotCurrentEditorDraft();
-      activateTabByIndex(focusedTabIndex);
+      const nextId = tabs[(focusedTabIndex + tabs.length) % tabs.length]?.id;
+      if (nextId) {
+        setActiveTabId(nextId);
+        router.replace(`/clients/${clientId}/queries/${nextId}`);
+        Promise.resolve().then(() => activateQuery({ clientId, queryId: nextId }).catch(() => {}));
+      }
     }
   }, [tabs.length, focusedTabIndex, focusTabByIndex, snapshotCurrentEditorDraft, activateTabByIndex]);
 
@@ -153,22 +170,35 @@ function QueryWorkspace() {
         onTabClick={handleTabClick}
         setTabRef={(idx, el) => { tabButtonRefs.current[idx] = el; }}
         onAddTab={handleAddTab}
-        onCloseTab={(index, id) => {
+        onCloseTab={async (index, id) => {
           // AIDEV-NOTE: Remove tab; adjust active/focus; preserve drafts
-          setTabs(prev => {
-            const next = prev.filter(t => t.id !== id);
-            if (next.length === 0) return prev; // keep at least one tab (no-op)
-            // fix active
-            if (activeTabId === id) {
-              const fallbackIndex = Math.max(0, index - 1);
-              setActiveTabId(next[Math.min(fallbackIndex, next.length - 1)].id);
-            }
-            // fix focus
-            if (focusedTabIndex >= next.length) {
-              setFocusedTabIndex(next.length - 1);
-            }
-            return next;
-          });
+          const next = tabs.filter(t => t.id !== id);
+          if (next.length === 0) return; // keep at least one tab (no-op)
+
+          let navigateToId: string | null = null;
+          if (activeTabId === id) {
+            const fallbackIndex = Math.max(0, index - 1);
+            navigateToId = next[Math.min(fallbackIndex, next.length - 1)].id;
+          }
+
+          setTabs(next);
+          try {
+            // AIDEV-NOTE: Immediately persist new tabs list to avoid rehydrating closed tab
+            const payload = JSON.stringify({ tabs: next, activeTabId: navigateToId || activeTabId });
+            window.localStorage.setItem('pg-query-client/query-workspace/tabs' + `/${clientId}`, payload);
+          } catch {}
+          if (navigateToId) {
+            setActiveTabId(navigateToId);
+            setFocusedTabIndex(Math.min(index - 1, next.length - 1));
+            try { await closeQuery({ clientId, queryId: id }); } catch {}
+            router.replace(`/clients/${clientId}/queries/${navigateToId}`);
+          } else if (focusedTabIndex >= next.length) {
+            setFocusedTabIndex(next.length - 1);
+          }
+
+          if (!navigateToId) {
+            try { await closeQuery({ clientId, queryId: id }); } catch {}
+          }
         }}
       />
 
@@ -186,10 +216,18 @@ function QueryWorkspace() {
             onNameChange={renameActiveTab}
             isRunning={isRunning}
             onRun={runFromToolbar}
-            onSave={() => {
+            onSave={async () => {
               const latestText = getCurrentEditorText();
-              setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, name: nameDraft, sql: latestText } : t));
+              const nextTabs = tabs.map(t => t.id === activeTabId ? { ...t, name: nameDraft, sql: latestText } : t);
+              setTabs(nextTabs);
+              try {
+                const payload = JSON.stringify({ tabs: nextTabs, activeTabId });
+                window.localStorage.setItem('pg-query-client/query-workspace/tabs' + `/${clientId}`, payload);
+              } catch {}
               setSqlDraftByTab(prev => ({ ...prev, [activeTabId]: latestText }));
+              try {
+                await saveQueryContent({ clientId, queryId: activeTabId, name: nameDraft, sql: latestText });
+              } catch {}
             }}
             saveDisabled={useMemo(() => {
               const active = tabs.find(t => t.id === activeTabId);

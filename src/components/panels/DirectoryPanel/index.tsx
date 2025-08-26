@@ -1,11 +1,13 @@
 'use client';
 
-import { useOpSpaceLayout } from '../OpSpaceProvider';
+import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
+import { useClientRoute }   from '@Components/providers/ClientRouteProvider';
 import styles               from './styles.module.css';
 
 
 function DirectoryPanel({ collapsed, side = 'right' }: { collapsed: boolean; side?: 'left' | 'right' }) {
   const { expandSide } = useOpSpaceLayout();
+  const { clientId }   = useClientRoute();
 
   return (
     <div
@@ -21,7 +23,7 @@ function DirectoryPanel({ collapsed, side = 'right' }: { collapsed: boolean; sid
           </svg>
         </div>
       ) : (
-        <div className={styles['placeholder']}>Directory Panel</div>
+        <div className={styles['placeholder']}>Directory Panel (client {clientId.slice(0, 8)}…)</div>
       )}
     </div>
   );

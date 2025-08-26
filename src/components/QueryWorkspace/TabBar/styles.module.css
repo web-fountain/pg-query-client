@@ -15,8 +15,18 @@
   display: flex;
   align-items: center;
   gap: 0;
-  /* flex: 1 1 auto; */
+  flex: 1 1 auto;
+  min-width: 0; /* allow scroll area to shrink and overflow */
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  /* hide scrollbar cross-browser while preserving scroll */
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* IE 10+ */
 }
+.tabs-bar > [role='tablist']::-webkit-scrollbar { display: none; } /* WebKit */
 
 .tab {
   position: relative;
@@ -31,6 +41,7 @@
   border: none;
   cursor: default;
   background: transparent;
+  flex: 0 0 auto; /* prevent shrinking; allow horizontal scroll */
 }
 
 .tab .icon {
@@ -50,15 +61,8 @@
   height: var(--tab-underline-height);
   background: var(--tabs-underline-color);
 }
-
 .tab:focus-visible {
   outline: none;
-  border-radius: var(--radius-4);
-  background: color-mix(in oklch, var(--tabs-surface) 92%, var(--tabs-underline-color) 8%);
-  box-shadow:
-    inset 0 0 0 var(--border-1) color-mix(in oklch, var(--tabs-underline-color) 100%, transparent),
-    0 0 0 var(--space-0_5) color-mix(in oklch, var(--tabs-underline-color) 0%, transparent);
-  color: var(--tabs-foreground-active);
 }
 
 .tab-add {
@@ -74,6 +78,7 @@
   background: transparent;
   color: var(--tabs-icon-foreground);
   cursor: pointer;
+  flex: 0 0 auto; /* never shrink; always visible */
 }
 .tab-add:hover { background: var(--surface-hover); }
 .tab-add:focus-visible {
@@ -124,4 +129,5 @@
   background: var(--tabs-separator-border);
   margin: 0 var(--space-3);
   display: inline-block;
+  flex: 0 0 auto;
 }

@@ -17,6 +17,7 @@ type SqlRunError = {
 };
 
 type SqlRunnerContext = {
+  clientId: string;
   sqlText: string;
   setSqlText: (next: string) => void;
   isRunning: boolean;
@@ -28,7 +29,7 @@ type SqlRunnerContext = {
 
 const Ctx = createContext<SqlRunnerContext | null>(null);
 
-function SQLRunnerProvider({ children }: { children: ReactNode }) {
+function SQLRunnerProvider({ clientId, children }: { clientId: string; children: ReactNode }) {
   const [sqlText, setSqlText] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [lastResult, setLastResult] = useState<SqlRunSuccess | null>(null);
@@ -44,7 +45,7 @@ function SQLRunnerProvider({ children }: { children: ReactNode }) {
     setLastError(null);
     const started = performance.now();
     try {
-      const res = await fetch('/api/run-sql', {
+      const res = await fetch(`/api/run-sql?clientId=${encodeURIComponent(clientId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: raw
@@ -73,7 +74,7 @@ function SQLRunnerProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsRunning(false);
     }
-  }, [sqlText]);
+  }, [sqlText, clientId]);
 
   const clear = useCallback(() => {
     setSqlText('');
@@ -82,6 +83,7 @@ function SQLRunnerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: SqlRunnerContext = useMemo(() => ({
+    clientId,
     sqlText,
     setSqlText,
     isRunning,
@@ -89,7 +91,7 @@ function SQLRunnerProvider({ children }: { children: ReactNode }) {
     lastError,
     runQuery,
     clear
-  }), [sqlText, isRunning, lastResult, lastError, runQuery, clear]);
+  }), [clientId, sqlText, isRunning, lastResult, lastError, runQuery, clear]);
 
   return (
     <Ctx.Provider value={value}>{children}</Ctx.Provider>

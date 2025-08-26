@@ -17,7 +17,7 @@ import '@Styles/scrollbars.css';
 import '@Styles/prose.css';
 import '@Styles/print.css';
 
-import OpSpaceLayout from '@/components/layout/OpSpaceLayout';
+import Titlebar from '@Components/layout/Titlebar';
 
 
 const metadata: Metadata = {
@@ -31,11 +31,11 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
       <head>
         <meta name="apple-mobile-web-app-title" content="PG Query Client" />
 
-        <link rel="manifest"          href="favicon/manifest.json" />
-        <link rel="icon"              href="favicon/favicon.ico"    type="image/x-icon"   sizes="48x48"   />
-        <link rel="icon"              href="favicon/icon.svg"       type="image/svg+xml"  sizes="any"     />
-        <link rel="icon"              href="favicon/icon.png"       type="image/png"      sizes="96x96"   />
-        <link rel="apple-touch-icon"  href="favicon/apple-icon.png" type="image/png"      sizes="180x180" />
+        <link rel="manifest"          href="/favicon/manifest.json" />
+        <link rel="icon"              href="/favicon/favicon.ico"    type="image/x-icon"   sizes="48x48"   />
+        <link rel="icon"              href="/favicon/icon.svg"       type="image/svg+xml"  sizes="any"     />
+        <link rel="icon"              href="/favicon/icon.png"       type="image/png"      sizes="96x96"   />
+        <link rel="apple-touch-icon"  href="/favicon/apple-icon.png" type="image/png"      sizes="180x180" />
 
         {/* Persist user-selected theme; fallback to system preference */}
         <script
@@ -49,7 +49,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
                     : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
                   document.documentElement.setAttribute('data-theme', theme);
                 } catch (e) {
-                  var isLight = window.maπtchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+                  var isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
                   document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
                 }
               })();
@@ -61,7 +61,8 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
       </head>
 
       <body>
-        <OpSpaceLayout>{children}</OpSpaceLayout>
+        <Titlebar />
+        {children}
       </body>
 
     </html>
