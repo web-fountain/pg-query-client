@@ -45,10 +45,34 @@
     --icon-active: var(--foreground);
     --icon-blue:   #5189cb;
 
+    /* component roles: resizers */
+    --resizer-hover: #0078d4;
+
     /* icon sizing tokens (semantic mapping to scale) */
     --icon-size:    1em;             /* default: scale with text */
     --icon-size-sm: var(--space-3);  /* 12px */
     --icon-size-md: var(--space-4);  /* 16px */
     --icon-size-lg: var(--space-5);  /* 20px */
+
+    /* accessibility: focus treatment */
+    --focus-ring: var(--border-2) solid var(--color-primary);
+
+    /* tabs strip tokens (theme-ready) */
+    --tabs-surface:             var(--surface-canvas);
+    --tabs-foreground:          var(--text-secondary);
+    --tabs-foreground-active:   var(--text-primary);
+    --tabs-icon-foreground:     var(--icon-fill);
+    --tabs-separator-border:    var(--border-secondary);
+    --tabs-strip-border-bottom: var(--border-primary);
+    --tabs-underline-color:     var(--color-primary);
+
+    /* tabs sizing tokens */
+    --tab-strip-height:     38px;
+    --tab-padding-inline:   var(--space-4);
+    --tab-gap:              var(--space-2);
+    --tab-underline-height: var(--border-2);
+
+    /* syntax highlighting tokens consumed by editors (CodeMirror, etc.) */
+    --syntax-brace: #e5c07b;
   }
 }

@@ -21,6 +21,8 @@
       "@Components":    ["./src/components"],
       "@Lib/*":         ["./src/lib/*"],
       "@Lib":           ["./src/lib"],
+      "@Hooks/*":       ["./src/hooks/*"],
+      "@Hooks":         ["./src/hooks"],
       "@Pages/*":       ["./src/pages/*"],
       "@Pages":         ["./src/pages"],
       "@Styles/*":      ["./src/assets/styles/*"],
