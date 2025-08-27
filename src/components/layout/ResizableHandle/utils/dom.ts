@@ -1,18 +1,17 @@
 import {
-  SELECTOR_PANEL_LAYOUT,
-  SELECTOR_LEFT_SIDE,
-  SELECTOR_RIGHT_SIDE,
+  SELECTOR_LAYOUT_ROOT,
+  SELECTOR_SIDE_ATTR,
   PanelSide
 } from './constants';
 
 
 // AIDEV-NOTE: DOM helpers (read-only)
-const getPanelLayoutElFromHandle = (ele: HTMLElement | null) => ele?.closest(SELECTOR_PANEL_LAYOUT) as HTMLElement | null;
+const getPanelLayoutElFromHandle = (ele: HTMLElement | null) => ele?.closest(SELECTOR_LAYOUT_ROOT) as HTMLElement | null;
 
 const getSideContainerElFromHandle = (ele: HTMLElement | null, side: PanelSide) => {
   const layout = getPanelLayoutElFromHandle(ele);
   if (!layout) return null;
-  const selector = side === 'left' ? SELECTOR_LEFT_SIDE : SELECTOR_RIGHT_SIDE;
+  const selector = `[${SELECTOR_SIDE_ATTR}="${side}"]`;
   return layout.querySelector(selector) as HTMLElement | null;
 };
 

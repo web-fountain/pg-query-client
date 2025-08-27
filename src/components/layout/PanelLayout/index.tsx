@@ -26,12 +26,17 @@ function PanelLayout({ children, left, right }: { children: ReactNode; left?: Pa
   return (
     <div
       className={styles['panel-layout']}
+      data-op-space-layout="root"
       data-left-collapsed={leftCfg.collapsed || undefined}
       data-right-collapsed={rightCfg.collapsed || undefined}
     >
       {leftSlot ? (
         <>
-          <aside className={styles['left-side']}>
+          <aside
+            className={styles['left-side']}
+            data-op-space-layout-side="left"
+            aria-expanded={!leftCfg.collapsed}
+          >
             {React.cloneElement(leftSlot, { collapsed: leftCfg.collapsed, side: 'left' })}
           </aside>
           <div className={styles['handle-left']}>
@@ -49,7 +54,11 @@ function PanelLayout({ children, left, right }: { children: ReactNode; left?: Pa
           <div className={styles['handle-right']}>
             <ResizableHandle side="right" />
           </div>
-          <aside className={styles['right-side']}>
+          <aside
+            className={styles['right-side']}
+            data-op-space-layout-side="right"
+            aria-expanded={!rightCfg.collapsed}
+          >
             {React.cloneElement(rightSlot, { collapsed: rightCfg.collapsed, side: 'right' })}
           </aside>
         </>

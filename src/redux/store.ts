@@ -1,23 +1,27 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 
 import routeReducer       from './records/route';
 import tabsReducer        from './records/tabs';
 
 
-const makeStore = (preloadedState?: Partial<{ route: any; tabs: any; layout: any }>) => {
+// AIDEV-NOTE: Combine reducers to guide TS inference and avoid object-vs-function reducer confusion
+const rootReducer = combineReducers({
+  route: routeReducer,
+  tabs: tabsReducer
+});
+
+
+const makeStore = (preloadedState?: RootState) => {
   return configureStore({
-    reducer: {
-      route   : routeReducer,
-      tabs    : tabsReducer
-    },
+    reducer: rootReducer,
     preloadedState
   });
 };
 
 // Infer the type of makeStore and infer the `RootState` and `ReduxDispatch` types from the store itself
-type ReduxStore     = ReturnType<typeof makeStore>
-type RootState      = ReturnType<ReduxStore['getState']>
-type ReduxDispatch  = ReduxStore['dispatch']
+type ReduxStore     = ReturnType<typeof makeStore>;
+type RootState      = ReturnType<typeof rootReducer>;
+type ReduxDispatch  = ReduxStore['dispatch'];
 
 
 export { makeStore };

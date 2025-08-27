@@ -2,12 +2,12 @@
 
 import type { ReactNode } from 'react';
 
-import { ClientRouteProvider }  from '@Components/providers/ClientRouteProvider';
+import { ClientRouteProvider }  from './_providers/ClientRouteProvider';
+import { SQLValidatorProvider } from './_providers/SQLValidatorProvider';
 import Titlebar                 from '@Components/layout/Titlebar';
-import { SQLValidatorProvider } from '@Components/providers/SQLValidatorProvider';
 import PanelLayout              from '@Components/layout/PanelLayout';
-import ChatPanel                from '@Components/panels/ChatPanel';
-import DirectoryPanel           from '@Components/panels/DirectoryPanel';
+import ChatPanel                from './_components/ChatPanel';
+import DirectoryPanel           from './_components/DirectoryPanel';
 
 
 async function Layout({ children, params }: { children: ReactNode; params: Promise<{ clientId: string; queryId: string }> }) {

@@ -8,9 +8,8 @@ export const VAR_SNAP_OPEN          = '--op-space-layout-snap-open-threshold';
 export const VAR_SNAP_CLOSE         = '--op-space-layout-snap-close-threshold';
 export const VAR_COLLAPSED          = '--op-space-layout-panel-collapsed-width';
 
-export const SELECTOR_PANEL_LAYOUT  = '[class*="panel-layout"]';
-export const SELECTOR_LEFT_SIDE     = '[class*="left-side"]';
-export const SELECTOR_RIGHT_SIDE    = '[class*="right-side"]';
+export const SELECTOR_LAYOUT_ROOT   = '[data-op-space-layout="root"]';
+export const SELECTOR_SIDE_ATTR     = 'data-op-space-layout-side';
 
 export const DEFAULT_MIN            = 170;
 export const DEFAULT_MAX            = 600;

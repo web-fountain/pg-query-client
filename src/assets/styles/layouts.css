@@ -20,12 +20,6 @@
     --titlebar-height:  36px;  /* Titlebar */
     --bottombar-height: 22px;  /* Bottombar */
 
-    /* Panel constraints */
-    --panel-min-width:        200px; /* Minimum panel width */
-    --panel-max-width:        600px; /* Maximum panel width */
-    --panel-collapsed-width:  48px;  /* Collapsed panel width */
-    --minPanelWidth:          200px; /* Reduced to allow side resizing */
-
     /* Calculated available space */
     --available-height: calc(var(--screen-height) * 1px - var(--titlebar-height) - var(--bottombar-height));
     --available-width: calc(var(--screen-width) * 1px);

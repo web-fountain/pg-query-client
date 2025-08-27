@@ -5,6 +5,7 @@ import { useRef }  from 'react';
 import { useOpSpaceLayout }                 from '../OpSpaceProvider';
 import { useDragResize, useSeparatorAria }  from './hooks';
 import { clamp }                            from './utils/math';
+import { readMinMax, readCurrentWidth }     from './utils/cssVars';
 import styles                               from './styles.module.css';
 
 
@@ -28,12 +29,8 @@ function ResizableHandle({ side }: { side: 'left' | 'right' }) {
     if (!allowed.includes(evt.key)) return;
 
     const step = evt.shiftKey ? 50 : 10;
-    const cs = getComputedStyle(document.documentElement);
-    const cur = parseInt(cs.getPropertyValue(
-      side === 'left' ? '--op-space-layout-left-panel-width' : '--op-space-layout-right-panel-width'
-    ));
-    const min = parseInt(cs.getPropertyValue('--op-space-layout-panel-min-width'));
-    const max = parseInt(cs.getPropertyValue('--op-space-layout-panel-max-width'));
+    const { min, max } = readMinMax();
+    const cur = readCurrentWidth(side);
 
     let next = cur;
     if (evt.key === 'Home') next = min;

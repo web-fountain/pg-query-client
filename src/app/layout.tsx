@@ -66,7 +66,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
             __html: `
               (function() {
                 try {
-                  var raw = localStorage.getItem('pg-query-client/panel-layout') || localStorage.getItem('pg-query-client/layout');
+                  var raw = localStorage.getItem('pg-query-client/panel-layout');
                   if (!raw) return;
                   var parsed = JSON.parse(raw) || {};
                   var left  = parsed.left  || {};

@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { readMinMax } from './ResizableHandle/utils/cssVars';
+import { clamp } from './ResizableHandle/utils/math';
 
 
 type Side = 'left' | 'right';
@@ -37,12 +39,8 @@ const STORAGE_KEY = 'pg-query-client/panel-layout';
 const LayoutContext = createContext<LayoutCtx | null>(null);
 
 function clampToPanelLimits(px: number): number {
-  const cs = getComputedStyle(document.documentElement);
-  const minStr = cs.getPropertyValue('--op-space-layout-panel-min-width').trim();
-  const maxStr = cs.getPropertyValue('--op-space-layout-panel-max-width').trim();
-  const min = parseInt(minStr) || 170;
-  const max = parseInt(maxStr) || 600;
-  return Math.max(min, Math.min(max, px));
+  const { min, max } = readMinMax();
+  return clamp(px, min, max);
 }
 
 function applyCssWidths(leftWidth: number, rightWidth: number) {

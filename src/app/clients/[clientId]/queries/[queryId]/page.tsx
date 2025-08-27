@@ -1,14 +1,15 @@
 import type { ClientTabsState, QueryWorkspaceProps } from '@Types/workspace';
-import { getClientTabsState, openQuery as saOpen, activateQuery as saActivate } from '@/app/_actions/queries';
-import { notFound } from 'next/navigation';
-import { isUuidV4 } from '@Utils/uuid';
 
-import { redirect }   from 'next/navigation';
-import QueryWorkspace from '@Components/QueryWorkspace';
+import { notFound }   from 'next/navigation';
+import { isUuidV4 }   from '@Utils/uuid';
+import {
+  getClientTabsState,
+  openQuery     as saOpen,
+  activateQuery as saActivate
+}                     from './_actions/queries';
 
+import QueryWorkspace from './_components/QueryWorkspace';
 
-const DEFAULT_CLIENT_ID = '964b7ade-5057-4ef5-8bb8-24358928229e';
-const DEFAULT_QUERY_ID  = '4793e07f-7055-47d3-9a43-5255b6469a1d';
 
 async function Page({ params }: { params: Promise<{ clientId: string; queryId: string }> }) {
   const { clientId, queryId } = await params;
@@ -33,9 +34,6 @@ async function Page({ params }: { params: Promise<{ clientId: string; queryId: s
       lastActiveId: queryId
     } as ClientTabsState;
   }
-
-  const openIds = new Set(serverState.openTabs.map(t => t.id));
-  // No further augmentation here; trust server state and local storage merge on client to avoid flicker
 
   const props: QueryWorkspaceProps = {
     clientId,

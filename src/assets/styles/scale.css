@@ -4,6 +4,7 @@
     --space-0_5:  0.125rem;  /* 2px */
     --space-1:    0.25rem;   /* 4px */
     --space-2:    0.5rem;    /* 8px */
+    --space-2_5:  0.625rem;  /* 10px */
     --space-3:    0.75rem;   /* 12px */
     --space-3_5:  0.875rem;  /* 14px */
     --space-4:    1rem;      /* 16px */
@@ -41,6 +42,7 @@
     /* visual constants that should not scale with text size */
     --border-1: 1px;
     --border-2: 2px;
+    --radius-2: 2px;
     --radius-4: 4px;
     --radius-8: 8px;
     --radius-12: 12px;
