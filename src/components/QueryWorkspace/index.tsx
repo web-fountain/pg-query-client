@@ -3,7 +3,7 @@
 import type { SQLEditorHandle }     from '@Components/SQLEditor';
 import type { QueryWorkspaceProps } from '@Types/workspace';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter }                from 'next/navigation';
 import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 
@@ -23,44 +23,63 @@ import {
   selectFocusedTabIndex,
   selectDrafts
 }                                    from '@Redux/records/tabs';
+import { selectHydratedFromServer, selectMergedFromLocal } from '@Redux/records/tabs';
 
 import { createNewQuery, openQuery, activateQuery, closeQuery, saveQueryContent } from '@/app/_actions/queries';
 // AIDEV-NOTE: SQLEditor is large; if initial TTI needs improvement, consider next/dynamic.
-import SQLEditor from '@Components/SQLEditor';
-import QueryResults from '@Components/QueryResults';
-import TabBar from './TabBar';
-import Toolbar from './Toolbar';
-import SplitPane from './SplitPane';
-import { useSqlRunner } from '@Components/providers/SQLRunnerProvider';
+import SQLEditor                from '@Components/SQLEditor';
+import QueryResults             from '@Components/QueryResults';
+import TabBar                   from './TabBar';
+import Toolbar                  from './Toolbar';
+import SplitPane                from './SplitPane';
+import { useSqlRunner }         from '@Components/providers/SQLRunnerProvider';
 
-import { STORAGE_KEY_SPLIT } from './constants';
-import { selectSplitRatio, setSplitRatio } from '@Redux/records/layout';
-import { useEvent } from './hooks/useEvent';
+import { STORAGE_KEY_SPLIT }    from './constants';
+import { useEvent }             from './hooks/useEvent';
 import { useDebouncedCallback } from '@Hooks/useDebounce';
 
-import styles from './styles.module.css';
+import styles                   from './styles.module.css';
 
 
 function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspaceProps) {
   const dispatch = useReduxDispatch();
   // AIDEV-NOTE: Editor handle for external run trigger from toolbar and shortcuts.
   const router                    = useRouter();
-  const { isRunning, setSqlText } = useSqlRunner();
+  const { isRunning, setSqlText, sqlText } = useSqlRunner();
   const editorRef                 = useRef<SQLEditorHandle | null>(null);
   const containerRef              = useRef<HTMLDivElement | null>(null);
   const topPanelRef               = useRef<HTMLDivElement | null>(null);
   const bottomPanelRef            = useRef<HTMLDivElement | null>(null);
 
-  // AIDEV-NOTE: Split ratio via Redux (commit-only)
-  const topRatio = useReduxSelector(selectSplitRatio);
+  // AIDEV-NOTE: Split ratio is local; we persist only on commit.
+  const [topRatio, setTopRatio] = useState<number>(0.5);
+
+  // Hydrate ratio from localStorage after mount
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY_SPLIT);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const r = Number(parsed?.ratio);
+        if (!Number.isNaN(r) && r > 0 && r < 1) setTopRatio(r);
+      }
+    } catch {}
+  }, []);
 
   // AIDEV-NOTE: Tabs via Redux records (drafts in store)
   const tabs            = useReduxSelector(selectTabs);
   const activeTabId     = useReduxSelector(selectActiveTabId);
   const focusedTabIndex = useReduxSelector(selectFocusedTabIndex);
   const drafts          = useReduxSelector(selectDrafts);
+  const hydratedFromServer = useReduxSelector(selectHydratedFromServer);
+  const mergedFromLocal    = useReduxSelector(selectMergedFromLocal);
+  const draftsRef       = useRef(drafts);
+  useEffect(() => { draftsRef.current = drafts; }, [drafts]);
   const tabButtonRefs   = useRef<Array<HTMLButtonElement | null>>([]);
   const nameDraft       = (activeTabId && drafts[activeTabId]?.nameDraft) ?? (tabs.find((t: { id: string; name: string }) => t.id === activeTabId)?.name ?? 'Untitled');
+
+  // AIDEV-NOTE: Cache last known non-empty editor value per tab to defend against transient clears.
+  const lastEditorValueByTabRef = useRef<Record<string, string>>({});
 
   // AIDEV-NOTE: Precompute saveDisabled and editor onChange to keep hooks order stable
   const saveDisabled = useMemo(() => {
@@ -71,11 +90,20 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
     return (nameDraft === savedName) && (draftSql === savedSql);
   }, [tabs, activeTabId, nameDraft, drafts]);
 
-  const editorOnChange = useEvent(
-    useDebouncedCallback((text: string) => {
-      if (activeTabId) dispatch(setSqlDraftAction({ id: activeTabId, sql: text }));
-    }, 150)
-  );
+  // AIDEV-NOTE: Track if we're loading content to prevent saving drafts during tab switches
+  const isLoadingContent = useRef(false);
+
+  // AIDEV-NOTE: Debounced draft saver that captures tab id as an argument to avoid
+  // late-binding to a changed activeTabId when the timeout fires after navigation.
+  const debouncedSaveDraft = useDebouncedCallback((id: string, text: string) => {
+    dispatch(setSqlDraftAction({ id, sql: text }));
+  }, 150);
+
+  const editorOnChange = useEvent((text: string) => {
+    if (!activeTabId) return;
+    if (isLoadingContent.current) return;
+    debouncedSaveDraft(activeTabId, text);
+  });
 
   const runFromToolbar = useCallback(() => {
     editorRef.current?.runCurrentQuery();
@@ -132,11 +160,35 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
     // AIDEV-NOTE: When active tab changes, load draft-or-saved SQL into provider for editor hydration
     const idx = Math.max(0, tabs.findIndex((t: { id: string }) => t.id === activeTabId));
     const active = tabs[idx];
-    if (active && activeTabId) {
-      const draftSql = drafts[activeTabId]?.sqlDraft;
+    // Only perform hydration after server and local rehydrations have occurred to avoid
+    // immediately overwriting drafts with stale state during the initial mount sequence.
+    if (active && activeTabId && hydratedFromServer && mergedFromLocal) {
+      const d = draftsRef.current;
+      const draftSql = d?.[activeTabId]?.sqlDraft;
+      // Set flag to prevent onChange from saving this as a draft
+      isLoadingContent.current = true;
       setSqlText(draftSql != null ? draftSql : active.sql || '');
+      // Clear flag after a delay longer than the debounce
+      setTimeout(() => { isLoadingContent.current = false; }, 200);
     }
-  }, [activeTabId, tabs, drafts, setSqlText]);
+  }, [activeTabId, tabs, setSqlText, hydratedFromServer, mergedFromLocal]);
+
+  // AIDEV-NOTE: Guard against provider reset after navigation/remount.
+  // If provider sqlText becomes empty but we have a draft/saved value, restore it.
+  useEffect(() => {
+    if (!activeTabId) return;
+    const current = sqlText || '';
+    if (current) return;
+    const d = draftsRef.current;
+    const draftSql = d?.[activeTabId]?.sqlDraft;
+    const savedSql = (tabs.find((t: { id: string }) => t.id === activeTabId)?.sql || '');
+    const next = draftSql != null ? draftSql : savedSql;
+    if (next) {
+      isLoadingContent.current = true;
+      setSqlText(next);
+      setTimeout(() => { isLoadingContent.current = false; }, 200);
+    }
+  }, [sqlText, activeTabId, tabs, setSqlText]);
 
   const handleAddTab = useCallback(async () => {
     snapshotCurrentEditorDraft();
@@ -163,6 +215,9 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
   const handleTabClick = useCallback((index: number, id: string) => {
     // Manual activation: clicking activates; save current tab first.
     snapshotCurrentEditorDraft();
+    // Cancel any pending debounced draft write from the previous tab to avoid
+    // cross-tab overwrites firing after navigation.
+    try { (debouncedSaveDraft as any).cancel?.(); } catch {}
     dispatch(activateTabAction({ id }));
     dispatch(focusTabIndexAction({ index }));
     // Defer navigation by one frame to allow Redux state to render before route remount
@@ -171,7 +226,7 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
       // Fire-and-forget server update; do not block UI or navigation
       Promise.resolve().then(() => activateQuery({ clientId, queryId: id }).catch(() => {}));
     });
-  }, [snapshotCurrentEditorDraft, clientId, router, dispatch]);
+  }, [snapshotCurrentEditorDraft, clientId, router, dispatch, debouncedSaveDraft]);
 
   const handleTablistKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (tabs.length === 0) return;
@@ -192,6 +247,7 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
       e.preventDefault();
       // Activate the focused tab; snapshot current editor draft first.
       snapshotCurrentEditorDraft();
+      try { (debouncedSaveDraft as any).cancel?.(); } catch {}
       const nextId = tabs[(focusedTabIndex + tabs.length) % tabs.length]?.id as string | undefined;
       if (nextId) {
         dispatch(activateTabAction({ id: nextId }));
@@ -199,7 +255,7 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
         Promise.resolve().then(() => activateQuery({ clientId, queryId: nextId }).catch(() => {}));
       }
     }
-  }, [tabs.length, focusedTabIndex, dispatch, snapshotCurrentEditorDraft, clientId, router]);
+  }, [tabs.length, focusedTabIndex, dispatch, snapshotCurrentEditorDraft, clientId, router, debouncedSaveDraft]);
 
   // AIDEV-NOTE: Removed legacy, unused local drag logic; `SplitPane` manages resizing.
 
@@ -248,62 +304,73 @@ function QueryWorkspace({ clientId, initialTabs, initialActiveId }: QueryWorkspa
       />
 
       {/* Active tabpanel wrapping toolbar and content */}
-      {activeTab && (
-        <div
-          id={`panel-${activeTab.id}`}
-          role="tabpanel"
-          aria-labelledby={`tab-${activeTab.id}`}
-          className={styles['tabpanel']}
-        >
-          {/* Toolbar within the active tab panel */}
-          <Toolbar
-            name={nameDraft}
-            onNameChange={renameActiveTab}
-            isRunning={isRunning}
-            onRun={runFromToolbar}
-            onSave={async () => {
-              const latestText = getCurrentEditorText();
-              if (activeTabId) {
-                // push latest draft to store then commit
-                dispatch(setSqlDraftAction({ id: activeTabId, sql: latestText }));
-                dispatch(commitSaveActiveAction());
-                try {
-                  await saveQueryContent({ clientId, queryId: activeTabId, name: nameDraft, sql: latestText });
-                } catch {}
-              }
-            }}
-            saveDisabled={saveDisabled}
-          />
+      <div
+        id={activeTab ? `panel-${activeTab.id}` : 'panel-empty'}
+        role="tabpanel"
+        aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
+        className={styles['tabpanel']}
+        style={{ display: activeTab ? 'contents' : 'none' }}
+      >
+        {/* Toolbar within the active tab panel */}
+        <Toolbar
+          name={nameDraft}
+          onNameChange={renameActiveTab}
+          isRunning={isRunning}
+          onRun={runFromToolbar}
+          onSave={async () => {
+            const latestText = getCurrentEditorText();
+            if (activeTabId) {
+              // push latest draft to store then commit
+              dispatch(setSqlDraftAction({ id: activeTabId, sql: latestText }));
+              dispatch(commitSaveActiveAction());
+              try {
+                await saveQueryContent({ clientId, queryId: activeTabId, name: nameDraft, sql: latestText });
+              } catch {}
+            }
+          }}
+          saveDisabled={saveDisabled}
+        />
 
-          <SplitPane
-            top={(
-              <SQLEditor
-                editorRef={editorRef}
-                onChange={editorOnChange}
-              />
-            )}
-            bottom={<QueryResults />}
-            topStyle={topStyle}
-            bottomStyle={bottomStyle}
-            topRef={topPanelRef}
-            bottomRef={bottomPanelRef}
-            containerRef={containerRef as React.RefObject<HTMLElement | null>}
-            getRatio={() => topRatio}
-            onChangeImmediate={(r) => {
-              const topPct = Math.round(r * 100);
-              const bottomPct = Math.round((1 - r) * 100);
-              const topEl = topPanelRef.current;
-              const botEl = bottomPanelRef.current;
-              if (topEl) topEl.style.height = `${topPct}%`;
-              if (botEl) botEl.style.height = `${bottomPct}%`;
-            }}
-            onCommit={(r) => {
-              dispatch(setSplitRatio(r));
-              try { window.localStorage.setItem(STORAGE_KEY_SPLIT, JSON.stringify({ ratio: r })); } catch {}
-            }}
-          />
-        </div>
-      )}
+        <SplitPane
+          top={(
+            <SQLEditor
+              editorRef={editorRef}
+              onChange={editorOnChange}
+              value={(function computeValue() {
+                const id = (activeTabId || '') as string;
+                const saved = ((tabs.find((t: { id: string }) => t.id === id)?.sql) || '') as string;
+                const draft = (id && drafts[id]?.sqlDraft != null ? (drafts[id]?.sqlDraft as string) : undefined);
+                let next = (draft != null ? draft : saved) as string;
+                if (!next && id) {
+                  const cached = lastEditorValueByTabRef.current[id];
+                  if (cached) next = cached;
+                }
+                if (id && next) lastEditorValueByTabRef.current[id] = next;
+                return next;
+              })() as string}
+            />
+          )}
+          bottom={<QueryResults />}
+          topStyle={topStyle}
+          bottomStyle={bottomStyle}
+          topRef={topPanelRef}
+          bottomRef={bottomPanelRef}
+          containerRef={containerRef as React.RefObject<HTMLElement | null>}
+          getRatio={() => topRatio}
+          onChangeImmediate={(r) => {
+            const topPct = Math.round(r * 100);
+            const bottomPct = Math.round((1 - r) * 100);
+            const topEl = topPanelRef.current;
+            const botEl = bottomPanelRef.current;
+            if (topEl) topEl.style.height = `${topPct}%`;
+            if (botEl) botEl.style.height = `${bottomPct}%`;
+          }}
+          onCommit={(r) => {
+            setTopRatio(r);
+            try { window.localStorage.setItem(STORAGE_KEY_SPLIT, JSON.stringify({ ratio: r })); } catch {}
+          }}
+        />
+      </div>
     </div>
   );
 }

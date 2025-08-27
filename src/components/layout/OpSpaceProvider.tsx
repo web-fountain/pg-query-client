@@ -116,6 +116,23 @@ function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
     applyCssWidths(state.left.width, state.right.width);
   }, [state.left.width, state.right.width]);
 
+  // Keep root collapsed attributes in sync for CSS fallback rules (post-hydration)
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (state.left.collapsed) {
+        document.documentElement.setAttribute('data-op-space-left-collapsed', '');
+      } else {
+        document.documentElement.removeAttribute('data-op-space-left-collapsed');
+      }
+      if (state.right.collapsed) {
+        document.documentElement.setAttribute('data-op-space-right-collapsed', '');
+      } else {
+        document.documentElement.removeAttribute('data-op-space-right-collapsed');
+      }
+    } catch {}
+  }, [hydrated, state.left.collapsed, state.right.collapsed]);
+
   // AIDEV-NOTE: Stable callbacks to avoid tearing down resizer listeners mid-drag
   const getConfigCb = useCallback((side: Side) => state[side], [state]);
 
@@ -155,9 +172,10 @@ function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const swapSidesCb = useCallback(() => {
+    // AIDEV-NOTE: Swap content placement AND propagate the visible width/collapsed to the opposite side
     setState(prev => ({
-      left: { ...prev.right },
-      right: { ...prev.left },
+      left:  { ...prev.left,  width: prev.right.width, collapsed: prev.right.collapsed },
+      right: { ...prev.right, width: prev.left.width,  collapsed: prev.left.collapsed  },
       contentSwapped: !prev.contentSwapped
     }));
   }, []);

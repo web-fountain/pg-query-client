@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { interVariable, interDisplay } from '@Lib/fonts';
+import OpSpaceLayoutProvider            from '@Components/layout/OpSpaceProvider';
 import StoreProvider from '@Redux/StoreProvider';
 
 import '@Styles/scale.css';
@@ -65,7 +66,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
             __html: `
               (function() {
                 try {
-                  var raw = localStorage.getItem('pg-query-client/layout');
+                  var raw = localStorage.getItem('pg-query-client/panel-layout') || localStorage.getItem('pg-query-client/layout');
                   if (!raw) return;
                   var parsed = JSON.parse(raw) || {};
                   var left  = parsed.left  || {};
@@ -91,7 +92,9 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
 
       <body>
         <StoreProvider>
-          {children}
+          <OpSpaceLayoutProvider>
+            {children}
+          </OpSpaceLayoutProvider>
         </StoreProvider>
       </body>
 

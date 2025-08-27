@@ -2,15 +2,13 @@ import { configureStore } from '@reduxjs/toolkit';
 
 import routeReducer       from './records/route';
 import tabsReducer        from './records/tabs';
-import layoutReducer      from './records/layout';
 
 
 const makeStore = (preloadedState?: Partial<{ route: any; tabs: any; layout: any }>) => {
   return configureStore({
     reducer: {
       route   : routeReducer,
-      tabs    : tabsReducer,
-      layout  : layoutReducer
+      tabs    : tabsReducer
     },
     preloadedState
   });

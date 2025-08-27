@@ -3,12 +3,7 @@
 import type { ReactElement, ReactNode } from 'react';
 
 import React                            from 'react';
-import { useReduxSelector }             from '@Redux/storeHooks';
-import {
-  selectPanelLeft,
-  selectPanelRight,
-  selectContentSwapped
-}                                       from '@Redux/records/layout';
+import { useOpSpaceLayout }             from '../OpSpaceProvider';
 import QueryToolPanel                   from '../QueryToolPanel';
 import ResizableHandle                  from '../ResizableHandle';
 
@@ -20,9 +15,10 @@ type PanelChild = ReactElement<{ collapsed: boolean; side?: Side }>;
 
 function PanelLayout({ children, left, right }: { children: ReactNode; left?: PanelChild; right?: PanelChild }) {
   // AIDEV-NOTE: Side content is provided via slots; layout owns placement and collapse state via Redux.
-  const leftCfg         = useReduxSelector(selectPanelLeft);
-  const rightCfg        = useReduxSelector(selectPanelRight);
-  const contentSwapped  = useReduxSelector(selectContentSwapped);
+  const layoutCtx       = useOpSpaceLayout();
+  const leftCfg         = layoutCtx.getConfig('left');
+  const rightCfg        = layoutCtx.getConfig('right');
+  const contentSwapped  = layoutCtx.isContentSwapped();
 
   const leftSlot  = contentSwapped ? right : left;
   const rightSlot = contentSwapped ? left  : right;

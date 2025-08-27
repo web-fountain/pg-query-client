@@ -179,16 +179,16 @@ const editingRevealPlugin = ViewPlugin.fromClass(class {
   destroy() { this.clear(); }
 });
 
-type SQLEditorProps = { onChange?: (value: string) => void; editorRef?: React.Ref<SQLEditorHandle | null> };
+type SQLEditorProps = { onChange?: (value: string) => void; editorRef?: React.Ref<SQLEditorHandle | null>; value?: string };
 
-function SQLEditorImpl({ onChange, editorRef }: SQLEditorProps) {
-  const { runQuery, setSqlText, sqlText } = useSqlRunner();
+function SQLEditorImpl({ onChange, editorRef, value }: SQLEditorProps) {
+  const { runQuery, setSqlText } = useSqlRunner();
   const { getLinter } = useSQLValidator();
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
   // AIDEV-NOTE: Uncontrolled model — keep latest value and view in refs to avoid React re-renders while typing.
   const editorViewRef = useRef<EditorView | null>(null);
-  const latestTextRef = useRef<string>(sqlText);
+  const latestTextRef = useRef<string>(value || '');
   const submitRef = useRef<() => void>(() => {});
 
   // AIDEV-NOTE: Compartments hoisted to refs so we can reconfigure without rebuilding the extension pipeline.
@@ -245,24 +245,10 @@ function SQLEditorImpl({ onChange, editorRef }: SQLEditorProps) {
   // AIDEV-NOTE: Capture the EditorView instance once created.
   const handleCreateEditor = useCallback((view: EditorView) => {
     editorViewRef.current = view;
-    // Initialize editor content with provider-supplied text.
-    const initial = sqlText || '';
-    latestTextRef.current = initial;
-    if (initial) {
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: initial } });
-    }
-  }, [sqlText]);
+    // Initialize latest text ref; CodeMirror will receive `value` via controlled prop.
+    latestTextRef.current = value || '';
+  }, [value]);
 
-  // AIDEV-NOTE: When provider `sqlText` changes externally, update the doc via CM transaction.
-  useEffect(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-    const next = sqlText || '';
-    if (next !== latestTextRef.current) {
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } });
-      latestTextRef.current = next;
-    }
-  }, [sqlText]);
 
   // AIDEV-NOTE: Reconfigure linter extension without rebuilding the pipeline.
   useEffect(() => {
@@ -300,6 +286,7 @@ function SQLEditorImpl({ onChange, editorRef }: SQLEditorProps) {
           className={styles['editor']}
           height="100%"
           theme={cmColorTheme}
+          value={value || ''}
           basicSetup={useMemo(() => ({
             bracketMatching: true,
             closeBrackets: true,

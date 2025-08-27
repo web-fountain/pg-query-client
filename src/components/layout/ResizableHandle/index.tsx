@@ -2,31 +2,23 @@
 
 import { useRef }  from 'react';
 
-import { useReduxDispatch }                 from '@Redux/storeHooks';
-import {
-  collapseSide as collapseSideAction,
-  expandSide as expandSideAction,
-  setSideWidth as setSideWidthAction,
-  selectPanelLeft,
-  selectPanelRight
-}                                           from '@Redux/records/layout';
-import { useReduxSelector }                 from '@Redux/storeHooks';
+import { useOpSpaceLayout }                 from '../OpSpaceProvider';
 import { useDragResize, useSeparatorAria }  from './hooks';
 import { clamp }                            from './utils/math';
 import styles                               from './styles.module.css';
 
 
 function ResizableHandle({ side }: { side: 'left' | 'right' }) {
-  const dispatch = useReduxDispatch();
-  const leftCfg  = useReduxSelector(selectPanelLeft);
-  const rightCfg = useReduxSelector(selectPanelRight);
+  const layoutCtx = useOpSpaceLayout();
+  const leftCfg  = layoutCtx.getConfig('left');
+  const rightCfg = layoutCtx.getConfig('right');
   const { ariaMin, ariaMax, ariaNow, setAriaNow, controlledId } = useSeparatorAria(side);
   const actualDragOccurred  = useRef(false);
   const ref                 = useRef<HTMLDivElement>(null);
 
-  const setSideWidth = (s: 'left' | 'right', px: number) => dispatch(setSideWidthAction({ side: s, px }));
-  const expandSide   = (s: 'left' | 'right') => dispatch(expandSideAction(s));
-  const collapseSide = (s: 'left' | 'right') => dispatch(collapseSideAction(s));
+  const setSideWidth = (s: 'left' | 'right', px: number) => layoutCtx.setSideWidth(s, px);
+  const expandSide   = (s: 'left' | 'right') => layoutCtx.expandSide(s);
+  const collapseSide = (s: 'left' | 'right') => layoutCtx.collapseSide(s);
 
   useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setAriaNow, controlledId });
 

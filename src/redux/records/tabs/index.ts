@@ -58,6 +58,17 @@ export const selectDrafts = createSelector.withTypes<RootState>()(
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
+export const selectHydratedFromServer = createSelector.withTypes<RootState>()(
+  [state => state.tabs.hydratedFromServer],
+  (hydrated) => hydrated,
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+export const selectMergedFromLocal = createSelector.withTypes<RootState>()(
+  [state => state.tabs.mergedFromLocal],
+  (merged) => merged,
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+
 // Reducer
 const reducer = createReducer(initialState, (builder) => {
   builder

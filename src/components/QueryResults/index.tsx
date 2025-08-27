@@ -2,9 +2,7 @@
 
 import type { DataQueryExecutionRecord }                from './types';
 
-import { useMemo }                                      from 'react';
-import { useReduxDispatch, useReduxSelector }           from '@Redux/storeHooks';
-import { selectResultsActiveTab, setResultsActiveTab }  from '@Redux/records/layout';
+import { useMemo, useState }                            from 'react';
 import JSONEditor                                       from '@Components/JSONEditor';
 import { useSqlRunner }                                 from '@Components/providers/SQLRunnerProvider';
 
@@ -13,8 +11,7 @@ import styles                                           from './styles.module.cs
 
 function QueryResults() {
   const { lastResult, lastError, sqlText } = useSqlRunner();
-  const activeTab = useReduxSelector(selectResultsActiveTab);
-  const dispatch = useReduxDispatch();
+  const [activeTab, setActiveTab] = useState<'data-output' | 'messages'>('data-output');
 
   // AIDEV-NOTE: Shape current provider results into the requested DataQueryExecutionRecord.
   const executionPayload = useMemo<DataQueryExecutionRecord | null>(() => {
@@ -71,7 +68,7 @@ function QueryResults() {
             aria-selected={activeTab === 'data-output'}
             className={styles['tab']}
             tabIndex={activeTab === 'data-output' ? 0 : -1}
-            onClick={() => dispatch(setResultsActiveTab('data-output'))}
+            onClick={() => setActiveTab('data-output')}
           >
             Data Output
           </button>
@@ -82,7 +79,7 @@ function QueryResults() {
             aria-selected={activeTab === 'messages'}
             className={styles['tab']}
             tabIndex={activeTab === 'messages' ? 0 : -1}
-            onClick={() => dispatch(setResultsActiveTab('messages'))}
+            onClick={() => setActiveTab('messages')}
           >
             Messages
           </button>
