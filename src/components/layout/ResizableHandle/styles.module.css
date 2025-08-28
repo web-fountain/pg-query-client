@@ -2,7 +2,7 @@
   width: 100%;
   height: 100%;
   cursor: col-resize;
-  background: var(--border-color);
+  background: transparent;
   touch-action: none;
   user-select: none;
   position: relative;
@@ -11,9 +11,33 @@
   /* a11y focus */
   outline: none;
 }
-.handle:hover,
-.handle:focus {
+.handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--border-color);
+  opacity: 0;
+  transition: opacity var(--duration-150) var(--ease-standard);
+}
+.handle:hover::before,
+.handle:focus::before {
+  opacity: 1;
   background: var(--resizer-hover);
+}
+
+/* AIDEV-NOTE: Offset hover track half outside of the panel edge, similar to SplitPane */
+.handle[data-side="left"]::before {
+  width: var(--op-space-layout-resizer-width);
+  left: calc(var(--op-space-layout-resizer-width) * -0.5);
+  right: auto;
+}
+.handle[data-side="right"]::before {
+  width: var(--op-space-layout-resizer-width);
+  right: calc(var(--op-space-layout-resizer-width) * -0.5);
+  left: auto;
 }
 
 .collapsed-left {

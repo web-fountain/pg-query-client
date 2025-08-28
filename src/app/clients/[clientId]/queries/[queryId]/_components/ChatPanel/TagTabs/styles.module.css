@@ -1,0 +1,26 @@
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tag, .tag-chip {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-8);
+  border: var(--border-1) solid var(--border-tertiary);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tag-chip {
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tag-chip .label { order: 0; }
+.tag-chip .close { order: 1; opacity: 0; display: inline-flex; align-items: center; }
+.tag-chip:hover .close { opacity: 1; }
+
+/* media/container queries at the bottom (reserved) */

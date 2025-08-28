@@ -26,9 +26,9 @@
       var(--op-space-layout-left-panel-width),
       var(--calculated-panel-max-width)
     )
-    var(--op-space-layout-resizer-width)
+    0
     minmax(var(--calculated-center-min-width), 1fr)
-    var(--op-space-layout-resizer-width)
+    0
     clamp(
       var(--op-space-layout-panel-min-width),
       var(--op-space-layout-right-panel-width),
@@ -73,7 +73,7 @@
 }
 .panel-layout .handle-left,
 .panel-layout .handle-right {
-  inline-size: var(--op-space-layout-resizer-width);
+  inline-size: 0;
   block-size: 100%;
   cursor: col-resize;
 }
@@ -91,9 +91,9 @@
 .panel-layout[data-left-collapsed] {
   grid-template-columns:
     var(--op-space-layout-panel-collapsed-width)
-    var(--op-space-layout-resizer-width)
+    0
     minmax(var(--calculated-center-min-width), 1fr)
-    var(--op-space-layout-resizer-width)
+    0
     clamp(
       var(--op-space-layout-panel-min-width),
       var(--op-space-layout-right-panel-width),
@@ -119,9 +119,9 @@
       var(--op-space-layout-left-panel-width),
       var(--calculated-panel-max-width)
     )
-    var(--op-space-layout-resizer-width)
+    0
     minmax(var(--calculated-center-min-width), 1fr)
-    var(--op-space-layout-resizer-width)
+    0
     var(--op-space-layout-panel-collapsed-width);
 }
 :root[data-op-space-right-collapsed] .panel-layout:not([data-right-collapsed]) {
@@ -140,10 +140,14 @@
 /* AIDEV-NOTE: Collapsed panels now show at 40px width with icon-only content */
 
 /* Optional visuals */
-.panel-layout .left-side,
+/* AIDEV-NOTE: Side panel borders only on inner edges */
+.panel-layout .left-side {
+  border-inline-end: var(--border-1) solid var(--border-color);
+  background: var(--surface-1);
+}
 .panel-layout .right-side {
-  border:     var(--border-1) solid var(--border-color);
-  background: var(--surface-2);
+  border-inline-start: var(--border-1) solid var(--border-color);
+  background: var(--surface-1);
 }
 .panel-layout .center {
   background: var(--surface-1);
@@ -156,9 +160,9 @@
 .panel-layout[data-left-collapsed][data-right-collapsed] {
   grid-template-columns:
     var(--op-space-layout-panel-collapsed-width)
-    var(--op-space-layout-resizer-width)
+    0
     minmax(0, 1fr)
-    var(--op-space-layout-resizer-width)
+    0
     var(--op-space-layout-panel-collapsed-width);
 }
 

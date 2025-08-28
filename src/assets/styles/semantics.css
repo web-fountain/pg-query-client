@@ -40,10 +40,11 @@
     --button-text-disabled:  #aeb2b8;
 
     /* component roles: icons */
-    --icon-fill:   #888995;
-    --icon-hover:  color-mix(in oklch, var(--foreground) 95%, transparent);
-    --icon-active: var(--foreground);
-    --icon-blue:   #5189cb;
+    --icon-fill:      #888995;
+    --icon-hover:     color-mix(in oklch, var(--foreground) 95%, transparent);
+    --icon-active:    var(--foreground);
+    --icon-disabled:  #555555;
+    --icon-blue:      #5189cb;
 
     /* component roles: resizers */
     --resizer-hover: #0078d4;

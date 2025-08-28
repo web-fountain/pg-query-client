@@ -1,13 +1,26 @@
 'use client';
 
+import { useState }         from 'react';
 import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
 import { useClientRoute }   from '../../_providers/ClientRouteProvider';
+import { useChat }          from '../../../_providers/ChatProvider';
+import Composer             from './Composer';
+import MessageList          from './MessageList';
 import styles               from './styles.module.css';
 
 
 function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
   const layout        = useOpSpaceLayout();
   const { clientId }  = useClientRoute();
+
+  // AIDEV-NOTE: Use ChatProvider so chat persists across QueryWorkspace tab switches.
+  const { messages, send } = useChat();
+  const [model, setModel]       = useState<string>('gpt-4o-mini');
+  const [tags, setTags]         = useState<string[]>([]);
+
+  function handleSend(text: string) { send(text); }
+
+  function handleToggleTag(tag: string) { setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])); }
 
   return (
     <div
@@ -23,7 +36,42 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
           </svg>
         </div>
       ) : (
-        <div className={styles['placeholder']}>Chat Panel (client {clientId.slice(0, 8)}…)</div>
+        <div className={styles['content']}>
+          {messages.length === 0 && (
+            <Composer
+              model={model}
+              onModelChange={setModel}
+              onSend={handleSend}
+              tags={tags}
+              onToggleTag={handleToggleTag}
+              placement="top"
+            />
+          )}
+
+          <div className={styles['messages']}>
+            <MessageList
+              messages={messages}
+              model={model}
+              onModelChange={setModel}
+              onSend={handleSend}
+              tags={tags}
+              onToggleTag={handleToggleTag}
+              />
+          </div>
+
+          {messages.length > 0 && (
+            <div className={styles['composer-dock']}>
+              <Composer
+                model={model}
+                onModelChange={setModel}
+                onSend={handleSend}
+                tags={tags}
+                onToggleTag={handleToggleTag}
+                placement="bottom"
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -64,6 +64,7 @@ function ResizableHandle({ side }: { side: 'left' | 'right' }) {
           : ''
         }
       `}
+      data-side={side}
       role="separator"
       aria-orientation="vertical"
       tabIndex={0}

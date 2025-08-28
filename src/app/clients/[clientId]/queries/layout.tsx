@@ -2,13 +2,16 @@
 
 import type { ReactNode }     from 'react';
 import { SQLRunnerProvider }  from './_providers/SQLRunnerProvider';
+import { ChatProvider }       from './_providers/ChatProvider';
 
 
 async function Layout({ children, params }: { children: ReactNode; params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
   return (
     <SQLRunnerProvider clientId={clientId}>
-      {children}
+      <ChatProvider>
+        {children}
+      </ChatProvider>
     </SQLRunnerProvider>
   );
 }

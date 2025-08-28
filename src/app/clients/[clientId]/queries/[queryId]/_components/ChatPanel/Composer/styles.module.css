@@ -1,0 +1,81 @@
+.composer {
+  display:        flex;
+  flex-direction: column;
+  row-gap:        var(--space-2);
+  padding:        var(--space-2);
+  border:         var(--border-1) solid var(--border-tertiary);
+  border-radius:  var(--radius-8);
+  background:     var(--surface-2);
+}
+
+.row-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  height: 28px;
+}
+
+.row-editor {
+  display: flex;
+  max-height: var(--space-52);
+  overflow-y: auto;
+}
+.editor-input {
+  width: 100%;
+  /* min-height: 96px; */
+  resize: vertical;
+  color: var(--text-primary);
+  border: var(--border-1) solid var(--border-primary);
+  border-radius: var(--radius-8);
+  outline: none;
+}
+
+.row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  margin-top: 10px;
+}
+.controls-left  { display: flex; align-items: center; gap: var(--space-1); }
+.controls-right { display: flex; align-items: center; gap: var(--space-1); }
+
+.send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-8);
+  border: var(--border-1) solid var(--button-border-primary);
+  background: transparent;
+  color: var(--button-text);
+  cursor: pointer;
+
+  > svg {
+    width: 28px;
+    height: 28px;
+    color: var(--surface-4);
+    transition: transform var(--duration-150) var(--ease-standard);
+    transform-origin: 50% 50%;
+  }
+}
+.send:hover { color: var(--text-muted); }
+
+/* AIDEV-NOTE: Subtle grow on hover/focus to suggest pressable control */
+.send:hover > svg,
+.send:focus-visible > svg { transform: scale(1.08); }
+
+/* Disabled state: no hover transform and muted color */
+.send[data-disabled] {
+  cursor: default;
+}
+.send[data-disabled] > svg {
+  color: var(--icon-disabled);
+  transform: none !important;
+}
+
+.row-footer { display: none; }
+
+/* media/container queries at the bottom (reserved) */
