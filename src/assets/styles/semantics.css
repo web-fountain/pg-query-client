@@ -27,6 +27,8 @@
     --surface-modal:      var(--surface-1);
     --surface-hover:      var(--surface-2);
     --surface-input:      var(--surface-3);
+    /* AIDEV-NOTE: Selected/active surface used for selected list/options, etc. */
+    --surface-selected:   #23242f;
     --surface-control:    var(--surface-1);
     --surface-disabled:   color-mix(in oklch, var(--surface-1) 92%, black);
     --surface-sql-editor: var(--surface-4);

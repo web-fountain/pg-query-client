@@ -54,7 +54,7 @@ type ComposerProps = {
 };
 
 function Composer({
-  model = 'gpt-4o-mini',
+  model = 'gpt-5',
   onModelChange,
   onSend,
   tags = [],
@@ -141,7 +141,7 @@ function Composer({
       {/* controls: model select (left) and send (right) */}
       <div className={styles['row-controls']}>
         <div className={styles['controls-left']}>
-          <ModelSelect model={model} onChange={(m) => onModelChange?.(m)} />
+          <ModelSelect model={model} onChange={(m) => onModelChange?.(m)} placement={placement} />
         </div>
         <div className={styles['controls-right']}>
           <button

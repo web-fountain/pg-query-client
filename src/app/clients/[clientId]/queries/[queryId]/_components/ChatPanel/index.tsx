@@ -15,7 +15,7 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
 
   // AIDEV-NOTE: Use ChatProvider so chat persists across QueryWorkspace tab switches.
   const { messages, send } = useChat();
-  const [model, setModel]       = useState<string>('gpt-4o-mini');
+  const [model, setModel]       = useState<string>('gpt-5');
   const [tags, setTags]         = useState<string[]>([]);
 
   function handleSend(text: string) { send(text); }

@@ -59,7 +59,7 @@ function MessageComposer({
   collapsed = false,
   expanded = false,
   onChange,
-  model = 'gpt-4o-mini',
+  model = 'gpt-5',
   onModelChange,
   onSend,
   tags = [],
@@ -165,7 +165,7 @@ function MessageComposer({
       {expanded ? (
         <div className={styles['row-controls']}>
           <div className={styles['controls-left']}>
-            <ModelSelect model={model} onChange={(m) => onModelChange?.(m)} />
+            <ModelSelect model={model} onChange={(m) => onModelChange?.(m)} placement="bottom" />
           </div>
           <div className={styles['controls-right']}>
             <button

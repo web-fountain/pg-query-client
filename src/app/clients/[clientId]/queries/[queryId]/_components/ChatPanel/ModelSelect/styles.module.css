@@ -1,7 +1,8 @@
 .model-select {
-  display: inline-flex;
+  display: inline-block;
+  position: relative;
   align-items: center;
-  gap: var(--space-2);
+  height: 28px;
 }
 
 .select {
@@ -9,15 +10,96 @@
   min-height: 28px;
   min-width: var(--space-20);
   padding: 0 var(--space-3);
+  padding-left: calc(var(--space-3) + 21px);
+  padding-right: calc(var(--space-6) + 1px);
 
   color: var(--text-muted);
   border: var(--border-1) solid var(--border-primary);
   border-radius: 9999px; /* pill */
   background: var(--surface-input);
+  /* AIDEV-NOTE: Button now acts as trigger; keep visuals consistent. */
 }
 
 .select:hover {
   color: var(--text-primary);
+}
+
+/* AIDEV-NOTE: Overlay the brain icon inside the select field (left side). */
+.icon {
+  position: absolute;
+  top: 50%;
+  left: var(--space-3);
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  /* AIDEV-NOTE: Size the nested <svg> via CSS var consumed by Icon component. */
+  --icon-size: 14px;
+  pointer-events: none;
+}
+
+.model-select:hover .icon {
+  color: var(--text-primary);
+}
+
+/* Right chevron placed inside the select */
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  --icon-size: 12px;
+}
+.model-select:hover .chevron { color: var(--text-primary); }
+
+/* Collapsed mode: hide the label (text) when container is narrow. */
+.model-select[data-collapsed] .select {
+  min-width: 0;
+  padding-left: calc(var(--space-3) + 0px + 16px); /* keep brain icon space */
+}
+.model-select[data-collapsed] .label {
+  display: none;
+}
+
+/* Ensure label is visible when not collapsed */
+.model-select:not([data-collapsed]) .label {
+  display: inline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Popover and options */
+.popover {
+  font-size: var(--text-xs);
+  z-index: 1000;
+  border: var(--border-1) solid var(--border-tertiary);
+  border-radius: var(--radius-8);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--space-1);
+  padding: var(--space-1);
+  margin: 0;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.option {
+  padding: var(--space-2) var(--space-3);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: var(--radius-8);
+}
+.option:hover { background: var(--surface-3); }
+.option[data-selected] {
+  background: var(--surface-selected);
 }
 
 /* media/container queries at the bottom (reserved) */
