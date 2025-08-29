@@ -2,8 +2,8 @@
 
 import type { FormEvent }               from 'react';
 
-import { useMemo, useRef, useState }    from 'react';
-import CodeMirror                       from '@uiw/react-codemirror';
+import { memo, useMemo, useRef, useState }    from 'react';
+import dynamic                          from 'next/dynamic';
 import { createTheme }                  from '@uiw/codemirror-themes';
 import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { EditorState, Prec }            from '@codemirror/state';
@@ -14,6 +14,12 @@ import TagTabs                          from '../TagTabs';
 import ModelSelect                      from '../ModelSelect';
 import styles                           from './styles.module.css';
 
+// AIDEV-NOTE: Defer heavy CodeMirror bundle using next/dynamic; SSR disabled.
+const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), {
+  ssr: false,
+  loading: () => <div className={styles['editor-fallback']} aria-hidden />
+});
+
 // AIDEV-NOTE: Align with SQLEditor/JSONEditor: structural theme via EditorView.theme,
 // color theme via createTheme for future customization.
 const cmStructuralTheme = EditorView.theme({
@@ -21,7 +27,7 @@ const cmStructuralTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-content': { padding: '0' },
   '.cm-scroller': { overflow: 'auto' },
-  '.cm-editor': { border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-8)' },
+  '.cm-editor': { border: 'none', borderRadius: 'var(--radius-8)', background: 'transparent' },
   '.cm-cursor': { borderLeftColor: 'var(--white)' },
   '.cm-dropCursor': { borderLeftColor: 'var(--white)' },
   '.cm-line': { padding: '0' }
@@ -63,6 +69,7 @@ function Composer({
 }: ComposerProps) {
   const viewRef   = useRef<EditorView | null>(null);
   const [hasText, setHasText] = useState<boolean>(false);
+  const prevHasTextRef = useRef<boolean>(false);
 
   function submit(e?: FormEvent) {
     if (e) e.preventDefault();
@@ -70,8 +77,11 @@ function Composer({
     if (!view) return;
     const text = view.state.doc.toString().trim();
     if (!text) return;
+
     onSend?.(text);
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '' } });
+    // AIDEV-NOTE: Edge-only hasText updates to avoid re-renders on every keystroke
+    prevHasTextRef.current = false;
     setHasText(false);
   }
 
@@ -133,7 +143,14 @@ function Composer({
           }}
           theme={cmColorTheme}
           extensions={extensions}
-          onChange={(val) => { setHasText(val.trim().length > 0); }}
+          onChange={(val) => {
+            // AIDEV-NOTE: Only update hasText when boolean edge changes (0->1 or 1->0)
+            const next = val.trim().length > 0;
+            if (prevHasTextRef.current !== next) {
+              prevHasTextRef.current = next;
+              setHasText(next);
+            }
+          }}
           onCreateEditor={(view) => { viewRef.current = view; }}
         />
       </div>
@@ -166,4 +183,4 @@ function Composer({
   );
 }
 
-export default Composer;
+export default memo(Composer);

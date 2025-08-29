@@ -16,10 +16,6 @@
   align-items: center;
 }
 
-.placeholder {
-  opacity: 0.7;
-}
-
 .content {
   display:        flex;
   flex-direction: column;
@@ -29,13 +25,10 @@
 }
 
 .messages {
-  display:        flex;
-  flex-direction: column;
-  gap:            var(--space-5);
-  overflow-y:     auto;
-  overflow-x:     hidden;
+  display:        block; /* Virtuoso manages items */
+  overflow-y:     hidden; /* Virtuoso handles its own scroll */
   min-height:     0;
-  flex:           1; /* consume remaining space; keeps composer at bottom */
+  flex:           1;
 }
 
 .collapsed-icon {

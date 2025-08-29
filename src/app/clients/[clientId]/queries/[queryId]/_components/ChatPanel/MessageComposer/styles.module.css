@@ -16,15 +16,35 @@
   height: 28px;
 }
 
-.row-editor { display: flex; }
+.row-editor { display: flex; align-items: stretch; }
 .editor-input {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
+  box-sizing: border-box;
   min-height: 0; /* let content determine height in bubble mode */
   resize: vertical;
   color: var(--text-primary);
   border: var(--border-1) solid var(--border-primary);
   border-radius: var(--radius-8);
   outline: none;
+  background: transparent;
+}
+
+/* AIDEV-NOTE: Lightweight placeholder for deferred CodeMirror */
+.editor-fallback {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: var(--border-1) solid var(--border-primary);
+  border-radius: var(--radius-8);
+  background: transparent;
+  line-height: var(--leading-normal);
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .row-controls {
@@ -87,7 +107,7 @@
 .composer[data-expanded] .row-editor {
   max-height: var(--space-52);
   overflow-y: auto;
-  margin-inline-end: calc(-1*var(--px-4));
+  /* margin-inline-end: calc(-1 * var(--px-4)); */
 }
 
 /* Control CodeMirror scroller overflow per collapsed/expanded state */
@@ -97,6 +117,15 @@
 .composer[data-expanded] :global(.cm-scroller) {
   overflow-y: auto !important;
   overflow-x: hidden !important;
+  scrollbar-gutter: stable !important;
+}
+
+/* Ensure CodeMirror internals expand to full width */
+.row-editor :global(.cm-theme),
+.row-editor :global(.cm-editor),
+.row-editor :global(.cm-scroller) {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* media/container queries at the bottom (reserved) */

@@ -1,10 +1,19 @@
 .message-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+  display: block; /* Virtuoso positions items; avoid flex/gap here */
+  padding-bottom: var(--space-6); /* ensure last item has breathing room above sticky composer */
 }
 
-.message { display: contents; }
+/* Virtuoso root to fill container height and avoid double scroll */
+.virtuoso {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+.message { display: block; margin-bottom: var(--space-5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .send > svg { transition: none; }
+}
 
 .user-bubble {
   padding: var(--space-2);
@@ -15,10 +24,13 @@
   overflow-wrap: anywhere; /* wrap long unbroken strings */
   word-break: break-word;
   max-height: none;
+  contain: content; /* isolate layout/paint for smoother scroll */
 }
 
 .user-bubble[data-collapsed] {
   cursor: pointer;
+  max-height: var(--space-22);
+  overflow: hidden;
 }
 
 .assistant { display: grid; gap: var(--space-2); }
@@ -32,5 +44,16 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* Plain text renderer for collapsed user messages */
+.user-plain {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Spacer footer rendered by Virtuoso to prevent cutoff at the bottom */
+.list-footer { height: var(--space-4); }
 
 /* media/container queries at the bottom (reserved) */

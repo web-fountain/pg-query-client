@@ -3,6 +3,10 @@
 import type { ReactNode }     from 'react';
 import { SQLRunnerProvider }  from './_providers/SQLRunnerProvider';
 import { ChatProvider }       from './_providers/ChatProvider';
+import Titlebar               from '@Components/layout/Titlebar';
+import PanelLayout            from '@Components/layout/PanelLayout';
+import ChatPanel              from './[queryId]/_components/ChatPanel';
+import DirectoryPanel         from './[queryId]/_components/DirectoryPanel';
 
 
 async function Layout({ children, params }: { children: ReactNode; params: Promise<{ clientId: string }> }) {
@@ -10,7 +14,13 @@ async function Layout({ children, params }: { children: ReactNode; params: Promi
   return (
     <SQLRunnerProvider clientId={clientId}>
       <ChatProvider>
-        {children}
+        <Titlebar />
+        <PanelLayout
+          left={<ChatPanel collapsed={false} side="left" />}
+          right={<DirectoryPanel collapsed={false} side="right" />}
+        >
+          {children}
+        </PanelLayout>
       </ChatProvider>
     </SQLRunnerProvider>
   );

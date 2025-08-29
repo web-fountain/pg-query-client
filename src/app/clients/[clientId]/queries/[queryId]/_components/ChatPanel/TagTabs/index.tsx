@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Icon   from '@Components/Icons';
 import styles from './styles.module.css';
 
@@ -26,18 +27,13 @@ function TagTabs({ tags = [], onToggle }: Props) {
             type="button"
             className={className}
             onClick={() => {
-              if (isDefault) {
-                console.log('Default context tag clicked');
-              } else {
-                console.log('Tag clicked:', tag);
-                onToggle?.(tag);
-              }
+              if (!isDefault) { onToggle?.(tag); }
             }}
           >
             <span className={styles['label']}>{display}</span>
             {!isDefault && (
               <span className={styles['close']}
-                onClick={(e) => { e.stopPropagation(); console.log('Remove tag:', tag); onToggle?.(tag); }}
+                onClick={(e) => { e.stopPropagation(); onToggle?.(tag); }}
                 aria-label={`Remove ${tag}`}
                 role="img"
               >
@@ -51,4 +47,4 @@ function TagTabs({ tags = [], onToggle }: Props) {
   );
 }
 
-export default TagTabs;
+export default memo(TagTabs);

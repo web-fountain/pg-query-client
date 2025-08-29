@@ -1,0 +1,83 @@
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-1);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: var(--text-xxs);
+  letter-spacing: var(--tracking-widest);
+}
+
+.title { font-weight: var(--semi-bold); }
+
+.toolbar {
+  display: flex;
+  gap: var(--space-2);
+  padding-inline: var(--space-1);
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-8);
+  color: var(--text-primary);
+  background: var(--surface-3);
+}
+.tool:hover { background: var(--surface-2); }
+.tool:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.list { user-select: none; /* AIDEV-NOTE: preserve selection for tree a11y via roving tabindex */ }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-8);
+  color: var(--text-primary);
+}
+.row:hover { background: var(--surface-hover); }
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-4);
+  color: var(--text-secondary);
+  background: transparent;
+}
+.toggle:hover { background: var(--surface-3); }
+
+.spacer { display: inline-block; width: var(--space-4); }
+
+.type-icon { color: var(--icon-blue); display: inline-flex; }
+.name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.action {
+  visibility: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--icon-fill);
+  border-radius: var(--radius-4);
+}
+.row:hover .action { visibility: visible; }
+.action:hover { color: var(--icon-active); background: var(--surface-3); }
+
+/* AIDEV-NOTE: container queries or media queries can refine spacing at wider widths */
+@media (min-width: 90rem) {
+  .row { padding-block: var(--space-2_5); }
+}

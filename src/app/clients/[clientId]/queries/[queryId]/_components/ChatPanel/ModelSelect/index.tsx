@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import Icon from '@Components/Icons';
 import styles from './styles.module.css';
 import {
@@ -56,10 +56,6 @@ function ModelSelect({ model = MODELS[0], onChange, placement = 'top' }: Props) 
             minWidth: `${menuMinWidth}px`,
             maxHeight: `${Math.min(availableHeight, 280)}px`
           });
-          try {
-            // eslint-disable-next-line no-console
-            console.log('[ModelSelect] popover size', { minWidth: menuMinWidth, maxHeight: Math.min(availableHeight, 280) });
-          } catch {}
         }
       })
     ]
@@ -89,10 +85,6 @@ function ModelSelect({ model = MODELS[0], onChange, placement = 'top' }: Props) 
           const triggerW = trigger ? trigger.getBoundingClientRect().width : nodeW;
           setMenuMinWidth((prev) => Math.max(prev, Math.round(Math.max(triggerW, 200))));
         }
-        try {
-          // eslint-disable-next-line no-console
-          console.log('[ModelSelect] measure(panel)', { panelW, collapsed: collapseByPanel, panelThreshold: PANEL_COLLAPSE_AT, menuMinWidth });
-        } catch {}
         return;
       }
 
@@ -103,10 +95,6 @@ function ModelSelect({ model = MODELS[0], onChange, placement = 'top' }: Props) 
         const triggerW = trigger ? trigger.getBoundingClientRect().width : nodeW;
         setMenuMinWidth((prev) => Math.max(prev, Math.round(Math.max(triggerW, 200))));
       }
-      try {
-        // eslint-disable-next-line no-console
-        console.log('[ModelSelect] measure(node)', { nodeW, node: node.tagName, collapsed: isCollapsed, threshold: COLLAPSE_AT, menuMinWidth });
-      } catch {}
     }
 
     measure();
@@ -116,12 +104,6 @@ function ModelSelect({ model = MODELS[0], onChange, placement = 'top' }: Props) 
     if (target) ro.observe(target);
     return () => ro.disconnect();
   }, [refs.reference]);
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[ModelSelect] state', { open, placement, collapsed, model });
-    } catch {}
-  }, [open, placement, collapsed, model]);
 
   const chevronName = placement === 'bottom' ? 'chevron-up' : 'chevron-down';
 
@@ -166,10 +148,6 @@ function ModelSelect({ model = MODELS[0], onChange, placement = 'top' }: Props) 
                   className={styles['option']}
                   data-selected={(m === model) || undefined}
                   onClick={() => {
-                    try {
-                      // eslint-disable-next-line no-console
-                      console.log('[ModelSelect] select', { model: m });
-                    } catch {}
                     onChange?.(m);
                     setOpen(false);
                   }}
@@ -185,4 +163,4 @@ function ModelSelect({ model = MODELS[0], onChange, placement = 'top' }: Props) 
   );
 }
 
-export default ModelSelect;
+export default memo(ModelSelect);

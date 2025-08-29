@@ -2,8 +2,8 @@
 
 import type { FormEvent }               from 'react';
 
-import { useEffect, useMemo, useRef, useState }   from 'react';
-import CodeMirror                       from '@uiw/react-codemirror';
+import { memo, useEffect, useMemo, useRef, useState }   from 'react';
+import dynamic                          from 'next/dynamic';
 import { createTheme }                  from '@uiw/codemirror-themes';
 import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { EditorSelection, EditorState, Prec } from '@codemirror/state';
@@ -15,13 +15,16 @@ import ModelSelect                      from '../ModelSelect';
 
 import styles                           from './styles.module.css';
 
+// AIDEV-NOTE: Defer heavy CodeMirror bundle using next/dynamic; SSR disabled.
+const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
+
 
 const cmStructuralTheme = EditorView.theme({
   '&': { color: 'inherit', fontSize: 'inherit' },
   '&.cm-focused': { outline: 'none' },
   '.cm-content': { padding: '0', minHeight: '0' },
   '.cm-scroller': { overflow: 'auto' },
-  '.cm-editor': { border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-8)', minHeight: '0' },
+  '.cm-editor': { border: 'none', borderRadius: 'var(--radius-8)', minHeight: '0', background: 'transparent' },
   '.cm-cursor': { borderLeftColor: 'var(--white)' },
   '.cm-dropCursor': { borderLeftColor: 'var(--white)' },
   '.cm-line': { padding: '0', lineHeight: 'var(--leading-normal)' }
@@ -67,6 +70,7 @@ function MessageComposer({
 }: MessageComposerProps) {
   const viewRef   = useRef<EditorView | null>(null);
   const [hasText, setHasText] = useState<boolean>(Boolean(value && value.trim().length > 0));
+  const [editorReady, setEditorReady] = useState<boolean>(false);
 
   function submit(e?: FormEvent) {
     if (e) e.preventDefault();
@@ -140,7 +144,11 @@ function MessageComposer({
       ) : null}
 
       {/* editor: CodeMirror 6 minimal Markdown */}
-      <div className={styles['row-editor']}>
+      <div className={styles['row-editor']} data-editor-ready={editorReady || undefined}>
+        {/* AIDEV-NOTE: Show plain text while CodeMirror loads/initializes to prevent blankness */}
+        {!editorReady && (
+          <div className={styles['editor-fallback']} aria-live="polite">{value}</div>
+        )}
         <CodeMirror
           className={styles['editor-input']}
           height="100%"
@@ -157,7 +165,7 @@ function MessageComposer({
           theme={cmColorTheme}
           extensions={extensions}
           onChange={(val) => { setHasText(val.trim().length > 0); onChange?.(val); }}
-          onCreateEditor={(view) => { viewRef.current = view; }}
+          onCreateEditor={(view) => { viewRef.current = view; setEditorReady(true); }}
         />
       </div>
 
@@ -189,4 +197,4 @@ function MessageComposer({
 }
 
 
-export default MessageComposer;
+export default memo(MessageComposer);

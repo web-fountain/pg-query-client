@@ -17,17 +17,42 @@
 
 .row-editor {
   display: flex;
+  align-items: stretch;
   max-height: var(--space-52);
   overflow-y: auto;
 }
 .editor-input {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
+  box-sizing: border-box;
   /* min-height: 96px; */
   resize: vertical;
   color: var(--text-primary);
   border: var(--border-1) solid var(--border-primary);
   border-radius: var(--radius-8);
   outline: none;
+  background: transparent;
+}
+
+/* Ensure CodeMirror internals expand to full width */
+.row-editor :global(.cm-theme),
+.row-editor :global(.cm-editor),
+.row-editor :global(.cm-scroller) {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* AIDEV-NOTE: Lightweight placeholder for deferred CodeMirror */
+.editor-fallback {
+  width: 100%;
+  /* min-height: 48px; */
+  border: var(--border-1) solid var(--border-primary);
+  border-radius: var(--radius-8);
+  background: transparent;
+  line-height: var(--leading-normal);
+  display: block;
 }
 
 .row-controls {

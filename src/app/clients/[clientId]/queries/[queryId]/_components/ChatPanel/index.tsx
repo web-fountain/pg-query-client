@@ -1,26 +1,31 @@
 'use client';
 
-import { useState }         from 'react';
+import { useCallback, useState }         from 'react';
 import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
-import { useClientRoute }   from '../../_providers/ClientRouteProvider';
 import { useChat }          from '../../../_providers/ChatProvider';
 import Composer             from './Composer';
 import MessageList          from './MessageList';
 import styles               from './styles.module.css';
-
+import { preloadEditors }   from './preloadEditors';
 
 function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
   const layout        = useOpSpaceLayout();
-  const { clientId }  = useClientRoute();
 
   // AIDEV-NOTE: Use ChatProvider so chat persists across QueryWorkspace tab switches.
   const { messages, send } = useChat();
   const [model, setModel]       = useState<string>('gpt-5');
   const [tags, setTags]         = useState<string[]>([]);
 
-  function handleSend(text: string) { send(text); }
+  const handleSend = useCallback((text: string) => {
+    send(text);
+    preloadEditors();
+  }, [send]);
 
-  function handleToggleTag(tag: string) { setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])); }
+  const handleModelChange = useCallback((m: string) => { setModel(m); }, []);
+
+  const handleToggleTag = useCallback((tag: string) => {
+    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }, []);
 
   return (
     <div
@@ -40,7 +45,7 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
           {messages.length === 0 && (
             <Composer
               model={model}
-              onModelChange={setModel}
+              onModelChange={handleModelChange}
               onSend={handleSend}
               tags={tags}
               onToggleTag={handleToggleTag}
@@ -52,7 +57,7 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
             <MessageList
               messages={messages}
               model={model}
-              onModelChange={setModel}
+              onModelChange={handleModelChange}
               onSend={handleSend}
               tags={tags}
               onToggleTag={handleToggleTag}
@@ -63,7 +68,7 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
             <div className={styles['composer-dock']}>
               <Composer
                 model={model}
-                onModelChange={setModel}
+                onModelChange={handleModelChange}
                 onSend={handleSend}
                 tags={tags}
                 onToggleTag={handleToggleTag}
