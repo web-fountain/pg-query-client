@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       '@ai-sdk/openai':
-        specifier: 2.0.22
-        version: 2.0.22(zod@3.25.76)
+        specifier: 2.0.23
+        version: 2.0.23(zod@3.25.76)
       '@ai-sdk/react':
-        specifier: 2.0.26
-        version: 2.0.26(react@19.1.1)(zod@3.25.76)
+        specifier: 2.0.28
+        version: 2.0.28(react@19.1.1)(zod@3.25.76)
       '@ai-sdk/rsc':
-        specifier: 1.0.26
-        version: 1.0.26(react@19.1.1)(zod@3.25.76)
+        specifier: 1.0.28
+        version: 1.0.28(react@19.1.1)(zod@3.25.76)
       '@codemirror/commands':
         specifier: 6.8.1
         version: 6.8.1
@@ -54,11 +54,11 @@ importers:
         specifier: 4.25.1
         version: 4.25.1(@babel/runtime@7.28.3)(@codemirror/autocomplete@6.18.6)(@codemirror/language@6.11.3)(@codemirror/lint@6.8.5)(@codemirror/search@6.5.11)(@codemirror/state@6.5.2)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.38.1)(codemirror@6.0.2)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       ai:
-        specifier: 5.0.26
-        version: 5.0.26(zod@3.25.76)
+        specifier: 5.0.28
+        version: 5.0.28(zod@3.25.76)
       next:
         specifier: 15.5.2
-        version: 15.5.2(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@19.1.0-rc.2)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+        version: 15.5.2(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       react:
         specifier: 19.1.1
         version: 19.1.1
@@ -85,14 +85,14 @@ importers:
         specifier: 19.1.12
         version: 19.1.12
       '@types/react-dom':
-        specifier: 19.1.8
-        version: 19.1.8(@types/react@19.1.12)
+        specifier: 19.1.9
+        version: 19.1.9(@types/react@19.1.12)
       autoprefixer:
         specifier: 10.4.21
         version: 10.4.21(postcss@8.5.6)
       babel-plugin-react-compiler:
-        specifier: 19.1.0-rc.2
-        version: 19.1.0-rc.2
+        specifier: 19.1.0-rc.3
+        version: 19.1.0-rc.3
       del-cli:
         specifier: 6.0.0
         version: 6.0.0
@@ -126,8 +126,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4
 
-  '@ai-sdk/openai@2.0.22':
-    resolution: {integrity: sha512-qjSIPL5+LNM9flcBPeR64ZWeAZdYg4XWkAK34H3FaY61dSbuIaeqFPSzmQUrxotVcphAzgfL5tuYRqRYP2ZYyg==}
+  '@ai-sdk/openai@2.0.23':
+    resolution: {integrity: sha512-uOXk8HzmMUoCmD0JMX/Y1HC/ABOR/Jza2Z2rkCaJISDYz3fp5pnb6eNjcPRL48JSMzRAGp9UP5p0OpxS06IJZg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -142,8 +142,8 @@ packages:
     resolution: {integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==}
     engines: {node: '>=18'}
 
-  '@ai-sdk/react@2.0.26':
-    resolution: {integrity: sha512-l1lUnEmB26j/LtBkxVNpPxVTnwyPee0b7xTxiuyyF68D8QyAsoz5DJYK7I2LRhwdgqII7Grw7/WJs6tBiF8SPw==}
+  '@ai-sdk/react@2.0.28':
+    resolution: {integrity: sha512-+1iINCSRvjVgCMfe05Ki1PnV9nMeQvQqCIN45KKV+QhQSItyLsuE+WWQrKt5nDRAF3LFq6cSD0tm5F50SJJh4Q==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -152,8 +152,8 @@ packages:
       zod:
         optional: true
 
-  '@ai-sdk/rsc@1.0.26':
-    resolution: {integrity: sha512-9kI0V//fXuQojHa7KHZ/TDRDYSWhSRtc7rjBqf+5VGiW/5FO9GIeLtd/VKbvrPJDo+yHoH3IMM5eYXcyF5V6sw==}
+  '@ai-sdk/rsc@1.0.28':
+    resolution: {integrity: sha512-KNfPKlhbBktAjDzNMFZfPaJNr+VfvDjoBfj3yJY7I49zZpnuKtsRX0eoIgze675AWCC5j4m1jYrrpWwlcdHmvg==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -244,8 +244,8 @@ packages:
     peerDependencies:
       postcss-selector-parser: ^7.0.0
 
-  '@emnapi/runtime@1.4.5':
-    resolution: {integrity: sha512-++LApOtY0pEEz1zrd9vy1/zXVaVJJ/EbAF3u0fXIzPJEDtnITsBGbbK0EkM72amhl/R5b+5xx0Y/QhcVOpuulg==}
+  '@emnapi/runtime@1.5.0':
+    resolution: {integrity: sha512-97/BJ3iXHww3djw6hYIfErCZFee7qCtrneuLa20UXFCOTCfBM2cvQHjWJ2EG0s0MtdNwInarqCTz35i4wWXHsQ==}
 
   '@img/sharp-darwin-arm64@0.34.3':
     resolution: {integrity: sha512-ryFMfvxxpQRsgZJqBd4wsttYQbCxsJksrv9Lw/v798JcQ8+w84mBWuXwl+TT0WJ/WrYOLaYpwQXi3sA9nTIaIg==}
@@ -524,8 +524,8 @@ packages:
   '@types/node@24.3.0':
     resolution: {integrity: sha512-aPTXCrfwnDLj4VvXrm+UUCQjNEvJgNA8s5F1cvwQU+3KNltTOkBm1j30uNLyqqPNe7gE3KFzImYoZEfLhp4Yow==}
 
-  '@types/react-dom@19.1.8':
-    resolution: {integrity: sha512-xG7xaBMJCpcK0RpN8jDbAACQo54ycO6h4dSSmgv8+fu6ZIAdANkx/WsawASUjVXYfy+J9AbUpRMNNEsXCDfDBQ==}
+  '@types/react-dom@19.1.9':
+    resolution: {integrity: sha512-qXRuZaOsAdXKFyOhRBg6Lqqc0yay13vN7KrIg4L7N4aaHN68ma9OK3NE1BoDFgFOTfM7zg+3/8+2n8rLUH3OKQ==}
     peerDependencies:
       '@types/react': ^19.0.0
 
@@ -577,8 +577,8 @@ packages:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
 
-  ai@5.0.26:
-    resolution: {integrity: sha512-bGNtG+nYQ2U+5mzuLbxIg9WxGQJ2u5jv2gYgP8C+CJ1YI4qqIjvjOgGEZWzvNet8jiOGIlqstsht9aQefKzmBw==}
+  ai@5.0.28:
+    resolution: {integrity: sha512-tnybAqoDFzuK6O1NOMHX1d/wH7Eug8y0H4l/Gl6swi8BYGtlTPDjniKnGYzgTpLTdpj7SI3qjZuomz7evph9+w==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -593,8 +593,8 @@ packages:
     peerDependencies:
       postcss: ^8.1.0
 
-  babel-plugin-react-compiler@19.1.0-rc.2:
-    resolution: {integrity: sha512-kSNA//p5fMO6ypG8EkEVPIqAjwIXm5tMjfD1XRPL/sRjYSbJ6UsvORfaeolNWnZ9n310aM0xJP7peW26BuCVzA==}
+  babel-plugin-react-compiler@19.1.0-rc.3:
+    resolution: {integrity: sha512-mjRn69WuTz4adL0bXGx8Rsyk1086zFJeKmes6aK0xPuK3aaXmDJdLHqwKKMrpm6KAI1MCoUK72d2VeqQbu8YIA==}
 
   bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
@@ -607,8 +607,8 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  browserslist@4.25.3:
-    resolution: {integrity: sha512-cDGv1kkDI4/0e5yON9yM5G/0A5u8sf5TnmdX5C9qHzI9PPu++sQ9zjm1k9NiOrf3riY4OkK0zSGqfvJyJsgCBQ==}
+  browserslist@4.25.4:
+    resolution: {integrity: sha512-4jYpcjabC606xJ3kw2QwGEZKX0Aw7sgQdZCvIK9dhVSPh76BKo+C+btT1RRofH7B+8iNpEbgGNVWiLki5q93yg==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
 
@@ -1599,7 +1599,7 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.7(zod@3.25.76)
       zod: 3.25.76
 
-  '@ai-sdk/openai@2.0.22(zod@3.25.76)':
+  '@ai-sdk/openai@2.0.23(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.7(zod@3.25.76)
@@ -1616,21 +1616,21 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@2.0.26(react@19.1.1)(zod@3.25.76)':
+  '@ai-sdk/react@2.0.28(react@19.1.1)(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider-utils': 3.0.7(zod@3.25.76)
-      ai: 5.0.26(zod@3.25.76)
+      ai: 5.0.28(zod@3.25.76)
       react: 19.1.1
       swr: 2.3.6(react@19.1.1)
       throttleit: 2.1.0
     optionalDependencies:
       zod: 3.25.76
 
-  '@ai-sdk/rsc@1.0.26(react@19.1.1)(zod@3.25.76)':
+  '@ai-sdk/rsc@1.0.28(react@19.1.1)(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.7(zod@3.25.76)
-      ai: 5.0.26(zod@3.25.76)
+      ai: 5.0.28(zod@3.25.76)
       jsondiffpatch: 0.6.0
       react: 19.1.1
     optionalDependencies:
@@ -1738,7 +1738,7 @@ snapshots:
     dependencies:
       postcss-selector-parser: 7.1.0
 
-  '@emnapi/runtime@1.4.5':
+  '@emnapi/runtime@1.5.0':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -1817,7 +1817,7 @@ snapshots:
 
   '@img/sharp-wasm32@0.34.3':
     dependencies:
-      '@emnapi/runtime': 1.4.5
+      '@emnapi/runtime': 1.5.0
     optional: true
 
   '@img/sharp-win32-arm64@0.34.3':
@@ -1985,7 +1985,7 @@ snapshots:
     dependencies:
       undici-types: 7.10.0
 
-  '@types/react-dom@19.1.8(@types/react@19.1.12)':
+  '@types/react-dom@19.1.9(@types/react@19.1.12)':
     dependencies:
       '@types/react': 19.1.12
 
@@ -2039,7 +2039,7 @@ snapshots:
       mime-types: 3.0.1
       negotiator: 1.0.0
 
-  ai@5.0.26(zod@3.25.76):
+  ai@5.0.28(zod@3.25.76):
     dependencies:
       '@ai-sdk/gateway': 1.0.15(zod@3.25.76)
       '@ai-sdk/provider': 2.0.0
@@ -2056,7 +2056,7 @@ snapshots:
 
   autoprefixer@10.4.21(postcss@8.5.6):
     dependencies:
-      browserslist: 4.25.3
+      browserslist: 4.25.4
       caniuse-lite: 1.0.30001737
       fraction.js: 4.3.7
       normalize-range: 0.1.2
@@ -2064,7 +2064,7 @@ snapshots:
       postcss: 8.5.6
       postcss-value-parser: 4.2.0
 
-  babel-plugin-react-compiler@19.1.0-rc.2:
+  babel-plugin-react-compiler@19.1.0-rc.3:
     dependencies:
       '@babel/types': 7.28.2
 
@@ -2088,12 +2088,12 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  browserslist@4.25.3:
+  browserslist@4.25.4:
     dependencies:
       caniuse-lite: 1.0.30001737
       electron-to-chromium: 1.5.211
       node-releases: 2.0.19
-      update-browserslist-db: 1.1.3(browserslist@4.25.3)
+      update-browserslist-db: 1.1.3(browserslist@4.25.4)
 
   bytes@3.1.2: {}
 
@@ -2766,7 +2766,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next@15.5.2(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@19.1.0-rc.2)(react-dom@19.1.1(react@19.1.1))(react@19.1.1):
+  next@15.5.2(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.1.1(react@19.1.1))(react@19.1.1):
     dependencies:
       '@next/env': 15.5.2
       '@swc/helpers': 0.5.15
@@ -2785,7 +2785,7 @@ snapshots:
       '@next/swc-win32-arm64-msvc': 15.5.2
       '@next/swc-win32-x64-msvc': 15.5.2
       '@opentelemetry/api': 1.9.0
-      babel-plugin-react-compiler: 19.1.0-rc.2
+      babel-plugin-react-compiler: 19.1.0-rc.3
       sharp: 0.34.3
     transitivePeerDependencies:
       - '@babel/core'
@@ -3248,9 +3248,9 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  update-browserslist-db@1.1.3(browserslist@4.25.3):
+  update-browserslist-db@1.1.3(browserslist@4.25.4):
     dependencies:
-      browserslist: 4.25.3
+      browserslist: 4.25.4
       escalade: 3.2.0
       picocolors: 1.1.1
 
