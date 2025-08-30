@@ -49,6 +49,26 @@
   transition: grid-template-columns var(--duration-250) var(--ease-standard);
 }
 
+/* AIDEV-NOTE: Swapped visual layout – move right panel to the left and left panel to the right */
+.panel-layout[data-content-swapped] {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    );
+  grid-template-areas:
+    'right handle-right center handle-left left';
+}
+
 /* AIDEV-NOTE: Disable grid transition during active drag for responsive feel */
 :root[data-op-space-layout-dragging] .panel-layout {
   transition: none;
@@ -100,6 +120,18 @@
       var(--calculated-panel-max-width)
     );
 }
+.panel-layout[data-content-swapped][data-left-collapsed] {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    var(--op-space-layout-panel-collapsed-width);
+}
 :root[data-op-space-left-collapsed] .panel-layout:not([data-left-collapsed]) {
   grid-template-columns:
     var(--op-space-layout-panel-collapsed-width)
@@ -112,6 +144,18 @@
       var(--calculated-panel-max-width)
     );
 }
+:root[data-op-space-left-collapsed] .panel-layout[data-content-swapped]:not([data-left-collapsed]) {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    var(--op-space-layout-resizer-width)
+    minmax(var(--calculated-center-min-width), 1fr)
+    var(--op-space-layout-resizer-width)
+    var(--op-space-layout-panel-collapsed-width);
+}
 .panel-layout[data-right-collapsed] {
   grid-template-columns:
     clamp(
@@ -123,6 +167,30 @@
     minmax(var(--calculated-center-min-width), 1fr)
     0
     var(--op-space-layout-panel-collapsed-width);
+}
+:root[data-op-space-right-collapsed] .panel-layout[data-content-swapped]:not([data-right-collapsed]) {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    var(--op-space-layout-resizer-width)
+    minmax(var(--calculated-center-min-width), 1fr)
+    var(--op-space-layout-resizer-width)
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    );
+}
+.panel-layout[data-content-swapped][data-right-collapsed] {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    );
 }
 :root[data-op-space-right-collapsed] .panel-layout:not([data-right-collapsed]) {
   grid-template-columns:

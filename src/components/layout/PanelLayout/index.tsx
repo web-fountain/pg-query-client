@@ -20,8 +20,9 @@ function PanelLayout({ children, left, right }: { children: ReactNode; left?: Pa
   const rightCfg        = layoutCtx.getConfig('right');
   const contentSwapped  = layoutCtx.isContentSwapped();
 
-  const leftSlot  = contentSwapped ? right : left;
-  const rightSlot = contentSwapped ? left  : right;
+  // AIDEV-NOTE: Keep instances in their original asides; CSS swaps visual positions
+  const leftSlot  = left;
+  const rightSlot = right;
 
   return (
     <div
@@ -29,6 +30,7 @@ function PanelLayout({ children, left, right }: { children: ReactNode; left?: Pa
       data-op-space-layout="root"
       data-left-collapsed={leftCfg.collapsed || undefined}
       data-right-collapsed={rightCfg.collapsed || undefined}
+      data-content-swapped={contentSwapped || undefined}
     >
       {leftSlot ? (
         <>
@@ -37,7 +39,10 @@ function PanelLayout({ children, left, right }: { children: ReactNode; left?: Pa
             data-op-space-layout-side="left"
             aria-expanded={!leftCfg.collapsed}
           >
-            {React.cloneElement(leftSlot, { collapsed: leftCfg.collapsed, side: 'left' })}
+            {React.cloneElement(
+              leftSlot as React.ReactElement<any>,
+              { collapsed: leftCfg.collapsed, side: 'left' }
+            )}
           </aside>
           <div className={styles['handle-left']}>
             <ResizableHandle side="left" />
@@ -59,7 +64,10 @@ function PanelLayout({ children, left, right }: { children: ReactNode; left?: Pa
             data-op-space-layout-side="right"
             aria-expanded={!rightCfg.collapsed}
           >
-            {React.cloneElement(rightSlot, { collapsed: rightCfg.collapsed, side: 'right' })}
+            {React.cloneElement(
+              rightSlot as React.ReactElement<any>,
+              { collapsed: rightCfg.collapsed, side: 'right' }
+            )}
           </aside>
         </>
       ) : null}

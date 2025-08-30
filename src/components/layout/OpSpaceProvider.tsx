@@ -1,9 +1,17 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { readMinMax } from './ResizableHandle/utils/cssVars';
-import { clamp } from './ResizableHandle/utils/math';
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+}                         from 'react';
+import { readMinMax }     from './ResizableHandle/utils/cssVars';
+import { clamp }          from './ResizableHandle/utils/math';
 
 
 type Side = 'left' | 'right';
@@ -170,10 +178,10 @@ function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const swapSidesCb = useCallback(() => {
-    // AIDEV-NOTE: Swap content placement AND propagate the visible width/collapsed to the opposite side
+    // AIDEV-NOTE: CSS handles visual swap; keep side widths/collapsed bound to sides
+    // so resizers and CSS vars remain authoritative. Only flip contentSwapped.
     setState(prev => ({
-      left:  { ...prev.left,  width: prev.right.width, collapsed: prev.right.collapsed },
-      right: { ...prev.right, width: prev.left.width,  collapsed: prev.left.collapsed  },
+      ...prev,
       contentSwapped: !prev.contentSwapped
     }));
   }, []);
@@ -220,6 +228,7 @@ const useOpSpaceLayout = () => {
 const useOptionalOpSpaceLayout = () => {
   return useContext(LayoutContext);
 };
+
 
 export { useOpSpaceLayout, useOptionalOpSpaceLayout };
 export default OpSpaceLayoutProvider;

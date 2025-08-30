@@ -1,12 +1,14 @@
-.message-list {
-  display: block; /* Virtuoso positions items; avoid flex/gap here */
+.virtual-list {
+  position: relative; /* absolute-positioned items live inside */
+  display: block;
   padding-bottom: var(--space-6); /* ensure last item has breathing room above sticky composer */
 }
 
-/* Virtuoso root to fill container height and avoid double scroll */
-.virtuoso {
+/* Virtualizer root to fill container height and manage scroll */
+.virtual-scroller {
   height: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .message { display: block; margin-bottom: var(--space-5); }
@@ -53,7 +55,5 @@
   word-break: break-word;
 }
 
-/* Spacer footer rendered by Virtuoso to prevent cutoff at the bottom */
-.list-footer { height: var(--space-4); }
 
 /* media/container queries at the bottom (reserved) */
