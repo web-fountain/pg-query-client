@@ -1,15 +1,15 @@
 'use client';
 
-import { useMemo, useEffect, useState }  from 'react';
-import { useTree }  from '@headless-tree/react';
+import { useMemo, useEffect, useState } from 'react';
+import { useTree }                      from '@headless-tree/react';
 import {
   asyncDataLoaderFeature,
   selectionFeature,
   hotkeysCoreFeature
-}                   from '@headless-tree/core';
+}                                       from '@headless-tree/core';
 
-import Icon         from '@Components/Icons';
-import styles       from './styles.module.css';
+import Icon                             from '@Components/Icons';
+import styles                           from './styles.module.css';
 
 // AIDEV-NOTE: Minimal node payload used by the async data loader.
 export type NodePayload = {
@@ -220,12 +220,7 @@ function QueryTree({ rootId, indent = 16 }: { rootId: string; indent?: number })
 
   return (
     <section className={styles['tree']} aria-label="Queries">
-      <header className={styles['header']}>
-        {/* AIDEV-NOTE: Static title; not collapsible by design. */}
-        <span className={styles['title']}>Queries</span>
-      </header>
-
-      <div className={styles['toolbar']}>
+      <header className={styles['toolbar']}>
         <button
           type="button"
           className={styles['tool']}
@@ -240,7 +235,7 @@ function QueryTree({ rootId, indent = 16 }: { rootId: string; indent?: number })
           <Icon name="file-plus" aria-hidden="true" />
           <span>New File</span>
         </button>
-      </div>
+      </header>
 
       <div {...tree.getContainerProps('Queries Tree')} className={styles['list']}>
         {tree.getItems().map((item: any) => {

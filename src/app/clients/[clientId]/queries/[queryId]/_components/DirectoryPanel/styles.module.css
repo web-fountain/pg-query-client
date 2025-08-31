@@ -3,7 +3,9 @@
   flex-direction: column;
   /* AIDEV-NOTE: panels do not own height; grid area controls layout */
   gap:            var(--space-3);
-  padding:        var(--space-4);
+  /* AIDEV-NOTE: Enable container queries for responsive tabs/icon-only mode */
+  container-type: inline-size;
+  container-name: directory-panel;
 }
 
 .directory-panel[data-collapsed] {

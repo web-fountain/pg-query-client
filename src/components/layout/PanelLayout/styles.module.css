@@ -205,7 +205,7 @@
     var(--op-space-layout-panel-collapsed-width);
 }
 
-/* AIDEV-NOTE: Collapsed panels now show at 40px width with icon-only content */
+/* AIDEV-NOTE: Collapsed panels show at 48px width with icon-only content (see --op-space-layout-panel-collapsed-width) */
 
 /* Optional visuals */
 /* AIDEV-NOTE: Side panel borders only on inner edges */
