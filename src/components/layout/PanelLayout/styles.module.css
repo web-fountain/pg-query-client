@@ -38,9 +38,11 @@
   grid-template-areas:
     'left handle-left center handle-right right';
 
-  /* AIDEV-NOTE: Fill the grid area allocated by OpSpaceLayout (1fr row) */
-  height: 100%;
+  /* AIDEV-NOTE: Fill viewport minus Titlebar using screen-height; grid will also constrain */
+  height: calc(var(--available-height));
   min-height: 0;
+  /* AIDEV-NOTE: Ensure the sole row consumes the block-size so center can flex children */
+  grid-template-rows: 1fr;
 
   /* AIDEV-NOTE: Avoid using grid gap as clickable gutter; resizer columns are explicit elements */
   gap: 0;
@@ -87,6 +89,9 @@
 }
 .panel-layout .center {
   grid-area: center;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* allow inner flex children to become scroll containers */
 }
 .panel-layout .right-side {
   grid-area: right;
@@ -216,6 +221,15 @@
 .panel-layout .right-side {
   border-inline-start: var(--border-1) solid var(--border-color);
   background: var(--surface-1);
+}
+/* AIDEV-NOTE: Maintain inner borders when swapped: inner edges must always border the center */
+.panel-layout[data-content-swapped] .left-side {
+  border-inline-end: 0;
+  border-inline-start: var(--border-1) solid var(--border-color);
+}
+.panel-layout[data-content-swapped] .right-side {
+  border-inline-start: 0;
+  border-inline-end: var(--border-1) solid var(--border-color);
 }
 .panel-layout .center {
   background: var(--surface-1);

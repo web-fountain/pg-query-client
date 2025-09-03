@@ -19,6 +19,9 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100vh;           /* AIDEV-NOTE: ensure full viewport height */
+    min-height: 100vh;
+    overflow: hidden;        /* AIDEV-NOTE: delegate scrolling to panels */
   }
 
   img, picture, video, canvas, svg {

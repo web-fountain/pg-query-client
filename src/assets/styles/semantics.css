@@ -74,6 +74,7 @@
     --tab-padding-inline:   var(--space-4);
     --tab-gap:              var(--space-2);
     --tab-underline-height: var(--border-2);
+    --tab-width:            116px;
 
     /* syntax highlighting tokens consumed by editors (CodeMirror, etc.) */
     --syntax-brace: #e5c07b;

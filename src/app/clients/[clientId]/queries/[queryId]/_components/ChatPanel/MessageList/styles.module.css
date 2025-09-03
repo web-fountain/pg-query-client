@@ -11,7 +11,10 @@
   overflow-y: auto;
 }
 
-.message { display: block; margin-bottom: var(--space-5); }
+.message {
+  display: block;
+  margin-bottom: var(--space-5);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .send > svg { transition: none; }
@@ -53,6 +56,12 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+/* AIDEV-NOTE: When an ancestor (ChatPanel .content) has [data-scrollable],
+   add a small inline-end padding so items don't collide with the scrollbar. */
+:global([data-scrollable]) .message {
+  padding-inline-end: 5px;
 }
 
 

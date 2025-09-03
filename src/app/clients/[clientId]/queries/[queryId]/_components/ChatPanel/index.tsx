@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useState }         from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
 import { useChat }          from '../../../_providers/ChatProvider';
 import Composer             from './Composer';
 import MessageList          from './MessageList';
 import styles               from './styles.module.css';
+import messageListStyles    from './MessageList/styles.module.css';
 import { preloadEditors }   from './preloadEditors';
 
 function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'left' | 'right' }) {
@@ -15,6 +16,52 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
   const { messages, send } = useChat();
   const [model, setModel]       = useState<string>('gpt-5');
   const [tags, setTags]         = useState<string[]>([]);
+  const contentRef              = useRef<HTMLDivElement | null>(null);
+  const [isScrollableY, setIsScrollableY] = useState<boolean>(false);
+
+  // AIDEV-NOTE: Detect when the inner message scroller overflows vertically and
+  // reflect it on the content container via data attribute for conditional CSS.
+  useEffect(() => {
+    if (!contentRef.current || collapsed) {
+      setIsScrollableY(false);
+      return;
+    }
+
+    const contentEl = contentRef.current;
+    const scroller = contentEl.querySelector(`.${messageListStyles['virtual-scroller']}`) as HTMLDivElement | null;
+    if (!scroller) {
+      setIsScrollableY(false);
+      return;
+    }
+
+    const compute = () => {
+      try {
+        const scrollable = scroller.scrollHeight > scroller.clientHeight + 1;
+        setIsScrollableY(scrollable);
+      } catch {}
+    };
+
+    // Observe size changes of the scroller; also recompute on window resize.
+    let ro: ResizeObserver | null = null;
+    try {
+      ro = new ResizeObserver(() => compute());
+      ro.observe(scroller);
+    } catch {}
+
+    compute();
+
+    const onResize = () => compute();
+    window.addEventListener('resize', onResize);
+    // Recompute when scroller scroll position changes (height might remain but safe to listen)
+    const onScroll = () => compute();
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      try { scroller.removeEventListener('scroll', onScroll); } catch {}
+      window.removeEventListener('resize', onResize);
+      if (ro) { try { ro.disconnect(); } catch {} }
+    };
+  }, [collapsed, messages.length]);
 
   const handleSend = useCallback((text: string) => {
     send(text);
@@ -48,6 +95,8 @@ function ChatPanel({ collapsed, side = 'left' }: { collapsed: boolean; side?: 'l
 
       <div
         className={styles['content']}
+        ref={contentRef}
+        data-scrollable={isScrollableY || undefined}
         style={{ display: collapsed ? 'none' : 'flex' }}
         aria-hidden={collapsed}
       >

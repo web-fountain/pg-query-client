@@ -11,6 +11,13 @@ function Titlebar() {
   const right    = layout.getConfig('right');
   const swapped  = layout.isContentSwapped();
 
+  // AIDEV-NOTE: When swapped, visual left is logical right (and vice versa).
+  // Map controls to visual sides so the buttons always operate the visible panel.
+  const visualLeft  = swapped ? right : left;
+  const visualRight = swapped ? left : right;
+  const leftButtonControlsSide  = swapped ? 'right' : 'left' as const;
+  const rightButtonControlsSide = swapped ? 'left' : 'right' as const;
+
   return (
     <header className={styles['titlebar']}>
       <div className={styles['title']}>PG Query Client</div>
@@ -18,13 +25,13 @@ function Titlebar() {
       <div className={styles['controls']}>
         <button
           className={styles['button']}
-          aria-pressed={left.collapsed}
-          aria-label={left.collapsed ? 'Expand left panel' : 'Collapse left panel'}
-          onClick={() => layout.toggleCollapseSide('left')}
-          title={left.collapsed ? 'Expand left panel' : 'Collapse left panel'}
+          aria-pressed={visualLeft.collapsed}
+          aria-label={visualLeft.collapsed ? 'Expand left panel' : 'Collapse left panel'}
+          onClick={() => layout.toggleCollapseSide(leftButtonControlsSide)}
+          title={visualLeft.collapsed ? 'Expand left panel' : 'Collapse left panel'}
         >
           <Icon
-            name={left.collapsed ? 'panel-layout-left' : 'panel-layout-left-solid'}
+            name={visualLeft.collapsed ? 'panel-layout-left' : 'panel-layout-left-solid'}
             aria-hidden="true"
           />
         </button>
@@ -41,13 +48,13 @@ function Titlebar() {
 
         <button
           className={styles['button']}
-          aria-pressed={right.collapsed}
-          aria-label={right.collapsed ? 'Expand right panel' : 'Collapse right panel'}
-          onClick={() => layout.toggleCollapseSide('right')}
-          title={right.collapsed ? 'Expand right panel' : 'Collapse right panel'}
+          aria-pressed={visualRight.collapsed}
+          aria-label={visualRight.collapsed ? 'Expand right panel' : 'Collapse right panel'}
+          onClick={() => layout.toggleCollapseSide(rightButtonControlsSide)}
+          title={visualRight.collapsed ? 'Expand right panel' : 'Collapse right panel'}
         >
           <Icon
-            name={right.collapsed ? 'panel-layout-right' : 'panel-layout-right-solid'}
+            name={visualRight.collapsed ? 'panel-layout-right' : 'panel-layout-right-solid'}
             aria-hidden="true"
           />
         </button>

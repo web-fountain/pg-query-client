@@ -1,3 +1,8 @@
 .query-tool-panel {
   /* AIDEV-NOTE: panels do not own height; grid area controls layout */
+  display       : flex;
+  flex-direction: column;
+  height        : 100%;
+  min-height    : 0; /* allow inner scroll containers to size */
+  overflow      : hidden; /* delegate scrolling to inner viewports */
 }

@@ -32,10 +32,11 @@ type Args = {
   collapseSide  : (side: PanelSide) => void;
   setAriaNow    : (v: number) => void;
   controlledId  : string;
+  anchoredOnRight: boolean;
 };
 
 // AIDEV-NOTE: Drag/resize logic extracted into a hook; no setState in hot paths
-function useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setAriaNow, controlledId }: Args) {
+function useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setAriaNow, controlledId, anchoredOnRight }: Args) {
   useEffect(() => {
     if (!ref.current) return;
 
@@ -149,7 +150,7 @@ function useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setA
 
       const rect = getPanelRect();
       pressOffset = rect
-        ? side === 'left' ? (e.clientX - rect.right) : (rect.left - e.clientX)
+        ? (anchoredOnRight ? (e.clientX - rect.right) : (rect.left - e.clientX))
         : 0;
 
       document.documentElement.setAttribute('data-op-space-layout-dragging', 'true');
@@ -183,7 +184,7 @@ function useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setA
 
       const rect = getPanelRect();
       pressOffset = rect
-        ? side === 'left' ? (evt.clientX - rect.right) : (rect.left - evt.clientX)
+        ? (anchoredOnRight ? (evt.clientX - rect.right) : (rect.left - evt.clientX))
         : 0;
 
       document.documentElement.style.cursor     = 'col-resize';
@@ -207,14 +208,14 @@ function useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setA
       const closeAbsWidth       = Math.max(0, thresholds.close ?? DEFAULT_SNAP);
       const currentlyCollapsed  = isPanelCollapsed();
 
-      const widthCandidate = side === 'left'
+      const widthCandidate = anchoredOnRight
         ? (clientX - rect.left - pressOffset)
         : (rect.right - clientX - pressOffset);
 
       if (currentlyCollapsed) {
         const collapsedWidth    = sessionCollapsedWidth ?? DEFAULT_COLLAPSED;
         const requiredDistance  = Math.max(0, thresholds.open - collapsedWidth);
-        const distanceFromEdge  = side === 'left'
+        const distanceFromEdge  = anchoredOnRight
           ? (clientX - rect.right - pressOffset)
           : (rect.left - clientX - pressOffset);
 
@@ -302,7 +303,7 @@ function useDragResize({ ref, side, setSideWidth, expandSide, collapseSide, setA
       el.removeEventListener('lostpointercapture' , onLostPointerCapture  as EventListener);
       el.removeEventListener('pointercancel'      , onPointerCancel       as EventListener);
     };
-  }, [ref, side, setSideWidth, expandSide, collapseSide, setAriaNow, controlledId]);
+  }, [ref, side, setSideWidth, expandSide, collapseSide, setAriaNow, controlledId, anchoredOnRight]);
 }
 
 

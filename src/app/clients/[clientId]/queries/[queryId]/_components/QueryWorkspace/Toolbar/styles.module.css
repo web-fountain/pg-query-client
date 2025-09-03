@@ -69,8 +69,3 @@
   color: var(--button-text-disabled);
   cursor: default;
 }
-
-/* Media queries at bottom */
-@media (max-width: 960px) {
-  .name-input { min-width: 140px; }
-}
