@@ -4,8 +4,6 @@ import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
 import Icon                 from '@Components/Icons';
 
 import QueryTree            from './QueryTree';
-import Tabs                 from './Tabs';
-import HistoryList          from './HistoryList';
 import styles               from './styles.module.css';
 
 
@@ -28,15 +26,9 @@ function DirectoryPanel({ collapsed, side = 'right' }: { collapsed: boolean; sid
         <Icon name={side === 'right' ? 'panel-layout-right' : 'panel-layout-left'} aria-hidden='true' />
       </div>
 
-      {/* AIDEV-NOTE: Keep tabs and both panels mounted; hide via collapsed state above */}
+      {/* AIDEV-NOTE: Tabs removed per design. Directory panel shows QueryTree only. */}
       <div style={{ display: collapsed ? 'none' : 'contents' }} aria-hidden={collapsed}>
-        <Tabs
-          defaultTabId='queries'
-          tabs={[
-            { id: 'queries', label: 'Queries', icon: 'file-lines', panel: <QueryTree rootId='root' /> },
-            { id: 'history', label: 'History', icon: 'clock-rotate-left', panel: <HistoryList /> }
-          ]}
-        />
+        <QueryTree rootId='root' />
       </div>
     </div>
   );

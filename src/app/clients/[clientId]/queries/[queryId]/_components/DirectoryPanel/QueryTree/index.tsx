@@ -2,7 +2,7 @@
 
 import type { NodePayload }             from './types';
 
-import { useMemo, useRef, useEffect, useCallback } from 'react';
+import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { useTree }                      from '@headless-tree/react';
 import {
   asyncDataLoaderFeature,
@@ -29,6 +29,7 @@ import styles                           from './styles.module.css';
 
 
 function QueryTree({ rootId, indent = 24 }: { rootId: string; indent?: number }) {
+  // AIDEV-NOTE: Debugging disabled in production
   // AIDEV-NOTE: Headless Tree instance with async data loader; names/folder state derive from cache.
   const tree = useTree<NodePayload>({
     rootItemId: rootId,
@@ -49,8 +50,12 @@ function QueryTree({ rootId, indent = 24 }: { rootId: string; indent?: number })
   // AIDEV-NOTE: On mount/root change, load children for the root via dedicated hook.
   useInitialLoad(tree as any, rootId);
 
-  // AIDEV-NOTE: Toolbar and row actions via hook; refreshes affected parents.
-  const { handleCreateFolder, handleCreateFile, handleRename, handleDropMove } = useItemActions(tree as any, targetFolderId);
+  // AIDEV-NOTE: Row actions and section-scoped toolbars. Bind actions per top-level folder id.
+  const { handleRename, handleDropMove } = useItemActions(tree as any, targetFolderId);
+  const actionsQueries   = useItemActions(tree as any, 'queries');
+  const actionsServers   = useItemActions(tree as any, 'servers');
+  const actionsProjects  = useItemActions(tree as any, 'projects_top');
+  const actionsDatabases = useItemActions(tree as any, 'databases');
 
   // AIDEV-NOTE: Virtualize visible rows with fixed 28px height.
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -76,19 +81,30 @@ function QueryTree({ rootId, indent = 24 }: { rootId: string; indent?: number })
 
   // AIDEV-NOTE: Focus sync – only for keyboard navigation to prevent jump on mouse clicks
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [focusedTopId, setFocusedTopId] = useState<string | null>(null);
   (tree as any).onFocusedItemChange?.((focusedId: string | null) => {
     if (!focusedId) return;
     if (lastInputRef.current !== 'keyboard') return;
-    const index = tree.getItems().findIndex((it: any) => it.getId?.() === focusedId);
+    const itemsNow = tree.getItems();
+    const index = itemsNow.findIndex((it: any) => it.getId?.() === focusedId);
     if (index >= 0) {
       try { virtualizer.scrollToIndex(index, { align: 'auto' }); } catch {}
+      // derive top-level id for focused row
+      try {
+        let currentTop: string | null = null;
+        for (let i = 0; i < itemsNow.length; i++) {
+          const it = itemsNow[i];
+          const lvl = (it?.getItemMeta?.().level ?? 0) as number;
+          if (lvl === 1) currentTop = it.getId?.() ?? null;
+          if (i === index) break;
+        }
+        setFocusedTopId(currentTop);
+      } catch {}
     }
   });
 
-  // AIDEV-NOTE: For now, actions target the invisible root (level 0). Disable New Folder if cap reached.
-  const maxDepth = 4;
-  const targetLevel = 0; // root
-  const disableNewFolder = targetLevel + 1 > maxDepth - 0; // would create level 1, cap is 4
+  // AIDEV-NOTE: Disable logic can be section-specific later; keep enabled for now.
+  const disableNewFolder = false;
 
   // AIDEV-NOTE: Compute rendering ranges and items outside JSX to avoid TSX parsing quirks
   const allItems = (tree as any).getItems?.() ?? [];
@@ -173,8 +189,6 @@ function QueryTree({ rootId, indent = 24 }: { rootId: string; indent?: number })
 
   return (
     <section className={styles['tree']} aria-label="Queries">
-      <Toolbar onCreateFolder={handleCreateFolder} onCreateFile={handleCreateFile} disableNewFolder={disableNewFolder} />
-
       {(() => {
         const containerProps = (tree as any).getContainerProps?.('Queries Tree') ?? {};
         const bridgeRef = (el: HTMLDivElement | null) => {
@@ -187,12 +201,61 @@ function QueryTree({ rootId, indent = 24 }: { rootId: string; indent?: number })
         };
         const mergedScrollerClass = `${containerProps.className ?? ''} ${styles['scroller']}`.trim();
         const mergedListClass = `${styles['list']}`;
+        // AIDEV-NOTE: Build index→top-level mapping for sections
+        const indexToTopId = new Map<number, string>();
+        const topIdToIndex = new Map<string, number>();
+        const TOP_LEVEL_IDS = new Set(['queries', 'servers', 'projects_top', 'databases']);
+        let currentTop: string | null = null;
+        for (let i = 0; i < allItems.length; i++) {
+          const it: any = allItems[i];
+          const id = it?.getId?.();
+          if (id && TOP_LEVEL_IDS.has(id)) {
+            currentTop = id;
+            topIdToIndex.set(id, i);
+            indexToTopId.set(i, id);
+          } else if (currentTop) {
+            indexToTopId.set(i, currentTop);
+          }
+        }
+
+        const [hoveredTopId, setHoveredTopId] = (function() {
+          // keep hovered state stable across renders
+          const ref = (QueryTree as any)._hoverState || { get: null as string | null };
+          (QueryTree as any)._hoverState = ref;
+          const [val, setVal] = useState<string | null>(ref.get);
+          useEffect(() => { ref.get = val; }, [val]);
+          return [val, setVal] as const;
+        })();
+        const activeTopId = hoveredTopId; // active section is pointer-derived only
+        const topIndex = activeTopId ? (topIdToIndex.get(activeTopId) ?? -1) : -1;
+        const topRange = topIndex >= 0 ? vRanges.find((r) => r.index === topIndex) : undefined;
+        const topStart: number | null = topIndex >= 0 ? (topRange ? topRange.start : topIndex * rowHeight) : null;
+        const topItem = topIndex >= 0 ? allItems[topIndex] : null;
+        const isTopExpanded = !!(topItem && (topItem as any).isExpanded?.());
+        const lastActiveTopIdRef = useRef<string | null>(null);
+        const lastTopStartRef = useRef<number>(0);
+        if (activeTopId) lastActiveTopIdRef.current = activeTopId;
+        if (topStart != null) lastTopStartRef.current = topStart;
         return (
           <div
             {...containerProps}
             ref={bridgeRef}
             className={mergedScrollerClass}
             data-scrollable
+            onMouseLeave={() => {
+              try { (setHoveredTopId as any)(null); } catch {}
+            }}
+            onMouseMove={(e) => {
+              try {
+                const scroller = scrollerRef.current;
+                if (!scroller) return;
+                const rect = scroller.getBoundingClientRect();
+                const offsetY = e.clientY - rect.top + scroller.scrollTop;
+                const approxIndex = Math.max(0, Math.min(allItems.length - 1, Math.floor(offsetY / rowHeight)));
+                const topId = indexToTopId.get(approxIndex) ?? null;
+                (setHoveredTopId as any)(topId);
+              } catch {}
+            }}
           >
             <div className={mergedListClass} style={{ height: computedHeight, width: '100%', position: 'relative' }}>
               {renderRanges.map((range: any) => {
@@ -215,6 +278,30 @@ function QueryTree({ rootId, indent = 24 }: { rootId: string; indent?: number })
                   </div>
                 );
               })}
+              <div
+                className={styles['section-toolbar']}
+                style={{ transform: `translateY(${lastTopStartRef.current}px)` }}
+                data-active-top-id={lastActiveTopIdRef.current || ''}
+                data-visible={activeTopId && isTopExpanded ? 'true' : 'false'}
+              >
+                {(() => {
+                  const map: Record<string, { onCreateFolder: () => void | Promise<void>; onCreateFile: () => void | Promise<void> }> = {
+                    queries   : { onCreateFolder: actionsQueries.handleCreateFolder,   onCreateFile: actionsQueries.handleCreateFile },
+                    servers   : { onCreateFolder: actionsServers.handleCreateFolder,   onCreateFile: actionsServers.handleCreateFile },
+                    projects_top: { onCreateFolder: actionsProjects.handleCreateFolder, onCreateFile: actionsProjects.handleCreateFile },
+                    databases : { onCreateFolder: actionsDatabases.handleCreateFolder, onCreateFile: actionsDatabases.handleCreateFile }
+                  };
+                  const idForHandlers = lastActiveTopIdRef.current || 'queries';
+                  const handlers = map[idForHandlers] || map['queries'];
+                  return (
+                    <Toolbar
+                      onCreateFolder={handlers.onCreateFolder}
+                      onCreateFile={handlers.onCreateFile}
+                      disableNewFolder={disableNewFolder}
+                    />
+                  );
+                })()}
+              </div>
             </div>
           </div>
         );

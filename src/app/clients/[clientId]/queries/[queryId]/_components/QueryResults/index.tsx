@@ -70,7 +70,7 @@ function QueryResults() {
             tabIndex={activeTab === 'data-output' ? 0 : -1}
             onClick={() => setActiveTab('data-output')}
           >
-            Data Output
+            Results
           </button>
           <button
             role="tab"

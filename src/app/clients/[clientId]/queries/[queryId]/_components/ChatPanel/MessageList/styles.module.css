@@ -9,11 +9,16 @@
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
+  /* AIDEV-NOTE: Keep layout stable when scrollbar visuals fade in/out */
+  scrollbar-gutter: stable;
+  /* AIDEV-NOTE: Base state hides scrollbar visuals; width unchanged */
+  scrollbar-color: transparent transparent;
 }
 
 .message {
   display: block;
   margin-bottom: var(--space-5);
+  padding-inline-start: 12px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -61,7 +66,40 @@
 /* AIDEV-NOTE: When an ancestor (ChatPanel .content) has [data-scrollable],
    add a small inline-end padding so items don't collide with the scrollbar. */
 :global([data-scrollable]) .message {
-  padding-inline-end: 5px;
+  padding-inline-end: 2px;
+}
+
+
+/* AIDEV-NOTE: Hover/focus fade-in for scrollbar visuals without changing thickness */
+.virtual-scroller::-webkit-scrollbar-thumb,
+.virtual-scroller::-webkit-scrollbar-track {
+  background-color: transparent;
+  transition: background-color var(--duration-150) var(--ease-standard);
+}
+
+.virtual-scroller:hover::-webkit-scrollbar-thumb,
+.virtual-scroller:focus-visible::-webkit-scrollbar-thumb,
+.virtual-scroller:focus-within::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--foreground) 25%, transparent);
+}
+
+/* Track remains transparent; no width/thickness changes applied */
+.virtual-scroller:hover::-webkit-scrollbar-track,
+.virtual-scroller:focus-visible::-webkit-scrollbar-track,
+.virtual-scroller:focus-within::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Firefox: reveal thumb color on hover/focus without changing width */
+.virtual-scroller:hover,
+.virtual-scroller:focus-visible,
+.virtual-scroller:focus-within {
+  scrollbar-color: color-mix(in oklch, var(--foreground) 25%, transparent) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .virtual-scroller::-webkit-scrollbar-thumb,
+  .virtual-scroller::-webkit-scrollbar-track { transition: none; }
 }
 
 

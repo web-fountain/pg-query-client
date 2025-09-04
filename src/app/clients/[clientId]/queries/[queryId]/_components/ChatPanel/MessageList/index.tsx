@@ -148,7 +148,7 @@ function MessageList({
   }, [messages.length, rowVirtualizer]);
 
   return (
-    <div ref={parentRef} className={styles['virtual-scroller']}>
+    <div ref={parentRef} className={styles['virtual-scroller']} tabIndex={0}>
       <div
         className={styles['virtual-list']}
         style={{

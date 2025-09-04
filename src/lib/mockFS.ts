@@ -23,23 +23,48 @@ const STATIC_TREE: StaticTreeNode = {
   name: 'ROOT',
   children: [
     {
-      id: 'f_accounts',
+      id: 'queries',
       kind: 'folder',
-      name: 'accounts',
+      name: 'QUERIES',
       children: [
-        { id: 'q_user_queries', kind: 'query', name: 'user-queries.sql' },
-        { id: 'q_account_summary', kind: 'query', name: 'account-summary.sql' }
+        {
+          id: 'f_accounts',
+          kind: 'folder',
+          name: 'accounts',
+          children: [
+            { id: 'q_user_queries', kind: 'query', name: 'user-queries.sql' },
+            { id: 'q_account_summary', kind: 'query', name: 'account-summary.sql' }
+          ]
+        },
+        {
+          id: 'f_orders',
+          kind: 'folder',
+          name: 'orders',
+          children: [
+            { id: 'q_monthly_revenue', kind: 'query', name: 'monthly-revenue.sql' }
+          ]
+        },
+        { id: 'q_quick_stats', kind: 'query', name: 'quick-stats.sql' }
       ]
     },
     {
-      id: 'f_orders',
+      id: 'servers',
       kind: 'folder',
-      name: 'orders',
-      children: [
-        { id: 'q_monthly_revenue', kind: 'query', name: 'monthly-revenue.sql' }
-      ]
+      name: 'SERVERS',
+      children: []
     },
-    { id: 'q_quick_stats', kind: 'query', name: 'quick-stats.sql' }
+    {
+      id: 'projects_top',
+      kind: 'folder',
+      name: 'PROJECTS',
+      children: []
+    },
+    {
+      id: 'databases',
+      kind: 'folder',
+      name: 'DATABASES',
+      children: []
+    }
   ]
 };
 
@@ -67,8 +92,8 @@ seedFromStaticTree();
 // Generates a predictable structure shape with random suffixes to avoid name collisions.
 // AIDEV-TODO: Tweak counts if UI becomes sluggish without virtualization.
 function augmentWithRandomData() {
-  const root = store.get(ROOT_ID);
-  if (!root) return;
+  const queriesTop = store.get('queries');
+  if (!queriesTop) return;
 
   const addFolder = (parent: Node, baseName: string): Node => {
     if (parent.level + 1 > maxDepth) return parent;
@@ -94,7 +119,7 @@ function augmentWithRandomData() {
   // Each module has files + 2 features. Each feature has files + 1 detail folder with files.
   const numProjects = 10;
   for (let i = 0; i < numProjects; i++) {
-    const project = addFolder(root, `project-${i + 1}`);
+    const project = addFolder(queriesTop, `project-${i + 1}`);
     // L1 files under project
     for (let f = 0; f < 4; f++) addFile(project, `report-${f + 1}`);
     // L2 modules

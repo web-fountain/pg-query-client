@@ -25,7 +25,6 @@ function Toolbar({ onCreateFolder, onCreateFile, disableNewFolder }: ToolbarProp
         >
           <Icon name="folder-plus" aria-hidden="true" />
         </button>
-        <span className={styles['spacer']} />
         <button
           type="button"
           className={styles['tool']}

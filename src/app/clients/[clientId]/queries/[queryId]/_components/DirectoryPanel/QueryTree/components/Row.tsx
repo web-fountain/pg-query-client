@@ -14,16 +14,21 @@ type RowProps = {
   onRename    : OnRename;
   onDropMove  : OnDropMove;
   onPreToggle?: (id: string) => void;
+  isTopLevel?: boolean;
 };
 
-function Row({ item, indent, onRename, onDropMove, onPreToggle }: RowProps) {
-  const level     = item.getItemMeta().level as number;
+function Row({ item, indent, onRename, onDropMove, onPreToggle, isTopLevel: isTopLevelProp }: RowProps) {
+  const level     = (item.getItemMeta().level ?? 0) as number;
   const isFolder  = item.isFolder();
+  const TOP_LEVEL_IDS = new Set(['queries', 'servers', 'projects_top', 'databases']);
   // AIDEV-NOTE: Merge className/style from library props to preserve its internal state classes
   const itemProps = item.getProps();
+  const id        = item.getId();
+  const isTopLevel = isTopLevelProp ?? TOP_LEVEL_IDS.has(id);
   const mergedClassName = [
     (itemProps as any)?.className,
-    styles['row']
+    styles['row'],
+    isTopLevel ? styles['row-top-level'] : undefined
   ].filter(Boolean).join(' ');
   const mergedStyle = {
     ...(itemProps as any)?.style,
@@ -45,7 +50,6 @@ function Row({ item, indent, onRename, onDropMove, onPreToggle }: RowProps) {
     }, 0);
   };
   const expanded  = item.isExpanded();
-  const id        = item.getId();
   const dnd       = useDragAndDrop(id, isFolder, onDropMove);
 
   return (
@@ -54,6 +58,7 @@ function Row({ item, indent, onRename, onDropMove, onPreToggle }: RowProps) {
       {...itemProps}
       className={mergedClassName}
       style={mergedStyle}
+      aria-label={isTopLevel ? item.getItemName() : undefined}
       onClick={handleRowClick}
       draggable
       onDragStart={(e) => {
@@ -92,7 +97,11 @@ function Row({ item, indent, onRename, onDropMove, onPreToggle }: RowProps) {
             }
           }}
         >
-          {expanded ? <Icon name="folder-open" /> : <Icon name="folder" />}
+          {isTopLevel ? (
+            expanded ? <Icon name="chevron-down" /> : <Icon name="chevron-right" />
+          ) : (
+            expanded ? <Icon name="folder-open" /> : <Icon name="folder" />
+          )}
         </button>
       ) : (
         <span className={styles['type-icon']} aria-hidden="true">
