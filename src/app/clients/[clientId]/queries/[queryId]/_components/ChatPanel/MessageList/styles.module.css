@@ -19,6 +19,7 @@
   display: block;
   margin-bottom: var(--space-5);
   padding-inline-start: 12px;
+  padding-inline-end: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
