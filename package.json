@@ -8,8 +8,8 @@
   },
   "packageManager": "pnpm@10.15.0",
   "devDependencies": {
-    "@types/node": "24.5.2",
-    "@types/react": "19.1.15",
+    "@types/node": "24.6.0",
+    "@types/react": "19.1.16",
     "@types/react-dom": "19.1.9",
     "autoprefixer": "10.4.21",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
@@ -23,9 +23,9 @@
     "typescript": "5.9.2"
   },
   "dependencies": {
-    "@ai-sdk/openai": "2.0.39",
-    "@ai-sdk/react": "2.0.57",
-    "@ai-sdk/rsc": "1.0.57",
+    "@ai-sdk/openai": "2.0.42",
+    "@ai-sdk/react": "2.0.59",
+    "@ai-sdk/rsc": "1.0.59",
     "@codemirror/commands": "6.8.1",
     "@codemirror/lang-json": "6.0.2",
     "@codemirror/lang-sql": "6.10.0",
@@ -42,7 +42,7 @@
     "@tanstack/react-virtual": "3.13.12",
     "@uiw/codemirror-themes": "4.25.2",
     "@uiw/react-codemirror": "4.25.2",
-    "ai": "5.0.57",
+    "ai": "5.0.59",
     "next": "15.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
