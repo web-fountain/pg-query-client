@@ -2,8 +2,7 @@ name: PNPM update -> PR
 
 on:
   schedule:
-    - cron: "0 9 * * *"   # 09:00 UTC
-    - cron: "0 21 * * *"  # 21:00 UTC
+    - cron: "0 9 * * 1"   # 09:00 UTC every Monday
   workflow_dispatch: {}
 
 permissions:
