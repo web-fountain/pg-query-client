@@ -23,7 +23,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@ai-sdk/openai": "2.0.67",
+    "@ai-sdk/openai": "2.0.68",
     "@ai-sdk/react": "2.0.93",
     "@ai-sdk/rsc": "1.0.94",
     "@codemirror/commands": "6.10.0",
@@ -32,7 +32,7 @@
     "@codemirror/language": "6.11.3",
     "@codemirror/lint": "6.9.2",
     "@codemirror/state": "6.5.2",
-    "@codemirror/view": "6.38.7",
+    "@codemirror/view": "6.38.8",
     "@floating-ui/react": "0.27.16",
     "@headless-tree/core": "1.5.1",
     "@headless-tree/react": "1.5.1",
@@ -46,7 +46,7 @@
     "ajv": "8.17.1",
     "ajv-errors": "3.0.0",
     "ajv-formats": "3.0.1",
-    "jose": "6.1.1",
+    "jose": "6.1.2",
     "next": "16.0.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
