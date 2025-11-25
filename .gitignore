@@ -173,5 +173,6 @@ z*
 .specstory
 
 # prompts
+prompts/
 _*.md
 CONTEXT.md

@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
-import { interVariable, interDisplay } from '@Lib/fonts';
+import type { Metadata }                from 'next';
+import { interVariable, interDisplay }  from '@Lib/fonts';
 import OpSpaceLayoutProvider            from '@Components/layout/OpSpaceProvider';
-import StoreProvider from '@Redux/StoreProvider';
+import StoreProvider                    from '@Redux/StoreProvider';
+import DevJwtBootstrapClient            from './_components/DevJwtBootstrapClient';
 
 import '@Styles/scale.css';
 import '@Styles/normalize.css';
@@ -18,7 +19,6 @@ import '@Styles/a11y.css';
 import '@Styles/scrollbars.css';
 import '@Styles/prose.css';
 import '@Styles/print.css';
-
 
 
 const metadata: Metadata = {
@@ -66,6 +66,9 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
             __html: `
               (function() {
                 try {
+                  // AIDEV-NOTE: Mark pre-hydration phase so CSS can temporarily disable transitions
+                  document.documentElement.setAttribute('data-op-space-pre-hydration', '');
+
                   var raw = localStorage.getItem('pg-query-client/panel-layout');
                   if (!raw) return;
                   var parsed = JSON.parse(raw) || {};
@@ -76,6 +79,9 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
                   }
                   if (typeof right.width === 'number') {
                     document.documentElement.style.setProperty('--op-space-layout-right-panel-width', right.width + 'px');
+                  }
+                  if (parsed.contentSwapped) {
+                    document.documentElement.setAttribute('data-op-space-content-swapped', '');
                   }
                   if (left.collapsed) {
                     document.documentElement.setAttribute('data-op-space-left-collapsed', '');
@@ -88,9 +94,12 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
             `,
           }}
         />
+
+        {/* AIDEV-NOTE: DEV auth cookies moved to client bootstrap (DevJwtBootstrapClient) */}
       </head>
 
       <body>
+        {process.env.NODE_ENV !== 'production' ? <DevJwtBootstrapClient /> : null}
         <StoreProvider>
           <OpSpaceLayoutProvider>
             {children}

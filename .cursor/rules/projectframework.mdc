@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+---
+I am using the latest nextjs v16, reactjs, react-redux,and typescript
+
+Here are some more references to review:
+- https://nextjs.org/blog/next-16
+- https://react.dev/blog/2025/10/01/react-19-2
+- https://react.dev/blog/2024/12/05/react-19
+- https://react-redux.js.org/introduction/getting-started
+- https://devblogs.microsoft.com/typescript/announcing-typescript-5-9
+
+Always use the latest version of nextjs, reactjs, react-redux, and typescript.
+
+Always use the latest syntax and features of nextjs, reactjs, react-redux, and typescript.

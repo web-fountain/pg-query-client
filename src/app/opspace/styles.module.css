@@ -1,0 +1,45 @@
+/* AIDEV-NOTE: Center the page content. Used by opspace/[opspaceId]/page.tsx */
+.center-page {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 16px;
+}
+
+/* AIDEV-NOTE: Group logo + instructions in a single grid with 32px gap */
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  row-gap: 32px;
+}
+
+/* AIDEV-NOTE: Fixed logo size per spec (78x88) */
+.logo {
+  width: 78px;
+  height: 88px;
+  object-fit: contain;
+}
+
+/* AIDEV-NOTE: Center text/content for instruction list block */
+.instructions {
+  text-align: center;
+}
+
+.instructions-button {
+  /* AIDEV-NOTE: Rely on global button tokens; only text-specific behavior here */
+  font-weight: var(--semi-bold);
+}
+.instructions-button:hover {
+  text-decoration: underline;
+}
+.instructions .instructions-button {
+  /* Ensure button text uses the design token even if parent sets color */
+  color: var(--button-text);
+}
+/* AIDEV-NOTE: Remove default list spacing so gap is the true 32px */
+.instructions ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}

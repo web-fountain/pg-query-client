@@ -1,0 +1,318 @@
+'use client';
+
+import type { UnsavedQueryTreeRecord, UnsavedTreeNode } from '@Redux/records/unsavedQueryTree/types';
+
+import { useEffect, useMemo, useRef, useState }         from 'react';
+import { useTree }                                      from '@headless-tree/react';
+import {
+  syncDataLoaderFeature, selectionFeature,
+  hotkeysCoreFeature, dragAndDropFeature
+}                                                       from '@headless-tree/core';
+import { useReduxSelector }                             from '@Redux/storeHooks';
+import { selectUnsavedQueryTree }                       from '@Redux/records/unsavedQueryTree';
+import {
+  selectTabIds,
+  selectFocusedTabIndex
+}                                                       from '@Redux/records/tabbar';
+import Icon                                             from '@Components/Icons';
+
+import { useItemActions }                               from './hooks/useItemActions';
+import Row                                              from './components/Row';
+import Toolbar                                          from './components/Toolbar';
+
+import styles                                           from './styles.module.css';
+
+
+// AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes.
+// AIDEV-NOTE: We continue to rely on a reset key here to avoid subtle cache issues inside headless-tree.
+function UnsavedQueriesTree(props: { rootId: string; label: string; indent?: number }) {
+  const unsavedQueryTree = useReduxSelector(selectUnsavedQueryTree);
+  const nodeCount = Object.keys(unsavedQueryTree.nodes || {}).length;
+  const edgeCount = Object.keys(unsavedQueryTree.childrenByParentId || {}).length;
+  const resetKey = `${props.rootId}:${nodeCount}:${edgeCount}`;
+
+  return <UnsavedQueriesTreeInner key={resetKey} unsavedQueryTree={unsavedQueryTree} {...props} />;
+}
+
+function UnsavedQueriesTreeInner(
+  { rootId, indent = 20, label = 'UNSAVED QUERIES', unsavedQueryTree }:
+  { rootId: string; indent?: number; label: string; unsavedQueryTree: UnsavedQueryTreeRecord }
+) {
+  const tabIds          = useReduxSelector(selectTabIds);
+  const focusedTabIndex = useReduxSelector(selectFocusedTabIndex);
+
+  // AIDEV-NOTE: Derive unsaved group metadata from the current tree snapshot.
+  const allGroupNodeIds = Object.values(unsavedQueryTree.nodes || {})
+    .filter((node) => node && node.kind === 'group')
+    .map((node) => node.nodeId);
+  const rootChildrenIds = unsavedQueryTree.childrenByParentId[rootId] || [];
+  const rootGroupIds = rootChildrenIds.filter((childId) => {
+    const node = unsavedQueryTree.nodes[childId];
+    return node && node.kind === 'group';
+  });
+  const groupCount = rootGroupIds.length;
+  const hasMultipleGroups = groupCount > 1;
+  const singleGroupId = groupCount === 1 ? rootGroupIds[0] : null;
+
+  // AIDEV-NOTE: Sync unsaved tree highlight with tabbar's roving focus index.
+  const activeUnsavedNodeId = useMemo(() => {
+    if (!tabIds || tabIds.length === 0 || focusedTabIndex == null) return null;
+
+    const count = tabIds.length;
+    const clamped = (((focusedTabIndex || 0) % count) + count) % count;
+    const tabId = tabIds[clamped] as string;
+
+    const node = unsavedQueryTree.nodes[tabId];
+    if (node && node.kind === 'file') {
+      return node.nodeId;
+    }
+
+    return null;
+  }, [tabIds, focusedTabIndex, unsavedQueryTree.nodes]);
+
+  // AIDEV-NOTE: Memoized tree configuration to keep item props and handlers stable where possible.
+  // AIDEV-NOTE: The onDrop handler intentionally closes over `actions`; the binding is updated after tree creation.
+  const treeConfig = useMemo(() => ({
+    rootItemId: rootId,
+    indent, // AIDEV-NOTE: Indentation applied by library on each row via item props style
+    getItemName: (item: any) => item.getItemData()?.name,
+    isItemFolder: (item: any) => item.getItemData()?.kind === 'group',
+    dataLoader: {
+      // AIDEV-NOTE: Unsaved tree data is fully local from Redux; use synchronous loader.
+      getItem: (nodeId: string) => unsavedQueryTree.nodes[nodeId],
+      getChildren: (nodeId: string) => unsavedQueryTree.childrenByParentId[nodeId] || []
+    },
+    // AIDEV-NOTE: All data is present synchronously; syncDataLoaderFeature wires dataLoader into the tree.
+    features: [syncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
+    // AIDEV-NOTE: Expanded root and all groups so folders appear open and cannot be collapsed via UI controls.
+    // AIDEV-NOTE: Combined with the hydration reload + invalidate below, this avoids the library sticking to an initial "empty" cache.
+    initialState: { expandedItems: [rootId, ...allGroupNodeIds], selectedItems: [rootId], focusedItem: rootId },
+    // AIDEV-NOTE: DnD configuration per headless-tree docs: https://headless-tree.lukasbach.com/features/dnd/
+    canDrag: (items: any[]) => items.length > 0,
+    canDrop: (items: any[], target: any) => {
+      // AIDEV-NOTE: Disallow cross-section moves
+      try {
+        const draggedRoot = items[0]?.getTree?.()?.getRootItem?.()?.getId?.();
+        const targetRoot = target.item?.getTree?.()?.getRootItem?.()?.getId?.();
+        if (draggedRoot && targetRoot && draggedRoot !== targetRoot) return false;
+      } catch {}
+
+      const isReorder = 'childIndex' in target && typeof target.childIndex === 'number';
+      // Base allowance: reorder within same parent OR drop into a folder
+      let allowed = isReorder ? true : target.item?.isFolder?.() === true;
+      if (!allowed) return false;
+
+      // AIDEV-NOTE: Enforce depth rule: no folders at aria-level >= 4 (meta level >= 3)
+      try {
+        const parentItem = target.item;
+        const parentLevel = (parentItem?.getItemMeta?.()?.level ?? 0) as number;
+        const newLevel = parentLevel + 1; // child meta level
+        const draggedIsFolder = !!items[0]?.isFolder?.();
+        if (draggedIsFolder && newLevel >= 3) return false;
+      } catch {}
+
+      return allowed;
+    },
+    openOnDropDelay: 250,
+    onDrop: async (items: any[], target: any) => {
+      const dragged = items[0];
+      const dragId = dragged?.getId?.();
+      const dropTargetId = target.item?.getId?.();
+      if (!dragId || !dropTargetId) return;
+      const isTargetFolder = !('childIndex' in target && typeof target.childIndex === 'number');
+      await actions.handleDropMove(dragId, dropTargetId, isTargetFolder);
+    }
+  }), [rootId, indent, unsavedQueryTree, allGroupNodeIds]);
+
+  const tree = useTree<UnsavedTreeNode>(treeConfig);
+
+  // AIDEV-NOTE: Row actions scoped to this section root
+  const actions = useItemActions(tree as any, rootId);
+
+  // AIDEV-NOTE: Ref for scroll host (used for scrollbar gutter detection).
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // Track whether the tree (scroller) currently contains focus
+  const [isTreeFocused, setIsTreeFocused] = useState<boolean>(false);
+  // AIDEV-NOTE: Section open/closed UI state (decoupled from Tree's root expansion)
+  const [isOpen, setIsOpen] = useState<boolean>(true);
+
+  // Compute rendering ranges and items outside JSX
+  const allItems = (tree as any).getItems?.() ?? [];
+  // AIDEV-NOTE: Baseline diagnostic — disable custom virtualization, render all items.
+  // AIDEV-NOTE: When only a single group exists under the root, flatten it by hiding its row.
+  const renderItems = useMemo(() => {
+    return allItems.filter((it: any) => {
+      const id = it?.getId?.();
+      if (!id) return false;
+      // Always hide the internal root row
+      if (id === rootId) return false;
+      if (!hasMultipleGroups && singleGroupId) {
+        const data = (it as any).getItemData?.() as UnsavedTreeNode | undefined;
+        if (data && data.kind === 'group' && data.nodeId === singleGroupId) return false;
+      }
+      return true;
+    });
+  }, [allItems, rootId, hasMultipleGroups, singleGroupId]);
+
+  // AIDEV-NOTE: Toggle scrollbar gutter only when vertical scrollbar is present.
+  // This ensures `scrollbar-gutter` is unset when no scrollbar is visible.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const check = () => {
+      try {
+        const hasY = el.scrollHeight > (el.clientHeight + 1);
+        if (hasY) el.setAttribute('data-has-scrollbar', 'true');
+        else el.removeAttribute('data-has-scrollbar');
+      } catch {}
+    };
+
+    check();
+
+    const onResizeFrame = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(check);
+    };
+
+    let ro: ResizeObserver | null = null;
+    try {
+      ro = new ResizeObserver(onResizeFrame);
+      ro.observe(el);
+    } catch {}
+
+    window.addEventListener('resize', onResizeFrame);
+
+    return () => {
+      try { ro?.disconnect(); } catch {}
+      window.removeEventListener('resize', onResizeFrame);
+      cancelAnimationFrame(raf);
+    };
+  }, [isOpen, allItems.length]);
+
+  // Detect expanded state of section: root item is index 0
+  const rootItem = allItems.find((it: any) => it?.getId?.() === rootId) || allItems[0];
+
+  return (
+    <section
+      className={styles['tree']}
+      aria-label={label}
+      data-open={isOpen ? 'true' : 'false'}
+    >
+      {/* Header with toggle and per-section tools */}
+      <div
+        className={styles['header']}
+        role="heading"
+        aria-level={2}
+        tabIndex={0}
+        aria-expanded={isOpen ? 'true' : 'false'}
+        onClick={() => setIsOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen((v) => !v);
+          }
+        }}
+      >
+        <div className={styles['header-left']}>
+          <button
+            type="button"
+            className={styles['header-toggle']}
+            aria-label={isOpen ? `Collapse ${label}` : `Expand ${label}`}
+            onClick={(e) => { e.stopPropagation(); setIsOpen((v) => !v); }}
+          >
+            {isOpen ? (<Icon name="chevron-down" aria-hidden="true" />) : (<Icon name="chevron-right" aria-hidden="true" />)}
+          </button>
+          <span className={styles['header-label']}>{label.toUpperCase()}</span>
+        </div>
+        {/* AIDEV-NOTE: Always render toolbar; reveal via CSS only when expanded + hovered */}
+        <div
+          className={styles['header-tools']}
+          onClick={(e) => { e.stopPropagation(); }}
+          onKeyDown={(e) => { e.stopPropagation(); }}
+        >
+          <Toolbar
+            onCreateFolder={actions.handleCreateFolder}
+            onCreateFile={actions.handleCreateFile}
+            disableNewFolder={(() => {
+              try {
+                const rootItemMeta = (rootItem as any)?.getItemMeta?.() ?? {};
+                const rootLevel = (rootItemMeta.level ?? 0) as number;
+                // AIDEV-NOTE: Block New Folder when a new child would be meta level >= 3 (aria-level >= 4)
+                return rootLevel + 1 >= 3;
+              } catch {}
+              return false;
+            })()}
+          />
+        </div>
+      </div>
+      {(() => {
+        // AIDEV-NOTE: Apply getContainerProps to the scroll host so the library observes scroll/size and binds roles/handlers.
+        const rawContainerProps = (tree as any).getContainerProps?.(`${label} Tree`) ?? {};
+        const {
+          style: containerStyle,
+          className: containerClassName,
+          onFocus: containerOnFocus,
+          onBlur: containerOnBlur,
+          ref: containerRef,
+          ...containerAriaAndHandlers
+        } = (rawContainerProps as any);
+        const scrollerBridgeRef = (el: HTMLDivElement | null) => {
+          scrollerRef.current = el;
+          try {
+            const r = containerRef;
+            if (typeof r === 'function') r(el);
+            else if (r && 'current' in r) (r as any).current = el;
+          } catch {}
+        };
+        const mergedScrollerClass = `${(containerClassName ?? '')} ${styles['scroller']} ${styles['list']}`.trim();
+
+        const handleFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+          try { containerOnFocus?.(e as any); } catch {}
+          try { if ((e.currentTarget as HTMLElement).matches('[data-scrollable]')) setIsTreeFocused(true); } catch {}
+        };
+        const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+          try { containerOnBlur?.(e as any); } catch {}
+          try {
+            const current = e.currentTarget as HTMLElement;
+            const next = e.relatedTarget as Node | null;
+            if (!next || !current.contains(next)) setIsTreeFocused(false);
+          } catch {}
+        };
+
+        return (
+          <div className={styles['content']}>
+            <div
+              {...containerAriaAndHandlers}
+              ref={scrollerBridgeRef}
+              className={mergedScrollerClass}
+              style={containerStyle}
+              data-scrollable
+              data-focused={isTreeFocused ? 'true' : 'false'}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+            >
+              {renderItems.map((item: any) => (
+                <Row
+                  key={item.getId()}
+                  item={item}
+                  indent={indent}
+                  onRename={actions.handleRename}
+                  onDropMove={actions.handleDropMove}
+                  isTreeFocused={isTreeFocused}
+                  isTopLevel={false}
+                  isActiveFromTab={activeUnsavedNodeId !== null && item.getId() === activeUnsavedNodeId}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </section>
+  );
+}
+
+
+export default UnsavedQueriesTree;

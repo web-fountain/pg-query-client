@@ -7,11 +7,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState
-}                         from 'react';
-import { readMinMax }     from './ResizableHandle/utils/cssVars';
-import { clamp }          from './ResizableHandle/utils/math';
+}                                       from 'react';
+import { STORAGE_KEY_PANEL_LAYOUT }     from '@Constants';
+import { readCurrentWidth, readMinMax } from '@Components/layout/ResizableHandle/utils/cssVars';
+import { clamp }                        from '@Components/layout/ResizableHandle/utils/math';
 
 
 type Side = 'left' | 'right';
@@ -42,7 +44,7 @@ type LayoutCtx = {
   isContentSwapped()                  : boolean;
 };
 
-const STORAGE_KEY = 'pg-query-client/panel-layout';
+
 
 const LayoutContext = createContext<LayoutCtx | null>(null);
 
@@ -60,6 +62,7 @@ function applyCssWidths(leftWidth: number, rightWidth: number) {
 
 function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
   const defaults: LayoutState = useMemo(() => ({
+    // AIDEV-NOTE: SSR-friendly defaults (match server HTML). CSS bootstrap + guards prevent flash.
     left:  { width: 300, collapsed: false, initialWidth: 300 },
     right: { width: 300, collapsed: false, initialWidth: 300 },
     contentSwapped: false
@@ -69,16 +72,24 @@ function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LayoutState>(defaults);
   const [hydrated, setHydrated] = useState(false);
 
-  // Apply initial CSS widths on mount (defaults are in layouts.css)
+  // Align state widths to current CSS vars on mount (pre-hydration script may have set them)
   useEffect(() => {
-    applyCssWidths(state.left.width, state.right.width);
+    try {
+      const lw = readCurrentWidth('left');
+      const rw = readCurrentWidth('right');
+      setState(prev => ({
+        ...prev,
+        left:  { ...prev.left,  width: lw },
+        right: { ...prev.right, width: rw }
+      }));
+    } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY_PANEL_LAYOUT);
       if (!raw) {
         setHydrated(true);
         return;
@@ -114,18 +125,27 @@ function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
       right: { width: state.right.width, collapsed: state.right.collapsed },
       contentSwapped: state.contentSwapped
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY_PANEL_LAYOUT, JSON.stringify(payload));
   }, [state, hydrated]);
 
-  // Keep CSS vars in sync when widths change
-  useEffect(() => {
-    applyCssWidths(state.left.width, state.right.width);
-  }, [state.left.width, state.right.width]);
-
-  // Keep root collapsed attributes in sync for CSS fallback rules (post-hydration)
+  // Keep CSS vars in sync when widths change (post-hydration only)
   useEffect(() => {
     if (!hydrated) return;
+    applyCssWidths(state.left.width, state.right.width);
+  }, [hydrated, state.left.width, state.right.width]);
+
+  useLayoutEffect(() => {
+    if (!hydrated) return;
     try {
+      // AIDEV-NOTE: End pre-hydration phase now that provider has synced attributes
+      try { document.documentElement.removeAttribute('data-op-space-pre-hydration'); } catch {}
+
+      if (state.contentSwapped) {
+        document.documentElement.setAttribute('data-op-space-content-swapped', '');
+      } else {
+        document.documentElement.removeAttribute('data-op-space-content-swapped');
+      }
+
       if (state.left.collapsed) {
         document.documentElement.setAttribute('data-op-space-left-collapsed', '');
       } else {
@@ -137,7 +157,7 @@ function OpSpaceLayoutProvider({ children }: { children: ReactNode }) {
         document.documentElement.removeAttribute('data-op-space-right-collapsed');
       }
     } catch {}
-  }, [hydrated, state.left.collapsed, state.right.collapsed]);
+  }, [hydrated, state.contentSwapped, state.left.collapsed, state.right.collapsed]);
 
   // AIDEV-NOTE: Stable callbacks to avoid tearing down resizer listeners mid-drag
   const getConfigCb = useCallback((side: Side) => state[side], [state]);

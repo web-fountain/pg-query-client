@@ -41,6 +41,12 @@
     --button-text:           var(--text-primary);
     --button-text-disabled:  #aeb2b8;
 
+    /* component roles: toolbar buttons */
+    /* AIDEV-NOTE: Dedicated tokens for toolbar button surfaces */
+    --toolbar-button-bg:            var(--surface-2);
+    --toolbar-button-hover-bg:      #393a47;
+    --toolbar-button-disabled-bg:   #22232e;
+
     /* component roles: icons */
     --icon-fill:      #888995;
     --icon-hover:     color-mix(in oklch, var(--foreground) 95%, transparent);
@@ -78,5 +84,10 @@
 
     /* syntax highlighting tokens consumed by editors (CodeMirror, etc.) */
     --syntax-brace: #e5c07b;
+
+    /* component roles: tree */
+    /* AIDEV-NOTE: Tree item selection surfaces. Focused is stronger, blurred is subtler. */
+    --tree-item-selected-focused: color-mix(in oklch, var(--color-primary) 30%, var(--surface-2));
+    --tree-item-selected-blurred: color-mix(in oklch, var(--color-primary) 18%, var(--surface-2));
   }
 }

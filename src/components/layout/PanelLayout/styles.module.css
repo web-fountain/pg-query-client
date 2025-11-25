@@ -1,142 +1,22 @@
-.panel-layout {
-  /* AIDEV-NOTE: panels do not scroll; inner content containers should; grid area controls layout */
-  /* AIDEV-NOTE: Width custom properties are controlled on :root by the provider; do NOT set here or updates won't propagate */
-  --op-space-layout-gap:                   var(--space-4);
-  --op-space-layout-panel-collapsed-width: 48px;
+/* AIDEV-NOTE: PanelLayout styles – ordered for readability; no functional changes
+   Sections:
+   1) Pre-hydration and root fallbacks
+   2) Base container
+   3) Swapped layout
+   4) Dragging (transition disable)
+   5) Slots and handles
+   6) Collapsed states (explicit)
+   7) Optional visuals
+   8) Container queries
+*/
 
-  /* AIDEV-NOTE: Screen-aware layout calculations using screen dimension variables */
-  --calculated-panel-max-width: min(
-    var(--op-space-layout-panel-max-width),
-    calc(var(--screen-width) * 1px * 0.35) /* max 35% of screen width */
-  );
-  --calculated-center-min-width: max(
-    var(--op-space-layout-panel-min-width),
-    calc(var(--screen-width) * 1px * 0.3) /* min 30% of screen width */
-  );
+/* 1) Pre-hydration and root fallbacks */
+:root[data-op-space-left-collapsed] .panel-layout:not([data-left-collapsed]) .left-side { visibility: hidden; }
+:root[data-op-space-right-collapsed] .panel-layout:not([data-right-collapsed]) .right-side { visibility: hidden; }
+:root[data-op-space-pre-hydration][data-op-space-left-collapsed] .panel-layout:not([data-left-collapsed]),
+:root[data-op-space-pre-hydration][data-op-space-right-collapsed] .panel-layout:not([data-right-collapsed]) { transition: none; }
 
-  /* AIDEV-NOTE: Enable container queries for component-scoped responsiveness */
-  container-type: inline-size;
-  container-name: panel-layout;
-
-  display: grid;
-  /* AIDEV-NOTE: Enhanced clamp with screen-aware max widths */
-  grid-template-columns:
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-left-panel-width),
-      var(--calculated-panel-max-width)
-    )
-    0
-    minmax(var(--calculated-center-min-width), 1fr)
-    0
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-right-panel-width),
-      var(--calculated-panel-max-width)
-    );
-
-  grid-template-areas:
-    'left handle-left center handle-right right';
-
-  /* AIDEV-NOTE: Fill viewport minus Titlebar using screen-height; grid will also constrain */
-  height: calc(var(--available-height));
-  min-height: 0;
-  /* AIDEV-NOTE: Ensure the sole row consumes the block-size so center can flex children */
-  grid-template-rows: 1fr;
-
-  /* AIDEV-NOTE: Avoid using grid gap as clickable gutter; resizer columns are explicit elements */
-  gap: 0;
-  background: var(--surface-1);
-  color: var(--text-primary);
-  transition: grid-template-columns var(--duration-250) var(--ease-standard);
-}
-
-/* AIDEV-NOTE: Swapped visual layout – move right panel to the left and left panel to the right */
-.panel-layout[data-content-swapped] {
-  grid-template-columns:
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-right-panel-width),
-      var(--calculated-panel-max-width)
-    )
-    0
-    minmax(var(--calculated-center-min-width), 1fr)
-    0
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-left-panel-width),
-      var(--calculated-panel-max-width)
-    );
-  grid-template-areas:
-    'right handle-right center handle-left left';
-}
-
-/* AIDEV-NOTE: Disable grid transition during active drag for responsive feel */
-:root[data-op-space-layout-dragging] .panel-layout {
-  transition: none;
-}
-
-.panel-layout .left-side,
-.panel-layout .center,
-.panel-layout .right-side {
-  /* AIDEV-NOTE: Let track sizing enforce min/max; collapsed tracks can be 0 without overflow */
-  min-width: 0;
-  overflow: hidden;
-  height: 100%;
-}
-.panel-layout .left-side {
-  grid-area: left;
-}
-.panel-layout .center {
-  grid-area: center;
-  display: flex;
-  flex-direction: column;
-  min-height: 0; /* allow inner flex children to become scroll containers */
-}
-.panel-layout .right-side {
-  grid-area: right;
-}
-.panel-layout .handle-left,
-.panel-layout .handle-right {
-  inline-size: 0;
-  block-size: 100%;
-  cursor: col-resize;
-}
-.panel-layout .handle-left {
-  grid-area: handle-left;
-}
-.panel-layout .handle-right {
-  grid-area: handle-right;
-}
-
-/* Swap: mirror grid areas so right shows on the left side */
-/* AIDEV-NOTE: Static grid; content swap is state-only and handled in React */
-
-/* Collapse: minimum panel column but keep handle visible */
-.panel-layout[data-left-collapsed] {
-  grid-template-columns:
-    var(--op-space-layout-panel-collapsed-width)
-    0
-    minmax(var(--calculated-center-min-width), 1fr)
-    0
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-right-panel-width),
-      var(--calculated-panel-max-width)
-    );
-}
-.panel-layout[data-content-swapped][data-left-collapsed] {
-  grid-template-columns:
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-right-panel-width),
-      var(--calculated-panel-max-width)
-    )
-    0
-    minmax(var(--calculated-center-min-width), 1fr)
-    0
-    var(--op-space-layout-panel-collapsed-width);
-}
+/* Left collapsed (fallback widths) */
 :root[data-op-space-left-collapsed] .panel-layout:not([data-left-collapsed]) {
   grid-template-columns:
     var(--op-space-layout-panel-collapsed-width)
@@ -161,36 +41,14 @@
     var(--op-space-layout-resizer-width)
     var(--op-space-layout-panel-collapsed-width);
 }
-.panel-layout[data-right-collapsed] {
-  grid-template-columns:
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-left-panel-width),
-      var(--calculated-panel-max-width)
-    )
-    0
-    minmax(var(--calculated-center-min-width), 1fr)
-    0
-    var(--op-space-layout-panel-collapsed-width);
-}
+
+/* Right collapsed (fallback widths) */
 :root[data-op-space-right-collapsed] .panel-layout[data-content-swapped]:not([data-right-collapsed]) {
   grid-template-columns:
     var(--op-space-layout-panel-collapsed-width)
     var(--op-space-layout-resizer-width)
     minmax(var(--calculated-center-min-width), 1fr)
     var(--op-space-layout-resizer-width)
-    clamp(
-      var(--op-space-layout-panel-min-width),
-      var(--op-space-layout-left-panel-width),
-      var(--calculated-panel-max-width)
-    );
-}
-.panel-layout[data-content-swapped][data-right-collapsed] {
-  grid-template-columns:
-    var(--op-space-layout-panel-collapsed-width)
-    0
-    minmax(var(--calculated-center-min-width), 1fr)
-    0
     clamp(
       var(--op-space-layout-panel-min-width),
       var(--op-space-layout-left-panel-width),
@@ -210,35 +68,206 @@
     var(--op-space-layout-panel-collapsed-width);
 }
 
-/* AIDEV-NOTE: Collapsed panels show at 48px width with icon-only content (see --op-space-layout-panel-collapsed-width) */
-
-/* Optional visuals */
-/* AIDEV-NOTE: Side panel borders only on inner edges */
-.panel-layout .left-side {
-  border-inline-end: var(--border-1) solid var(--border-color);
-  background: var(--surface-1);
+/* Both-sides collapsed (pre-hydration) */
+:root[data-op-space-left-collapsed][data-op-space-right-collapsed]
+.panel-layout:not([data-left-collapsed]):not([data-right-collapsed]) {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    0
+    minmax(0, 1fr)
+    0
+    var(--op-space-layout-panel-collapsed-width);
 }
+
+/* Mixed-state guards: ensure explicit collapsed side wins during transient root fallback mismatches */
+/* Root says RIGHT collapsed, container has LEFT collapsed (and not right): keep LEFT collapsed */
+:root[data-op-space-right-collapsed] .panel-layout[data-left-collapsed]:not([data-right-collapsed]) {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    );
+}
+:root[data-op-space-right-collapsed] .panel-layout[data-content-swapped][data-left-collapsed]:not([data-right-collapsed]) {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    var(--op-space-layout-panel-collapsed-width);
+}
+
+/* Root says LEFT collapsed, container has RIGHT collapsed (and not left): keep RIGHT collapsed */
+:root[data-op-space-left-collapsed] .panel-layout[data-right-collapsed]:not([data-left-collapsed]) {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    var(--op-space-layout-panel-collapsed-width);
+}
+:root[data-op-space-left-collapsed] .panel-layout[data-content-swapped][data-right-collapsed]:not([data-left-collapsed]) {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    );
+}
+
+/* 2) Base container */
+.panel-layout {
+  /* AIDEV-NOTE: panels do not scroll; inner content containers should; grid area controls layout */
+  /* AIDEV-NOTE: Width custom properties are controlled on :root by the provider; do NOT set here or updates won't propagate */
+  --op-space-layout-gap:                   var(--space-4);
+  --op-space-layout-panel-collapsed-width: 48px;
+
+  /* AIDEV-NOTE: Screen-aware layout calculations using screen dimension variables */
+  --calculated-panel-max-width: min(
+    var(--op-space-layout-panel-max-width),
+    calc(var(--screen-width) * 1px * 0.35)
+  );
+  --calculated-center-min-width: max(
+    var(--op-space-layout-panel-min-width),
+    calc(var(--screen-width) * 1px * 0.3)
+  );
+
+  /* AIDEV-NOTE: Enable container queries for component-scoped responsiveness */
+  container-type: inline-size;
+  container-name: panel-layout;
+
+  display: grid;
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    );
+  grid-template-areas: 'left handle-left center handle-right right';
+  height: calc(var(--available-height));
+  min-height: 0;
+  grid-template-rows: 1fr;
+  gap: 0;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  transition: grid-template-columns var(--duration-250) var(--ease-standard);
+}
+
+/* 3) Swapped layout */
+.panel-layout[data-content-swapped],
+:root[data-op-space-content-swapped] .panel-layout:not([data-content-swapped]) {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    );
+  grid-template-areas: 'right handle-right center handle-left left';
+}
+
+/* 4) Dragging (transition disable) */
+:root[data-op-space-layout-dragging] .panel-layout { transition: none; }
+
+/* 5) Slots and handles */
+.panel-layout .left-side,
+.panel-layout .center,
 .panel-layout .right-side {
-  border-inline-start: var(--border-1) solid var(--border-color);
-  background: var(--surface-1);
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
 }
-/* AIDEV-NOTE: Maintain inner borders when swapped: inner edges must always border the center */
-.panel-layout[data-content-swapped] .left-side {
-  border-inline-end: 0;
-  border-inline-start: var(--border-1) solid var(--border-color);
+.panel-layout .left-side  { grid-area: left; }
+.panel-layout .center     { grid-area: center; display: flex; flex-direction: column; min-height: 0; }
+.panel-layout .right-side { grid-area: right; }
+.panel-layout .handle-left,
+.panel-layout .handle-right { inline-size: 0; block-size: 100%; cursor: col-resize; }
+.panel-layout .handle-left  { grid-area: handle-left; }
+.panel-layout .handle-right { grid-area: handle-right; }
+
+/* 6) Collapsed states (explicit) */
+.panel-layout[data-left-collapsed] {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    );
 }
-.panel-layout[data-content-swapped] .right-side {
-  border-inline-start: 0;
-  border-inline-end: var(--border-1) solid var(--border-color);
+.panel-layout[data-content-swapped][data-left-collapsed] {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-right-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    var(--op-space-layout-panel-collapsed-width);
 }
-.panel-layout .center {
-  background: var(--surface-1);
+.panel-layout[data-right-collapsed] {
+  grid-template-columns:
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    )
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    var(--op-space-layout-panel-collapsed-width);
+}
+.panel-layout[data-content-swapped][data-right-collapsed] {
+  grid-template-columns:
+    var(--op-space-layout-panel-collapsed-width)
+    0
+    minmax(var(--calculated-center-min-width), 1fr)
+    0
+    clamp(
+      var(--op-space-layout-panel-min-width),
+      var(--op-space-layout-left-panel-width),
+      var(--calculated-panel-max-width)
+    );
 }
 
-/* AIDEV-NOTE: Collapses under swapped layout must mirror to correct columns */
-/* AIDEV-NOTE: Swapped-specific track rules removed; grid does not mirror */
-
-/* AIDEV-NOTE: When both sides are collapsed, keep both handles visible for user interaction */
+/* When both sides are collapsed, keep both handles visible */
 .panel-layout[data-left-collapsed][data-right-collapsed] {
   grid-template-columns:
     var(--op-space-layout-panel-collapsed-width)
@@ -248,26 +277,27 @@
     var(--op-space-layout-panel-collapsed-width);
 }
 
-/* AIDEV-NOTE: Container queries for component-scoped responsive behavior */
+/* 7) Optional visuals */
+.panel-layout .left-side  { border-inline-end:  var(--border-1) solid var(--border-color); background: var(--surface-1); }
+.panel-layout .right-side { border-inline-start: var(--border-1) solid var(--border-color); background: var(--surface-1); }
+.panel-layout[data-content-swapped] .left-side  { border-inline-end: 0; border-inline-start: var(--border-1) solid var(--border-color); }
+.panel-layout[data-content-swapped] .right-side { border-inline-start: 0; border-inline-end:   var(--border-1) solid var(--border-color); }
+.panel-layout .center { background: var(--surface-canvas); }
+
+/* 8) Container queries */
 @container panel-layout (max-width: 768px) {
   .panel-layout {
     --calculated-panel-max-width: calc(100cqi - 100px);
     --calculated-center-min-width: 200px;
-    /* Force mobile layout on small container */
     grid-template-columns: 1fr !important;
     grid-template-areas: 'center' !important;
   }
-
   .panel-layout .left-side,
   .panel-layout .right-side,
   .panel-layout .handle-left,
-  .panel-layout .handle-right {
-    display: none;
-  }
+  .panel-layout .handle-right { display: none; }
 }
 
 @container panel-layout (min-width: 1920px) {
-  .panel-layout {
-    --calculated-panel-max-width: min(800px, 40cqi);
-  }
+  .panel-layout { --calculated-panel-max-width: min(800px, 40cqi); }
 }

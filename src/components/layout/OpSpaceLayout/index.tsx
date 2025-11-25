@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import { SQLValidatorProvider } from '@/app/clients/[clientId]/queries/[queryId]/_providers/SQLValidatorProvider';
+import { SQLValidatorProvider } from '@/app/opspace/[opspaceId]/queries/[dataQueryId]/_providers/SQLValidatorProvider';
 import OpSpaceLayoutProvider    from '../OpSpaceProvider';
 import Titlebar                 from '../Titlebar';
 import PanelLayout              from '../PanelLayout';

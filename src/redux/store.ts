@@ -1,20 +1,31 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 
-import routeReducer       from './records/route';
-import tabsReducer        from './records/tabs';
+import routeErrorsMiddleware  from './middleware/routeErrorsMiddleware';
+import dataQueryReducer       from './records/dataQuery';
+import errorsReducer          from './records/errors';
+import queryFolderReducer     from './records/queryFolder';
+import queryTreeReducer       from './records/queryTree';
+import tabbarReducer          from './records/tabbar';
+import unsavedQueryTreeReducer from './records/unsavedQueryTree';
+import urlReducer             from './records/url';
 
 
 // AIDEV-NOTE: Combine reducers to guide TS inference and avoid object-vs-function reducer confusion
 const rootReducer = combineReducers({
-  route: routeReducer,
-  tabs: tabsReducer
+  dataQueryRecords    : dataQueryReducer,
+  errors              : errorsReducer,
+  queryFolderRecords  : queryFolderReducer,
+  queryTree           : queryTreeReducer,
+  tabs                : tabbarReducer,
+  unsavedQueryTree    : unsavedQueryTreeReducer,
+  url                 : urlReducer
 });
 
-
-const makeStore = (preloadedState?: RootState) => {
+const makeStore = (preloadedState?: Partial<RootState>) => {
   return configureStore({
     reducer: rootReducer,
-    preloadedState
+    preloadedState,
+    middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(routeErrorsMiddleware)
   });
 };
 

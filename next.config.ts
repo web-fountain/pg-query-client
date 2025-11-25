@@ -2,13 +2,14 @@ import type { NextConfig } from 'next';
 
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
+
   devIndicators: {
     position: 'bottom-right'
   },
 
   experimental: {
     cssChunking: 'strict',
-    reactCompiler: true,
     viewTransition: true
   },
 
@@ -43,6 +44,8 @@ const nextConfig: NextConfig = {
       ignore: [/\favicon\.ico/]
     }
   },
+
+  reactCompiler: true,
 
   typescript: {
     ignoreBuildErrors: true

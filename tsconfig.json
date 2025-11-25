@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -11,37 +15,94 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*":            ["./src/*"],
-      "@Components/*":  ["./src/components/*"],
-      "@Components":    ["./src/components"],
-      "@Lib/*":         ["./src/lib/*"],
-      "@Lib":           ["./src/lib"],
-      "@Hooks/*":       ["./src/hooks/*"],
-      "@Hooks":         ["./src/hooks"],
-      "@Pages/*":       ["./src/pages/*"],
-      "@Pages":         ["./src/pages"],
-      "@Redux/*":       ["./src/redux/*"],
-      "@Redux":         ["./src/redux"],
-      "@Styles/*":      ["./src/assets/styles/*"],
-      "@Styles":        ["./src/assets/styles"],
-      "@Types/*":       ["./src/types/*"],
-      "@Types":         ["./src/types"],
-      "@Utils/*":       ["./src/utils/*"],
-      "@Utils":         ["./src/utils"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@Auth/*": [
+        "./src/auth/*"
+      ],
+      "@Auth": [
+        "./src/auth"
+      ],
+      "@Components/*": [
+        "./src/components/*"
+      ],
+      "@Components": [
+        "./src/components"
+      ],
+      "@Constants/*": [
+        "./src/constants/*"
+      ],
+      "@Constants": [
+        "./src/constants"
+      ],
+      "@Lib/*": [
+        "./src/lib/*"
+      ],
+      "@Lib": [
+        "./src/lib"
+      ],
+      "@Hooks/*": [
+        "./src/hooks/*"
+      ],
+      "@Hooks": [
+        "./src/hooks"
+      ],
+      "@OpSpaceProviders/*": [
+        "./src/app/opspace/[opspaceId]/_providers/*"
+      ],
+      "@OpSpaceProviders": [
+        "./src/app/opspace/[opspaceId]/_providers"
+      ],
+      "@Pages/*": [
+        "./src/pages/*"
+      ],
+      "@Pages": [
+        "./src/pages"
+      ],
+      "@Redux/*": [
+        "./src/redux/*"
+      ],
+      "@Redux": [
+        "./src/redux"
+      ],
+      "@Styles/*": [
+        "./src/assets/styles/*"
+      ],
+      "@Styles": [
+        "./src/assets/styles"
+      ],
+      "@Types/*": [
+        "./src/types/*"
+      ],
+      "@Types": [
+        "./src/types"
+      ],
+      "@Utils/*": [
+        "./src/utils/*"
+      ],
+      "@Utils": [
+        "./src/utils"
+      ]
     }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
-   ]
+  ]
 }

@@ -1,0 +1,32 @@
+.query-workspace {
+  display: flex;
+  flex-direction: column;
+  height: var(--available-height);
+  min-height: var(--available-height);
+  background: var(--surface-canvas);
+  overflow: hidden;
+}
+
+.history-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+.history-text {
+  color: var(--text-tertiary);
+}
+
+.tabpanel {
+  display: contents;
+}
+
+/* AIDEV-NOTE: Minimal placeholders for dynamic loading fallbacks */
+.loading-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  color: var(--text-secondary);
+  font-size: var(--space-4);
+}

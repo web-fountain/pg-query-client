@@ -11,8 +11,8 @@
       display: none !important;
     }
     body {
-      background: #fff !important;
-      color: #000 !important;
+      background-color  : var(--white) !important;
+      color             : var(--black) !important;
     }
   }
 }

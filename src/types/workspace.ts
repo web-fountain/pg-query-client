@@ -1,44 +1,39 @@
-export type UUID = string;
+import type { Base64Url22, UUIDv7 } from '@Types/primitives';
 
-export type QueryTab = {
-  id: UUID;            // queryId
-  name: string;
-  sql: string;         // last saved SQL (not drafts)
-  createdAt: number;   // epoch ms
-  updatedAt: number;   // epoch ms
+
+export type DataQueryTab = {
+  dataQueryId : UUIDv7;
+  name        : string;
+  queryText   : string;   // last saved queryText (not drafts)
+  createdAt   : number;   // epoch ms
+  updatedAt   : number;   // epoch ms
 };
 
-export type ClientTabsState = {
-  clientId: UUID;
-  openTabs: QueryTab[];      // tabs currently visible/open in UI
-  lastActiveId: UUID;        // which tab to activate
+export type OpSpaceTabsState = {
+  opspaceId    : Base64Url22;
+  openTabs     : DataQueryTab[];  // tabs currently visible/open in UI
+  lastActiveId : UUIDv7;          // which tab to activate
 };
 
-export type NewQueryInput = {
-  clientId: UUID;
-  name?: string;
-  initialSql?: string;
-  queryId?: UUID;
+export type NewDataQueryInput = {
+  opspaceId         : Base64Url22;
+  name?             : string;
+  initialQueryText? : string;
+  dataQueryId?      : UUIDv7;
 };
 
-export type QueryLifecycleInput = {
-  clientId: UUID;
-  queryId: UUID;
-  name?: string;
+export type DataQueryLifecycleInput = {
+  opspaceId   : Base64Url22;
+  dataQueryId : UUIDv7;
+  name?       : string;
 };
 
-export type SaveQueryInput = {
-  clientId: UUID;
-  queryId: UUID;
-  name: string;
-  sql: string;
+export type SaveDataQueryInput = {
+  opspaceId   : Base64Url22;
+  dataQueryId : UUIDv7;
+  name        : string;
+  queryText   : string;
 };
 
-export type QueryWorkspaceProps = {
-  clientId: UUID;
-  initialTabs: QueryTab[];
-  initialActiveId: UUID;
-};
-
-// Local-only ephemeral drafts keyed by query id
-export type TabDrafts = Record<UUID, { sqlDraft?: string; nameDraft?: string }>;
+// AIDEV-NOTE: SQL drafts moved to dataQueryRecords; tabs keep only nameDraft locally.
+export type TabDrafts = Record<UUIDv7, { nameDraft?: string }>;

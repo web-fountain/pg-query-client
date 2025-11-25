@@ -16,61 +16,55 @@ type StaticTreeNode = {
   children?: StaticTreeNode[];
 };
 
-// AIDEV-NOTE: Edit this object to change seed data.
-const STATIC_TREE: StaticTreeNode = {
-  id: ROOT_ID,
-  kind: 'folder',
-  name: 'ROOT',
-  children: [
-    {
-      id: 'queries',
-      kind: 'folder',
-      name: 'QUERIES',
-      children: [
-        {
-          id: 'f_accounts',
-          kind: 'folder',
-          name: 'accounts',
-          children: [
-            { id: 'q_user_queries', kind: 'query', name: 'user-queries.sql' },
-            { id: 'q_account_summary', kind: 'query', name: 'account-summary.sql' }
-          ]
-        },
-        {
-          id: 'f_orders',
-          kind: 'folder',
-          name: 'orders',
-          children: [
-            { id: 'q_monthly_revenue', kind: 'query', name: 'monthly-revenue.sql' }
-          ]
-        },
-        { id: 'q_quick_stats', kind: 'query', name: 'quick-stats.sql' }
-      ]
-    },
-    {
-      id: 'servers',
-      kind: 'folder',
-      name: 'SERVERS',
-      children: []
-    },
-    {
-      id: 'projects_top',
-      kind: 'folder',
-      name: 'PROJECTS',
-      children: []
-    },
-    {
-      id: 'databases',
-      kind: 'folder',
-      name: 'DATABASES',
-      children: []
-    }
-  ]
-};
+// AIDEV-NOTE: Edit this array to change seed data for top-level sections.
+const STATIC_ROOTS: StaticTreeNode[] = [
+  {
+    id: 'queries',
+    kind: 'folder',
+    name: 'QUERIES',
+    children: [
+      {
+        id: 'f_accounts',
+        kind: 'folder',
+        name: 'accounts',
+        children: [
+          { id: 'q_user_queries', kind: 'query', name: 'user-queries.sql' },
+          { id: 'q_account_summary', kind: 'query', name: 'account-summary.sql' }
+        ]
+      },
+      {
+        id: 'f_orders',
+        kind: 'folder',
+        name: 'orders',
+        children: [
+          { id: 'q_monthly_revenue', kind: 'query', name: 'monthly-revenue.sql' }
+        ]
+      },
+      { id: 'q_quick_stats', kind: 'query', name: 'quick-stats.sql' }
+    ]
+  },
+  {
+    id: 'databases',
+    kind: 'folder',
+    name: 'DATABASES',
+    children: []
+  },
+  {
+    id: 'services',
+    kind: 'folder',
+    name: 'SERVICES',
+    children: []
+  },
+  {
+    id: 'projects',
+    kind: 'folder',
+    name: 'PROJECTS',
+    children: []
+  }
+];
 
-// AIDEV-NOTE: One-time conversion of STATIC_TREE → id-indexed store.
-// AIDEV-TODO: If we ever support multiple roots, loop an array here.
-function seedFromStaticTree() {
+// AIDEV-NOTE: One-time conversion of STATIC_ROOTS → id-indexed store.
+function seedFromStaticTrees() {
   if (store.size) return;
   const visit = (node: StaticTreeNode, parentId: string | null, level: number) => {
     const tags = node.tags ?? [];
@@ -84,9 +78,9 @@ function seedFromStaticTree() {
       }
     }
   };
-  visit(STATIC_TREE, null, 0);
+  for (const root of STATIC_ROOTS) visit(root, null, 0);
 }
-seedFromStaticTree();
+seedFromStaticTrees();
 
 // AIDEV-NOTE: Augment with randomized, deeper content up to depth 4 for load testing.
 // Generates a predictable structure shape with random suffixes to avoid name collisions.
@@ -149,12 +143,25 @@ export function getItem(id: string): NodePayloadDb {
 }
 export function getChildrenIds(id: string): string[] {
   const node = store.get(id); if (!node) return [];
-  const ids = [...node.children];
+  // AIDEV-NOTE: Always sort children: folders first, then by name (case-sensitive localeCompare).
+  const ids = [...node.children].sort((a, b) => {
+    const na = store.get(a)!;
+    const nb = store.get(b)!;
+    if (na.kind !== nb.kind) return na.kind === 'folder' ? -1 : 1;
+    return na.name.localeCompare(nb.name);
+  });
   return ids;
 }
 export function getChildrenWithData(id: string): { id: string; data: NodePayloadDb }[] {
   const node = store.get(id); if (!node) return [];
-  const rows = node.children.map((cid) => {
+  // AIDEV-NOTE: Always sort children: folders first, then by name.
+  const ordered = [...node.children].sort((a, b) => {
+    const na = store.get(a)!;
+    const nb = store.get(b)!;
+    if (na.kind !== nb.kind) return na.kind === 'folder' ? -1 : 1;
+    return na.name.localeCompare(nb.name);
+  });
+  const rows = ordered.map((cid) => {
     const c = store.get(cid)!;
     return { id: c.id, data: { id: c.id, kind: c.kind, name: c.name, tags: c.tags, level: c.level } };
   });
@@ -214,6 +221,18 @@ export function moveNode(id: string, newParentId: string) {
   if (id === newParentId) throw new Error('Cannot move into itself');
   if (isDescendant(id, newParentId)) throw new Error('Cannot move into its own descendant');
   if (newParent.children.some((cid) => store.get(cid)!.name.toLowerCase() === node.name.toLowerCase())) throw new Error('A sibling with the same name exists in the destination');
+  // AIDEV-NOTE: Block cross-section moves (cannot move across different top-level roots)
+  const rootOf = (x: string): string => {
+    let cur = store.get(x);
+    if (!cur) return x;
+    while (cur && cur.parentId) {
+      const next = store.get(cur.parentId);
+      if (!next) break;
+      cur = next;
+    }
+    return cur?.id ?? x;
+  };
+  if (rootOf(id) !== rootOf(newParentId)) throw new Error('Cannot move across sections');
   const height = subtreeHeight(id);
   const futureDeepest = newParent.level + 1 + (height - 1);
   if (futureDeepest > maxDepth) throw new Error(`Max depth ${maxDepth} would be exceeded`);

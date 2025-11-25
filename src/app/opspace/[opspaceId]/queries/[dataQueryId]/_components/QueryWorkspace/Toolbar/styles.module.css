@@ -1,0 +1,115 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-2);
+  border-bottom: var(--border-1) solid var(--border-primary);
+  background: var(--tabs-surface);
+}
+
+.name-group {
+  display: flex;
+  align-items: center;
+  font-size: var(--text-xs);
+}
+
+.name-input {
+  min-width: 180px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: var(--border-1) solid var(--border-primary);
+  border-inline-end: none;
+  border-radius: var(--radius-4) 0 0 var(--radius-4);
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+}
+.name-input-invalid {
+  /* AIDEV-NOTE: Error state for invalid query name input */
+  border-color: #e5484d;
+}
+.name-input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+}
+
+.save-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 0;
+  border-block: var(--border-1) solid var(--button-border-primary);
+  background-color: var(--toolbar-button-bg);
+  color: var(--button-primary);
+  cursor: pointer;
+}
+
+.save-button:hover {
+  background-color: var(--toolbar-button-hover-bg);
+}
+.save-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+.save-button:disabled {
+  background-color: var(--toolbar-button-disabled-bg);
+  color: var(--shadow-color-2);
+  cursor: default;
+}
+
+.spacer {
+
+  width: 1px;
+  height: 100%;
+  background-color: var(--border-secondary);
+}
+
+.run-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-block: var(--border-1) solid var(--button-border-primary);
+  border-radius: 0 var(--radius-4) var(--radius-4) 0;
+  background-color: var(--toolbar-button-bg);
+  color: var(--button-primary);
+  cursor: pointer;
+}
+
+.run-button:hover {
+  background-color: var(--toolbar-button-hover-bg);
+}
+.run-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+/* .run-button:disabled {
+  background: var(--button-disabled);
+  color: var(--button-text-disabled);
+  cursor: default;
+} */
+.run-button:active {
+  background-color: var(--color-primary-muted);
+}
+
+/* AIDEV-NOTE: Spinner animation for save in-progress */
+.spin {
+  animation: toolbar-rotate 0.9s linear infinite;
+}
+
+@keyframes toolbar-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

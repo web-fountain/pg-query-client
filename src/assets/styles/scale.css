@@ -44,8 +44,10 @@
     --px-8:  8px;
     --px-12: 12px;
     --px-16: 16px;
+    --px-20: 20px;
     --px-22: 22px;
     --px-24: 24px;
+    --px-28: 28px;
     --px-32: 32px;
     --px-48: 48px;
     --px-80: 80px;
@@ -61,6 +63,7 @@
     /* motion tokens (keep durations/easing here) */
     --ease-standard: cubic-bezier(.2,.8,.2,1);
     --duration-150: 150ms;
+    --duration-200: 200ms;
     --duration-250: 250ms;
 
     /* elevation tokens; color is theme-derived via --shadow-color-* */
