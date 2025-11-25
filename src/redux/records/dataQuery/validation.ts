@@ -14,16 +14,17 @@ export type FieldError = { path: string; message: string };
 
 // AIDEV-NOTE: 22-char base64url id and a 3–64 char name. No additional props.
 const DataQueryNameSchema: JSONSchemaType<UpdateDataQueryName> = {
+  $id: 'UpdateDataQueryName',
   type: 'object',
   additionalProperties: false,
   required: ['dataQueryId', 'name'],
   properties: {
     dataQueryId: {
       type: 'string',
-      pattern: '^[A-Za-z0-9\-_]{22}$',
+      format: 'uuid',
       errorMessage: {
-        type: 'dataQueryId must be a string',
-        pattern: 'dataQueryId must be a 22-character base64url id'
+        type: 'dataQueryId must be a valid UUID',
+        format: 'dataQueryId must be a valid UUID'
       }
     },
     name: {
@@ -31,7 +32,7 @@ const DataQueryNameSchema: JSONSchemaType<UpdateDataQueryName> = {
       minLength: 3,
       maxLength: 64,
       errorMessage: {
-        type: 'name must be a string',
+        type: 'name must be a valid string',
         minLength: 'name must be at least 3 characters',
         maxLength: 'name must be at most 64 characters'
       }

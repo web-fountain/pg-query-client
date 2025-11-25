@@ -10,6 +10,7 @@ import type {
   UpdateDataQueryName,
   UpdateDataQueryText
 }                                 from './types';
+import type { InvalidMap }        from './types';
 
 import {
   createAction, createReducer,
@@ -57,15 +58,25 @@ export const updateDataQuery            = createAction<UpdateDataQuery>     ('da
 export const updateDataQueryName        = createAction(
   'dataQuery/updateDataQueryName',
   (payload: UpdateDataQueryName) => {
-    // Invalid actions are flagged and routed to errors reducer by middleware.
+    // AIDEV-NOTE: Validate name field; map errors to invalid.name for reducer consumption
     const result = validateDataQueryName(payload);
-    const meta = { schemaId: 'UpdateDataQueryName' } as const;
+    const meta: { invalid?: InvalidMap } = {};
 
     if (!result.ok) {
+      const fieldErr  = result.errors[0];
+      meta.invalid   = {
+        ['name']: {
+          field     : 'name',
+          actionType: 'dataQuery/updateDataQueryName',
+          message   : fieldErr.message,
+          schemaId  : 'UpdateDataQueryName'
+        }
+      };
+
       return {
-        payload,
-        error : true,
-        meta  : { ...meta, errorInfo: { message: 'Invalid UpdateDataQueryName', fields: result.errors } }
+        meta,
+        payload
+        // error : true,
       };
     }
     return { payload, meta };
@@ -84,7 +95,7 @@ export const selectDataQueries = createSelector.withTypes<RootState>()(
 
 export const selectDataQueryRecord = createSelector.withTypes<RootState>()(
   [
-    (state: RootState) => state.dataQueryRecords,
+    (state: RootState)                      => state.dataQueryRecords,
     (state: RootState, dataQueryId: string) => dataQueryId
   ],
   (dataQueryRecords, dataQueryId): DataQueryRecordItem | undefined => {
@@ -164,9 +175,11 @@ export default createReducer(initialState, (builder) => {
         const { dataQueryId } = action.payload;
         state[dataQueryId] = {
           current: action.payload,
+          persisted: {},
           unsaved: {},
           isUnsaved: false,
-          isInvalid: false
+          isInvalid: false,
+          invalid: {}
         };
       }
     )
@@ -179,7 +192,8 @@ export default createReducer(initialState, (builder) => {
           persisted: {},
           unsaved: {},
           isUnsaved: false,
-          isInvalid: false
+          isInvalid: false,
+          invalid: {}
         };
       }
     )
@@ -214,7 +228,8 @@ export default createReducer(initialState, (builder) => {
             persisted : { ...dataQuery?.persisted, ...action.payload },
             unsaved   : {},
             isUnsaved : false,
-            isInvalid : false
+            isInvalid : false,
+            invalid: {}
           };
         }
       }
@@ -237,12 +252,13 @@ export default createReducer(initialState, (builder) => {
         const { dataQueryId, name } = action.payload;
 
         state[dataQueryId] = {
-          current   : { dataQueryId, name },
+          current   : { dataQueryId, name, ext: 'sql', queryText: '', description: '', tags: [], color: null },
           persisted : {},
           unsaved   : {},
           isUnsaved : false,
-          isInvalid : false
-        }
+          isInvalid : false,
+          invalid   : {}
+        };
       }
     )
     .addCase(updateDataQuery,
@@ -261,15 +277,36 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(updateDataQueryName,
-      function(state: DataQueryRecord, action: PayloadAction<UpdateDataQueryName>) {
-        const { dataQueryId } = action.payload;
-        const dataQuery = state[dataQueryId];
+      function(state: DataQueryRecord, action) {
+        const { dataQueryId, name } = action.payload;
+        const record = state[dataQueryId];
+        if (!record) return;
 
-        if (dataQuery) {
-          if (action.payload.name === dataQuery.current.name) return;
-          dataQuery.current = { ...dataQuery.current, ...action.payload };
-          markChanged(state, dataQueryId, { name: action.payload.name });
+        const invalidName = action.meta.invalid?.name;
+
+        if (invalidName) {
+          // AIDEV-NOTE: Replace record with a new object so selector detects change
+          state[dataQueryId] = {
+            ...record,
+            current: { ...record.current, name },
+            isInvalid: true,
+            invalid: { ...record.invalid, name: invalidName }
+          };
+          return;
         }
+
+        // Valid: clear invalid.name if present
+        const { name: _removed, ...restInvalid } = record.invalid || {};
+        const hasInvalid = Object.keys(restInvalid).length > 0;
+
+        state[dataQueryId] = {
+          ...record,
+          current: { ...record.current, name },
+          isInvalid: hasInvalid,
+          invalid: restInvalid
+        };
+
+        markChanged(state, dataQueryId, { name });
       }
     )
     .addCase(updateDataQueryText,

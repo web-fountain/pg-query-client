@@ -28,11 +28,17 @@
 }
 .name-input-invalid {
   /* AIDEV-NOTE: Error state for invalid query name input */
-  border-color: #e5484d;
+  border-color: #e5484d !important;
+  border-inline-end: var(--border-1) solid #e5484d !important;
+  background-color: rgba(229, 72, 77, 0.1);
+  box-shadow: 0 0 0 1px #e5484d;
 }
 .name-input:focus-visible {
   outline: var(--focus-ring);
   outline-offset: -1px;
+}
+.name-input-invalid:focus-visible {
+  outline: none;
 }
 
 .actions {

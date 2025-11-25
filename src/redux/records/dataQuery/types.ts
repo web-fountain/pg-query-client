@@ -1,5 +1,14 @@
 import type { UUIDv7 }    from '@Types/primitives';
-import type { DataQuery } from '@Types/dataQuery';
+import type { DataQuery, DataQueryEditField } from '@Types/dataQuery';
+
+
+type FieldInvalid = {
+  field       : DataQueryEditField;
+  actionType  : string;
+  message     : string;
+  schemaId    : string;
+};
+export type InvalidMap = Partial<Record<DataQueryEditField, FieldInvalid>>;
 
 
 export type SaveDataQuery = {
@@ -31,9 +40,10 @@ export type DataQueryChanges = {
 export type DataQueryRecordItem = {
   current     : DataQuery;
   persisted   : Partial<DataQuery>;
-  unsaved     : Partial<SaveDataQuery>;
   isUnsaved   : boolean;
+  unsaved     : Partial<SaveDataQuery>;
   isInvalid   : boolean;
+  invalid     : InvalidMap;
 };
 
 export type DataQueryRecord = {

@@ -17,7 +17,6 @@ import {
 }                                   from '@Redux/storeHooks';
 import { rehydrateUrl }             from '@Redux/records/url';
 import {
-  closeTab          as closeTabAction,
   focusTabIndex     as focusTabIndexAction,
   selectTabEntities,
   selectDataQueryIdForTabId,
@@ -35,7 +34,6 @@ import { createNewUnsavedDataQueryThunk } from '@Redux/records/dataQuery/thunks'
 import { selectNextUntitledName }        from '@Redux/records/unsavedQueryTree';
 import { generateUUIDv7 }                 from '@Utils/generateId';
 
-import { useSqlRunner }             from '../../../../_providers/SQLRunnerProvider';
 import { useOpSpaceRoute }          from '../../_providers/OpSpaceRouteProvider';
 
 import TabBar                       from './TabBar';
@@ -59,14 +57,12 @@ const QueryResults = dynamic(() => import('../QueryResults'), {
   loading: () => (<div className={styles['tabpanel']}>Loading results…</div>)
 });
 
-
 // AIDEV-NOTE: SQLEditor is large; if initial TTI needs improvement, consider next/dynamic.
 function QueryWorkspace() {
   const {
     opspaceId,
     dataQueryId: initialActiveId
   }                             = useOpSpaceRoute();
-  const { isRunning }           = useSqlRunner();
 
   const router                  = useRouter();
   const editorRef               = useRef<SQLEditorHandle | null>(null);
@@ -293,13 +289,7 @@ function QueryWorkspace() {
         <Toolbar
           key={activeDataQueryId}
           dataQueryId={activeDataQueryId as UUIDv7}
-          queryName={(activeDataQueryRecord?.current?.name ?? activeDataQueryRecord?.persisted?.name) as string}
-          isRunning={isRunning}
           onRun={runFromToolbar}
-          saveDisabled={(function() {
-            const isUnsaved = !!activeDataQueryRecord?.isUnsaved;
-            return !isUnsaved; // base gating only; Toolbar adds isSaving and name validation
-          })()}
           getCurrentEditorText={getCurrentEditorText}
         />
 

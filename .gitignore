@@ -167,6 +167,7 @@ z*.*
 z*
 
 # cursor
+.cursor/
 .cursorrules
 .cursorignore
 .cursorindexingignore

@@ -8,54 +8,46 @@ import {
   useMemo, useRef, useState
 }                               from 'react';
 
-import { useReduxDispatch }     from '@Redux/storeHooks';
+import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
 import {
+  selectDataQueryRecord,
   updateDataQueryName,
   updateDataQueryText
 }                               from '@Redux/records/dataQuery';
 import { saveDataQueryThunk }   from '@Redux/records/dataQuery/thunks';
 import { useDebouncedCallback } from '@Hooks/useDebounce';
 import Icon                     from '@Components/Icons';
+import { useSqlRunner }         from '../../../../../_providers/SQLRunnerProvider';
 
 import styles                   from './styles.module.css';
 
 
 type Props = {
-  dataQueryId   : UUIDv7;
-  queryName     : string;
-  isRunning     : boolean;
-  saveDisabled  : boolean;
-  getCurrentEditorText: () => string;
-  onRun         : () => void;
+  dataQueryId           : UUIDv7;
+  onRun                 : () => void;
+  getCurrentEditorText  : () => string;
 };
 
-function Toolbar({ dataQueryId, queryName: initialQueryName, isRunning, onRun, saveDisabled, getCurrentEditorText }: Props) {
+function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
+  const { isRunning }           = useSqlRunner();
+  const record                  = useReduxSelector(selectDataQueryRecord, dataQueryId);
   const dispatch                = useReduxDispatch();
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [
     queryName,
     setQueryName
-  ]                             = useState<string>(initialQueryName);
+  ]                             = useState<string>(record?.current?.name ?? record?.persisted?.name ?? '');
   const [
     nameValidationError,
     setNameValidationError
   ]                             = useState<string | null>(null);
   const queryNameRef            = useRef(queryName);
   queryNameRef.current          = queryName;
+  const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
-    const result = dispatch(updateDataQueryName({ dataQueryId: id, name: next }));
-    if ((result as any)?.error) {
-      const meta = (result as any).meta || {};
-      const fields = (meta?.errorInfo?.fields || []) as Array<{ path: string; message: string }>;
-      const fieldMsg = fields.find(f => f.path === '/name' || f.path === 'name')?.message;
-      const msg = fieldMsg || meta?.errorInfo?.message || (result as any)?.payload?.message || 'Invalid name';
-      setNameValidationError(msg);
-    } else {
-      setNameValidationError(null);
-    }
+    dispatch(updateDataQueryName({ dataQueryId: id, name: next }));
   }, [dispatch]);
-
   const debouncedCommit = useDebouncedCallback(commitNameChange, 200);
 
   const onNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -82,9 +74,9 @@ function Toolbar({ dataQueryId, queryName: initialQueryName, isRunning, onRun, s
   }, [dataQueryId, debouncedCommit, dispatch, getCurrentEditorText]);
 
   useEffect(() => {
-    setQueryName(initialQueryName);
-    setNameValidationError(null);
-  }, [initialQueryName]);
+    const name = record?.current?.name ?? record?.persisted?.name ?? '';
+    setQueryName(name);
+  }, [record?.current?.name, record?.persisted?.name]);
 
   useEffect(() => {
     return () => {
@@ -93,17 +85,30 @@ function Toolbar({ dataQueryId, queryName: initialQueryName, isRunning, onRun, s
   }, [dataQueryId, debouncedCommit]);
 
   useEffect(() => {
+    if (!record) {
+      setNameValidationError(null);
+      return;
+    }
+    const invalidName = record.invalid?.name as { message?: string } | undefined;
+    if (record.isInvalid && invalidName) {
+      setNameValidationError(invalidName.message || 'Invalid name');
+    } else {
+      setNameValidationError(null);
+    }
+  }, [record]);
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        if (!saveDisabled && !isSaving && !nameValidationError) {
+        if (canSave) {
           handleSaveClick();
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [saveDisabled, isSaving, nameValidationError, handleSaveClick]);
+  }, [canSave, handleSaveClick]);
 
   const inputClassName = useMemo(
     () => nameValidationError
@@ -131,7 +136,7 @@ function Toolbar({ dataQueryId, queryName: initialQueryName, isRunning, onRun, s
             aria-label={isSaving ? 'Saving' : 'Save'}
             aria-busy={isSaving}
             onClick={handleSaveClick}
-            disabled={saveDisabled || isSaving || !!nameValidationError}
+            disabled={!canSave}
           >
             {isSaving ? <Icon name="rotate-right" className={styles['spin']} /> : <Icon name="floppy-disk" />}
           </button>
