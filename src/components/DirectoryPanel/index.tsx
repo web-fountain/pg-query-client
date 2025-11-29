@@ -11,10 +11,10 @@ import styles               from './styles.module.css';
 
 
 type Props = {
-  side?      : 'left' | 'right';
+  side?         : 'left' | 'right';
   // AIDEV-NOTE: Optional streaming slots; falls back to client trees when not provided.
-  unsavedSlot?: ReactNode;
-  queriesSlot?: ReactNode;
+  unsavedSlot?  : ReactNode;
+  queriesSlot?  : ReactNode;
 };
 
 function DirectoryPanel({ side = 'right', unsavedSlot, queriesSlot }: Props) {

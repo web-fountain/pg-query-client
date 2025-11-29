@@ -63,11 +63,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
     setIsSaving(true);
     try {
       const latestText = getCurrentEditorText?.() || '';
-      // Update text and trigger save
-      dispatch(updateDataQueryText({ dataQueryId, queryText: latestText }));
-      await dispatch(saveDataQueryThunk({ dataQueryId })).unwrap();
-    } catch {
-      // Error handling if needed (thunk usually handles notification)
+      await dispatch(saveDataQueryThunk({ dataQueryId, queryText: latestText }));
     } finally {
       setIsSaving(false);
     }

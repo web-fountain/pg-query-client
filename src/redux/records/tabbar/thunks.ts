@@ -30,12 +30,18 @@ export const setActiveTabThunk = createAsyncThunk<void, UUIDv7, { state: RootSta
 export const closeTabThunk = createAsyncThunk<UUIDv7 | null, UUIDv7, { state: RootState }>(
   'tabs/closeTabThunk',
   async (tabId, { dispatch, getState }) => {
-    dispatch(closeTab({ tabId }));
-    dispatch(removeUnsavedTreeNodeByTabId({ tabId }));
+    const { unsavedQueryTree } = getState();
+    const hasUnsavedTreeNode = Boolean(unsavedQueryTree.nodes[tabId]);
 
-    const state = getState();
-    const nextTabId = state.tabs.activeTabId;
-    const nextDataQueryId = selectDataQueryIdForTabId(state, nextTabId);
+    dispatch(closeTab({ tabId }));
+
+    if (hasUnsavedTreeNode) {
+      dispatch(removeUnsavedTreeNodeByTabId({ tabId }));
+    }
+
+    const postState  = getState();
+    const nextTabId = postState.tabs.activeTabId;
+    const nextDataQueryId = selectDataQueryIdForTabId(postState, nextTabId);
 
     // Fire-and-forget server sync
     closeTabAction(tabId).catch((error) => {

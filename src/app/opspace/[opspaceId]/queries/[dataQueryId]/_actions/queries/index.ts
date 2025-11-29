@@ -11,6 +11,7 @@ import {
   backendFetchJSON,
   getHeadersContextOrNull
 }                                         from '@Utils/backendFetch';
+import { UpdateDataQuery } from '@/redux/records/dataQuery/types';
 
 
 type ResponsePayload04 = {
@@ -123,22 +124,22 @@ export async function createNewUnsavedDataQueryAction(payload: { dataQueryId: UU
   return { success: true, data: data.data };
 }
 
-export async function updateDataQuery(unsavedDataQuery: DataQuery): Promise<{ success: boolean }> {
+type ResponsePayload05 = {
+  ok: false | true;
+};
+export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: string, queryText?: string }): Promise<{ success: boolean }> {
   console.log('[ACTION] updateDataQuery');
 
-  // TODO: before calling this, unsavedDataQuery should be validated
-  // and any 'undefined' values should be removed from the payload
-  // 'empty string' values is ONLY allowed for the queryText field as it hints that the user is clearing their editor of text
   const ctx = await getHeadersContextOrNull();
   if (!ctx) {
-    return { success: false } as { success: boolean };
+    return { success: false };
   }
 
-  const { dataQueryId, name, queryText } = unsavedDataQuery;
+  const { dataQueryId, name, queryText } = payload;
 
-  const { ok, context, data } = await backendFetchJSON<unknown>({
+  const { ok, context } = await backendFetchJSON<ResponsePayload05>({
     path    : `/queries/${dataQueryId}`,
-    method  : 'PUT',
+    method  : 'PATCH',
     scope   : ['queries:write'],
     body    : { name, queryText },
     logLabel: 'updateDataQuery',
@@ -154,10 +155,15 @@ export async function updateDataQuery(unsavedDataQuery: DataQuery): Promise<{ su
     updateTag(`tree:children:${(context || ctx).opspacePublicId}:buildInitialQueryTree`);
   } catch {}
 
+  // AIDEV-NOTE: Invalidate cached unsaved query tree on successful save
+  try {
+    updateTag(`tree:children:${(context || ctx).opspacePublicId}:buildInitialUnsavedQueryTree`);
+  } catch {}
+
    // AIDEV-NOTE: Invalidate cached listDataQueries results for this opspace.
   try {
     updateTag(`queries:list:${(context || ctx).opspacePublicId}`);
   } catch {}
 
-  return { success: true } as { success: boolean };
+  return { success: true };
 }

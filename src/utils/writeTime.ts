@@ -5,7 +5,7 @@ type AnyRecord = Record<string, any>;
 function mergeAllowedChanges(prev: AnyRecord, changes: AnyRecord, allowedKeys: readonly string[]): AnyRecord {
   const next: AnyRecord = { ...prev };
   for (const key of allowedKeys) {
-    if (Object.prototype.hasOwnProperty.call(changes, key)) {
+    if (Object.hasOwn(changes, key)) {
       next[key] = changes[key];
     }
   }

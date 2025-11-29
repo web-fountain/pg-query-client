@@ -116,6 +116,7 @@ export default createReducer(initialState, (builder) => {
       function (state: UnsavedQueryTreeRecord, action: PayloadAction<{ tabId: UUIDv7 }>) {
         const { tabId } = action.payload;
         const node = state.nodes[tabId];
+        if (!node) return;
 
         const parentKey = String(node.parentNodeId);
         const children = state.childrenByParentId[parentKey] || [];

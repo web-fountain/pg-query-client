@@ -47,9 +47,7 @@ export const selectItem = createSelector.withTypes<RootState>()(
 export const selectQueryTree = createSelector.withTypes<RootState>()(
   [(state: RootState) => state.queryTree],
   (queryTree): QueryTreeRecord => queryTree,
-  {
-    devModeChecks: { identityFunctionCheck: 'never' }
-  }
+  { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
 // Reducer

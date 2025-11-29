@@ -78,7 +78,10 @@ export async function setActiveTabAction(tabId: UUIDv7): Promise<{ success: bool
     return { success: false };
   }
 
-  updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  // AIDEV-NOTE: Invalidate cached list of open tabs on successful focus
+  try {
+    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  } catch {}
 
   return { success: true };
 }
@@ -104,8 +107,15 @@ export async function closeTabAction(tabId: UUIDv7): Promise<{ success: boolean;
     return { success: false };
   }
 
-  updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
-  updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  // AIDEV-NOTE: Invalidate cached unsaved query tree on successful close
+  try {
+    updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
+  } catch {}
+
+  // AIDEV-NOTE: Invalidate cached list of open tabs on successful close
+  try {
+    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  } catch {}
 
   return { success: true };
 }

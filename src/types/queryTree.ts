@@ -1,18 +1,30 @@
 import type { UUIDv7 } from '@Types/primitives';
 
 
-type TreeNode = {
-  nodeId        : UUIDv7;
-  parentNodeId  : UUIDv7 | null;  // null for root
-  kind          : 'folder' | 'file';
+type QueryTreeFolderNode = {
+  nodeId        : string | UUIDv7;
+  parentNodeId  : string | null;
+  kind          : 'folder';
   label         : string;
   sortKey       : string;
-  mountId       : string;
-  level?        : number;
-};
+  mountId       : string | UUIDv7;
+  level         : number;
+}
+
+type QueryTreeNode = {
+  nodeId        : UUIDv7;
+  parentNodeId  : string | UUIDv7;
+  kind          : 'file';
+  label         : string;
+  sortKey       : string;
+  mountId       : UUIDv7;
+  level         : number;
+}
+
+type TreeNode = QueryTreeFolderNode | QueryTreeNode;
 
 type Nodes = {
-  [nodeId: UUIDv7]: TreeNode;
+  [nodeId: UUIDv7]: QueryTreeNode;
 };
 
 type ChildrenByParentId = {
@@ -41,5 +53,7 @@ export type {
   NodeIdsByFolderId,
   NodeIdsByDataQueryId,
   QueryTree,
+  QueryTreeFolderNode,
+  QueryTreeNode,
   TreeNode
 };

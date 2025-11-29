@@ -1,7 +1,7 @@
 'use client';
 
-import type { TreeNode }                from '@Redux/records/queryTree/types';
-import type { QueryTreeRecord }         from '@Redux/records/queryTree/types';
+import type { QueryTreeRecord, TreeNode } from '@Redux/records/queryTree/types';
+import type { UUIDv7 }                    from '@Types/primitives';
 
 import { useRef, useEffect, useState }  from 'react';
 import { useTree }                      from '@headless-tree/react';
@@ -23,28 +23,30 @@ import { getQueryTreeNodeChildrenThunk }  from '@Redux/records/queryTree/thunks'
 
 import Icon                               from '@Components/Icons';
 
-import {
+import { useTreeSectionState }            from '../hooks/useTreeSectionState';
+import { useItemActions }                 from './hooks/useItemActions';
+import Row                                from './components/Row';
+import Toolbar                            from './components/Toolbar';
+import { createLoadingItemData as adapterCreateLoadingItemData } from './adapters/treeItemAdapter';
 
-  createLoadingItemData as adapterCreateLoadingItemData
-}                                       from './adapters/treeItemAdapter';
-import { useItemActions }               from './hooks/useItemActions';
-import Row                              from './components/Row';
-import Toolbar                          from './components/Toolbar';
-
-import styles                           from './styles.module.css';
+import styles                             from './styles.module.css';
 
 
 // AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes
 function QueriesTree(props: { rootId: string; indent?: number; label?: string }) {
-  const { rootId } = props;
-  const queryTree = useReduxSelector(selectQueryTree);
-  const resetKey = `${rootId}:${Object.keys(queryTree?.nodes || {}).length}:${((queryTree?.childrenByParentId?.[rootId]) || []).length}`;
-  return <QueriesTreeInner key={resetKey} queryTree={queryTree} {...props} />;
+  const { isOpen, setIsOpen } = useTreeSectionState(props.rootId, true);
+  const queryTree             = useReduxSelector(selectQueryTree);
+
+  const nodeCount = Object.keys(queryTree.nodes || {}).length;
+  const edgeCount = Object.keys(queryTree.childrenByParentId || {}).length;
+  const resetKey = `${props.rootId}:${nodeCount}:${edgeCount}`;
+
+  return <QueriesTreeInner key={resetKey} queryTree={queryTree} isOpen={isOpen} setIsOpen={setIsOpen} {...props} />;
 }
 
 function QueriesTreeInner(
-  { rootId, indent = 20, label = 'QUERIES', queryTree }:
-  { rootId: string; indent?: number; label?: string; queryTree: QueryTreeRecord }
+  { rootId, indent = 20, label = 'QUERIES', queryTree, isOpen, setIsOpen }:
+  { rootId: string; indent?: number; label?: string; queryTree: QueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
   const dispatch      = useReduxDispatch();
 
@@ -53,17 +55,18 @@ function QueriesTreeInner(
     indent, // AIDEV-NOTE: The library computes left offset per row from this indent; we keep row styles from item.getProps()
     getItemName: (item) => item.getItemData()?.label,
     isItemFolder: (item) => item.getItemData()?.kind === 'folder',
+    features: [asyncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
     dataLoader: {
       getItem: async (nodeId) => {
-        const item = queryTree?.nodes?.[nodeId];
+        const item = queryTree?.nodes?.[nodeId as UUIDv7];
         return item as TreeNode;
       },
       getChildrenWithData: async (nodeId) => {
-        const childrenNodeIds = queryTree?.childrenByParentId?.[nodeId];
+        const childrenNodeIds = queryTree?.childrenByParentId?.[nodeId as UUIDv7];
 
         // If children are already in the tree, return them
         if (childrenNodeIds !== undefined) {
-          const rows = (childrenNodeIds || []).map((cid: string) => ({ id: cid, data: queryTree.nodes[cid] }));
+          const rows = (childrenNodeIds || []).map((cid: UUIDv7) => ({ id: cid, data: queryTree.nodes[cid] }));
           return rows as { id: string; data: TreeNode }[];
         }
 
@@ -72,7 +75,6 @@ function QueriesTreeInner(
         return (children || []).map((cid: TreeNode) => ({ id: cid.nodeId, data: cid })) as { id: string; data: TreeNode }[];
       }
     },
-    features: [asyncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
     // AIDEV-NOTE: Expanded root so the library constructs items on mount/remount.
     // AIDEV-NOTE: Combined with the hydration reload + invalidate below, this avoids the library sticking to an initial "empty" cache.
     initialState: { expandedItems: [rootId], selectedItems: [rootId], focusedItem: rootId },
@@ -122,8 +124,6 @@ function QueriesTreeInner(
 
   // Track whether the tree (scroller) currently contains focus
   const [isTreeFocused, setIsTreeFocused] = useState<boolean>(false);
-  // AIDEV-NOTE: Section open/closed UI state (decoupled from Tree's root expansion)
-  const [isOpen, setIsOpen] = useState<boolean>(true);
 
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
@@ -276,8 +276,9 @@ function QueriesTreeInner(
                   indent={indent}
                   onRename={actions.handleRename}
                   onDropMove={actions.handleDropMove}
-                  isTreeFocused={isTreeFocused}
                   isTopLevel={false}
+                  isTreeFocused={isTreeFocused}
+                  onTreeFocusFromRow={() => setIsTreeFocused(true)}
                 />
               ))}
             </div>

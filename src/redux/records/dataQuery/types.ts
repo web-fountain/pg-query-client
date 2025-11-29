@@ -59,10 +59,9 @@ export type CreateDataQuery = {
 };
 
 export type UpdateDataQuery = {
-  dataQueryId   : UUIDv7;
-  name?         : string;
-  queryText?    : string;
-  parameters?   : Record<string, any>;
+  dataQueryId : UUIDv7;
+  name?       : string;
+  queryText?  : string;
 };
 
 export type UpdateDataQueryName = {

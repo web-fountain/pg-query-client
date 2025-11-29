@@ -1,6 +1,7 @@
 import type { UUIDv7 }  from '@Types/primitives';
 import type {
   QueryTree,
+  QueryTreeNode,
   TreeNode
 }                       from '@Types/queryTree';
 
@@ -19,5 +20,6 @@ type NodePlacement = {
 export type {
   NodePlacement,
   QueryTreeRecord,
+  QueryTreeNode,
   TreeNode
 };

@@ -20,7 +20,11 @@ import {
   mergeAllowedChanges,
   buildUpdatePayload
 }                                 from '@Utils/writeTime';
-import { validateDataQueryName }  from './validation';
+import {
+  validateDataQueryName,
+  validateDataQueryText,
+  validateDataQueryUpdate
+}  from './validation';
 
 
 export type CreateNewDataQuery = {
@@ -54,7 +58,62 @@ export const createDataQuery            = createAction<CreateDataQuery>     ('da
 export const createNewUnsavedDataQuery  = createAction<CreateNewUnsavedDataQuery>  ('dataQuery/createNewUnsavedDataQuery');
 export const createNewUnsavedDataQueryFromFetch = createAction<CreateNewUnsavedDataQuery>  ('dataQuery/createNewUnsavedDataQueryFromFetch');
 
-export const updateDataQuery            = createAction<UpdateDataQuery>     ('dataQuery/updateDataQuery');
+export const updateDataQuery            = createAction(
+  'dataQuery/updateDataQuery',
+  (payload: UpdateDataQuery) => {
+    const result = validateDataQueryUpdate(payload);
+    const meta: { invalid?: InvalidMap } = {};
+
+    if (!result.ok) {
+      // AIDEV-NOTE: Map AJV field errors to InvalidMap entries for name/queryText.
+      const invalid: InvalidMap = {};
+
+      for (const err of result.errors) {
+        const rawPath = err.path || '';
+        const key = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+
+        if (key === 'name' || key === 'queryText') {
+          const field = key as 'name' | 'queryText';
+          invalid[field] = {
+            field,
+            actionType: 'dataQuery/updateDataQuery',
+            message   : err.message,
+            schemaId  : 'UpdateDataQuery'
+          };
+        }
+      }
+
+      // If only the anyOf constraint failed (no name/queryText specific errors),
+      // treat it as both fields missing so UI can surface a useful message.
+      if (!invalid.name && !invalid.queryText) {
+        const anyOfErr = result.errors.find(
+          (e) => (e.path || '') === '' && e.message === 'At least one of name or queryText must be provided'
+        );
+
+        if (anyOfErr) {
+          invalid.name = {
+            field     : 'name',
+            actionType: 'dataQuery/updateDataQuery',
+            message   : anyOfErr.message,
+            schemaId  : 'UpdateDataQuery'
+          };
+          invalid.queryText = {
+            field     : 'queryText',
+            actionType: 'dataQuery/updateDataQuery',
+            message   : anyOfErr.message,
+            schemaId  : 'UpdateDataQuery'
+          };
+        }
+      }
+
+      if (Object.keys(invalid).length > 0) {
+        meta.invalid = invalid;
+      }
+    }
+
+    return { payload, meta };
+  }
+);
 export const updateDataQueryName        = createAction(
   'dataQuery/updateDataQueryName',
   (payload: UpdateDataQueryName) => {
@@ -73,42 +132,63 @@ export const updateDataQueryName        = createAction(
         }
       };
 
-      return {
-        meta,
-        payload
-        // error : true,
-      };
+      return { payload, meta };
     }
+
     return { payload, meta };
   }
 );
-export const updateDataQueryText        = createAction<UpdateDataQueryText>       ('dataQuery/updateDataQueryText');
+export const updateDataQueryText        = createAction(
+  'dataQuery/updateDataQueryText',
+  (payload: UpdateDataQueryText) => {
+    // AIDEV-NOTE: Validate queryText field; map errors to invalid.queryText for reducer consumption
+    const result = validateDataQueryText(payload);
+    const meta: { invalid?: InvalidMap } = {};
+
+    if (!result.ok) {
+      const fieldErr  = result.errors[0];
+      meta.invalid   = {
+        ['queryText']: {
+          field     : 'queryText',
+          actionType: 'dataQuery/updateDataQueryText',
+          message   : fieldErr.message,
+          schemaId  : 'UpdateDataQueryText'
+        }
+      };
+
+      return { payload, meta };
+    }
+
+    return { payload, meta };
+  }
+);
 export const updateDataQueryIsUnsaved   = createAction<{ dataQueryId: UUIDv7 }    >   ('dataQuery/updateDataQueryIsUnsaved');
 export const markDataQuerySaved         = createAction<{ dataQueryId: UUIDv7, name?: string, queryText?: string }>   ('dataQuery/markDataQuerySaved');
 
 // Selectors
-export const selectDataQueries = createSelector.withTypes<RootState>()(
-  [(state: RootState) => state.dataQueryRecords],
+export const selectDataQueries      = createSelector.withTypes<RootState>()(
+  [(state: RootState)                 => state.dataQueryRecords],
   (dataQueryRecords): DataQueryRecord => dataQueryRecords,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
-export const selectDataQueryRecord = createSelector.withTypes<RootState>()(
+export const selectDataQueryRecord  = createSelector.withTypes<RootState>()(
   [
-    (state: RootState)                      => state.dataQueryRecords,
-    (state: RootState, dataQueryId: string) => dataQueryId
+    (state: RootState)                       => state.dataQueryRecords,
+    (_state: RootState, dataQueryId: string) => dataQueryId
   ],
   (dataQueryRecords, dataQueryId): DataQueryRecordItem | undefined => {
     if (dataQueryId && dataQueryRecords && dataQueryRecords[dataQueryId]) {
       return dataQueryRecords[dataQueryId];
     }
     return undefined;
-  }
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
 export const selectDataQueryUnsaved = createSelector.withTypes<RootState>()(
   [
-    (state: RootState) => state.dataQueryRecords,
+    (state: RootState)                      => state.dataQueryRecords,
     (state: RootState, dataQueryId: string) => dataQueryId
   ],
   (dataQueryRecords, dataQueryId) => {
@@ -123,7 +203,8 @@ export const selectDataQueryUnsaved = createSelector.withTypes<RootState>()(
       isUnsaved: false,
       unsaved: {}
     };
-  }
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
 // Write-time change tracker. Captures minimal fields changed and updates isUnsaved/unsaved.
@@ -151,10 +232,10 @@ function markChanged(state: DataQueryRecord, dataQueryId: UUIDv7, changes: Parti
       ...(record.unsaved?.create || {})
     } as { dataQueryId: UUIDv7; name?: string; queryText?: string };
 
-    if (Object.prototype.hasOwnProperty.call(changes, 'name')) {
+    if (Object.hasOwn(changes, 'name')) {
       createObj.name = changes.name as string;
     }
-    if (Object.prototype.hasOwnProperty.call(changes, 'queryText')) {
+    if (Object.hasOwn(changes, 'queryText')) {
       createObj.queryText = changes.queryText as string;
     }
 
@@ -262,25 +343,60 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(updateDataQuery,
-      function(state: DataQueryRecord, action: PayloadAction<UpdateDataQuery>) {
-        const { dataQueryId } = action.payload;
-        const dataQuery = state[dataQueryId];
+      function(state: DataQueryRecord, action) {
+        const { dataQueryId, name, queryText } = action.payload;
+        const record = state[dataQueryId];
+        if (!record) return;
 
-        if (dataQuery) {
-          dataQuery.current = { ...dataQuery.current, ...action.payload };
-          const { name, queryText } = action.payload as { name?: string; queryText?: string };
-          const changed: Record<string, any> = {};
-          if (name !== undefined) changed.name = name;
-          if (queryText !== undefined) changed.queryText = queryText;
-          if (Object.keys(changed).length > 0) markChanged(state, dataQueryId, changed);
+        const invalidName       = action.meta.invalid?.name;
+        const invalidQueryText  = action.meta.invalid?.queryText;
+        const hasNameProp       = Object.hasOwn(action.payload, 'name');
+        const hasQueryTextProp  = Object.hasOwn(action.payload, 'queryText');
+
+        if (hasNameProp)      record.current.name      = name      as string;
+        if (hasQueryTextProp) record.current.queryText = queryText as string;
+
+        if (invalidName || invalidQueryText) {
+          invalidName
+            ? record.invalid.name = invalidName
+            : delete record.invalid.name;
+          invalidQueryText
+            ? record.invalid.queryText = invalidQueryText
+            : delete record.invalid.queryText;
+
+          let hasInvalid = false;
+          for (const _ in record.invalid) { hasInvalid = true; break; }
+          record.isInvalid = hasInvalid;
+          return;
+        }
+
+        // No validation errors: clear field-level errors and update unsaved state
+        delete record.invalid.name;
+        delete record.invalid.queryText;
+
+        let hasInvalid = false;
+        for (const _ in record.invalid) { hasInvalid = true; break; }
+        record.isInvalid = hasInvalid;
+
+        const changed: Partial<{ name: string; queryText: string }> = {};
+        if (hasNameProp) {
+          changed.name = name as string;
+        }
+        if (hasQueryTextProp) {
+          changed.queryText = queryText as string;
+        }
+
+        if (hasNameProp || hasQueryTextProp) {
+          markChanged(state, dataQueryId, changed);
         }
       }
     )
     .addCase(updateDataQueryName,
-      function(state: DataQueryRecord, action) {
+      function(state: DataQueryRecord, action: ReturnType<typeof updateDataQueryName>) {
         const { dataQueryId, name } = action.payload;
         const record = state[dataQueryId];
         if (!record) return;
+        if (name === record.current.name) return;
 
         const invalidName = action.meta.invalid?.name;
 
@@ -310,15 +426,36 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(updateDataQueryText,
-      function(state: DataQueryRecord, action: PayloadAction<UpdateDataQueryText>) {
-        const { dataQueryId } = action.payload;
-        const dataQuery = state[dataQueryId];
+      function(state: DataQueryRecord, action: ReturnType<typeof updateDataQueryText>) {
+        const { dataQueryId, queryText } = action.payload;
+        const record = state[dataQueryId];
+        if (!record) return;
+        if (queryText === record.current.queryText) return;
 
-        if (dataQuery) {
-          if (action.payload.queryText === dataQuery.current.queryText) return;
-          dataQuery.current = { ...dataQuery.current, ...action.payload };
-          markChanged(state, dataQueryId, { queryText: action.payload.queryText });
+        const invalidQueryText = action.meta.invalid?.queryText;
+
+        if (invalidQueryText) {
+          state[dataQueryId] = {
+            ...record,
+            current: { ...record.current, queryText },
+            isInvalid: true,
+            invalid: { ...record.invalid, queryText: invalidQueryText }
+          };
+          return;
         }
+
+        // Valid: clear invalid.queryText if present
+        const { queryText: _removed, ...restInvalid } = record.invalid || {};
+        const hasInvalid = Object.keys(restInvalid).length > 0;
+
+        state[dataQueryId] = {
+          ...record,
+          current: { ...record.current, queryText },
+          isInvalid: hasInvalid,
+          invalid: restInvalid
+        };
+
+        markChanged(state, dataQueryId, { queryText });
       }
     )
     .addCase(updateDataQueryIsUnsaved,

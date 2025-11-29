@@ -8,7 +8,6 @@ type UnsavedQueryTreeGroupNode = {
   groupId       : number;
   position      : number;
   name          : string;
-  mountId?      : undefined;
 };
 
 type UnsavedQueryTreeNode = {

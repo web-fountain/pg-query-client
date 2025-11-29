@@ -16,6 +16,7 @@ import {
 }                                                       from '@Redux/records/tabbar';
 import Icon                                             from '@Components/Icons';
 
+import { useTreeSectionState }                          from '../hooks/useTreeSectionState';
 import { useItemActions }                               from './hooks/useItemActions';
 import Row                                              from './components/Row';
 import Toolbar                                          from './components/Toolbar';
@@ -26,17 +27,19 @@ import styles                                           from './styles.module.cs
 // AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes.
 // AIDEV-NOTE: We continue to rely on a reset key here to avoid subtle cache issues inside headless-tree.
 function UnsavedQueriesTree(props: { rootId: string; label: string; indent?: number }) {
-  const unsavedQueryTree = useReduxSelector(selectUnsavedQueryTree);
+  const { isOpen, setIsOpen } = useTreeSectionState(props.rootId, false);
+  const unsavedQueryTree      = useReduxSelector(selectUnsavedQueryTree);
+
   const nodeCount = Object.keys(unsavedQueryTree.nodes || {}).length;
   const edgeCount = Object.keys(unsavedQueryTree.childrenByParentId || {}).length;
   const resetKey = `${props.rootId}:${nodeCount}:${edgeCount}`;
 
-  return <UnsavedQueriesTreeInner key={resetKey} unsavedQueryTree={unsavedQueryTree} {...props} />;
+  return <UnsavedQueriesTreeInner key={resetKey} unsavedQueryTree={unsavedQueryTree} isOpen={isOpen} setIsOpen={setIsOpen} {...props} />;
 }
 
 function UnsavedQueriesTreeInner(
-  { rootId, indent = 20, label = 'UNSAVED QUERIES', unsavedQueryTree }:
-  { rootId: string; indent?: number; label: string; unsavedQueryTree: UnsavedQueryTreeRecord }
+  { rootId, indent = 20, label = 'UNSAVED QUERIES', unsavedQueryTree, isOpen, setIsOpen }:
+  { rootId: string; indent?: number; label: string; unsavedQueryTree: UnsavedQueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
   const tabIds          = useReduxSelector(selectTabIds);
   const focusedTabIndex = useReduxSelector(selectFocusedTabIndex);
@@ -77,13 +80,13 @@ function UnsavedQueriesTreeInner(
     indent, // AIDEV-NOTE: Indentation applied by library on each row via item props style
     getItemName: (item: any) => item.getItemData()?.name,
     isItemFolder: (item: any) => item.getItemData()?.kind === 'group',
+        // AIDEV-NOTE: All data is present synchronously; syncDataLoaderFeature wires dataLoader into the tree.
+        features: [syncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
     dataLoader: {
       // AIDEV-NOTE: Unsaved tree data is fully local from Redux; use synchronous loader.
       getItem: (nodeId: string) => unsavedQueryTree.nodes[nodeId],
       getChildren: (nodeId: string) => unsavedQueryTree.childrenByParentId[nodeId] || []
     },
-    // AIDEV-NOTE: All data is present synchronously; syncDataLoaderFeature wires dataLoader into the tree.
-    features: [syncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
     // AIDEV-NOTE: Expanded root and all groups so folders appear open and cannot be collapsed via UI controls.
     // AIDEV-NOTE: Combined with the hydration reload + invalidate below, this avoids the library sticking to an initial "empty" cache.
     initialState: { expandedItems: [rootId, ...allGroupNodeIds], selectedItems: [rootId], focusedItem: rootId },
@@ -134,8 +137,6 @@ function UnsavedQueriesTreeInner(
 
   // Track whether the tree (scroller) currently contains focus
   const [isTreeFocused, setIsTreeFocused] = useState<boolean>(false);
-  // AIDEV-NOTE: Section open/closed UI state (decoupled from Tree's root expansion)
-  const [isOpen, setIsOpen] = useState<boolean>(true);
 
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];

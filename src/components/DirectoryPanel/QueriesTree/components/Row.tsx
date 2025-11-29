@@ -1,9 +1,14 @@
 'use client';
 
 import type { TreeNode }                          from '@Redux/records/queryTree/types';
+import type { UUIDv7 }                            from '@Types/primitives';
 import type { TreeItemApi, OnRename, OnDropMove } from '../types';
 
+import { memo }                                   from 'react';
 import { useRouter, useParams }                   from 'next/navigation';
+import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
+import { selectTabIdByMountId, selectActiveTabId } from '@Redux/records/tabbar';
+import { setActiveTabThunk }                      from '@Redux/records/tabbar/thunks';
 import Icon                                       from '@Components/Icons';
 import styles                                     from './Row.module.css';
 
@@ -16,27 +21,59 @@ type RowProps = {
   onDropMove  : OnDropMove;
   isTopLevel?: boolean;
   isTreeFocused?: boolean;
+  onTreeFocusFromRow?: () => void;
 };
 
-function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, isTreeFocused }: RowProps) {
+function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, isTreeFocused, onTreeFocusFromRow }: RowProps) {
   const level     = (item.getItemMeta().level ?? 0) as number;
   const isFolder  = item.isFolder();
   const router    = useRouter();
   const params    = useParams<{ opspaceId: string; dataQueryId?: string }>();
   const opspaceId = params?.opspaceId as string | undefined;
+  const dispatch  = useReduxDispatch();
+
+  // AIDEV-NOTE: Get mountId at top level for selector usage
+  const itemData  = item?.getItemData?.() as TreeNode | undefined;
+  const mountId   = itemData?.mountId as UUIDv7;
+  const tabId     = useReduxSelector(selectTabIdByMountId, mountId) as UUIDv7;
+  const activeTabId = useReduxSelector(selectActiveTabId) as UUIDv7 | null;
 
   // AIDEV-NOTE: Merge className/style from library props to preserve its internal state classes
-  const itemProps = item.getProps();
-  // AIDEV-NOTE: Baseline diagnostic — keep library-provided style so headless-tree owns layout.
-  const id        = item.getId();
-  const isTopLevel = !!isTopLevelProp;
-  const ariaSelected = (itemProps as any)?.['aria-selected'] ?? (itemProps as any)?.['ariaSelected'];
-  const isSelected = ariaSelected === true || ariaSelected === 'true';
+  const id                = item.getId();
+  const itemProps         = item.getProps();
+  const isTopLevel        = !!isTopLevelProp;
+  const ariaSelected      = (itemProps as any)?.['aria-selected'] ?? (itemProps as any)?.['ariaSelected'];
+  const isSelectedByTree  = ariaSelected === true || ariaSelected === 'true';
+  const isActive          = isSelectedByTree;
+
+  // AIDEV-NOTE: For file nodes, "focused" means:
+  //   - this row is the tree's selected item, and
+  //   - its tab is the globally active tab (activeTabId).
+  // When another tab becomes active, the row remains selected but is shown
+  // with the dimmed (blurred) style instead.
+  const isFileActiveFromTab =
+    !isFolder && !!tabId && !!activeTabId && tabId === activeTabId;
+
+  // AIDEV-NOTE: Focused vs. blurred semantics:
+  // - Folders: focused when selected AND the tree section reports focus.
+  // - Files  : focused when selected AND their tab is the active tab.
+  //   In both cases, a selected row that does not meet the focused criteria
+  //   is rendered with the dimmed style instead.
+  const useFocusedStyle =
+    !isTopLevel &&
+    isActive &&
+    (isFolder ? !!isTreeFocused : isFileActiveFromTab);
+
+  const useBlurredStyle =
+    !isTopLevel &&
+    isActive &&
+    !useFocusedStyle;
+
   const mergedClassName = [
     (itemProps as any)?.className,
     styles['row'],
-    // AIDEV-NOTE: Top-level folders have no active/selected styling
-    (!isTopLevel && isSelected) ? (isTreeFocused ? styles['row-selected-focused'] : styles['row-selected-blurred']) : undefined,
+    useFocusedStyle ? styles['row-selected-focused'] : undefined,
+    useBlurredStyle ? styles['row-selected-blurred'] : undefined,
     isTopLevel ? styles['row-top-level'] : undefined
   ].filter(Boolean).join(' ');
   const mergedStyle = (itemProps as any)?.style as React.CSSProperties | undefined;
@@ -53,9 +90,21 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
     try {
       itemProps?.onClick?.(e);
     } catch {}
+
+    // Explicitly mark this tree section as focused when the user interacts
+    // with a row, in case DOM focus did not change in a way that our
+    // container onFocus/onBlur handlers can detect.
+    try {
+      onTreeFocusFromRow?.();
+    } catch {}
+
     if (isFolder) return;
 
-    const mountId = ((item as any)?.getItemData?.()?.mountId) as string;
+    // If this row's tab is already the active tab, avoid redundant dispatch + navigation.
+    const isAlreadyActiveFileRow = !isFolder && !!tabId && !!activeTabId && tabId === activeTabId;
+    if (isAlreadyActiveFileRow) return;
+
+    dispatch(setActiveTabThunk(tabId));
 
     // AIDEV-NOTE: Defer one frame so selected styling paints before route remount.
     try {
@@ -81,7 +130,6 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
         e.preventDefault();
         onRename(id);
       }}
-      title="Right-click to rename. Drag items to move."
     >
       {isFolder ? (
         <button

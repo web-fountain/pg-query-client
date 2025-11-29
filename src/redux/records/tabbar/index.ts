@@ -39,12 +39,24 @@ export const selectFocusedTabIndex  = createSelector.withTypes<RootState>()(
 export const selectDataQueryIdForTabId = createSelector.withTypes<RootState>()(
   [
     (state: RootState) => state.tabs.entities,
-    (state: RootState, tabId: UUIDv7 | null) => tabId
+    (_state: RootState, tabId: UUIDv7 | null) => tabId
   ],
   (entities, tabId) => {
     if (!tabId) return null;
     const tab = entities[tabId];
     return tab ? tab.mountId : null;
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+export const selectTabIdByMountId = createSelector.withTypes<RootState>()(
+  [
+    (state: RootState) => state.tabs.entities,
+    (_state: RootState, mountId: UUIDv7 | null) => mountId
+  ],
+  (entities, mountId) => {
+    if (!mountId) return null;
+    const tab = Object.values(entities).find(t => t.mountId === mountId);
+    return tab ? tab.tabId : null;
   },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );

@@ -54,10 +54,10 @@ function markChanged(state: QueryFolderRecord, queryFolderId: string, changes: P
       ...(record.unsaved?.create || {})
     } as { queryFolderId: string; name?: string; description?: string; tags?: string[]; color?: string };
 
-    if (Object.prototype.hasOwnProperty.call(changes, 'name')) {
+    if (Object.hasOwn(changes, 'name')) {
       createObj.name = changes.name as string;
     }
-    if (Object.prototype.hasOwnProperty.call(changes, 'description')) {
+    if (Object.hasOwn(changes, 'description')) {
       createObj.description = changes.description as string;
     }
 

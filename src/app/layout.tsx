@@ -94,8 +94,6 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
             `,
           }}
         />
-
-        {/* AIDEV-NOTE: DEV auth cookies moved to client bootstrap (DevJwtBootstrapClient) */}
       </head>
 
       <body>
