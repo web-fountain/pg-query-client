@@ -66,10 +66,8 @@ export function useTabDragAndDrop({
     state.currentX = clientX;
     const deltaX = clientX - state.startX;
 
-    const fromOrder = state.startOrder;
     const draggingId = state.draggingTabId;
-    const fromIndex = fromOrder.indexOf(draggingId);
-    if (fromIndex === -1) return;
+    if (!draggingId) return;
 
     if (!state.didMove && Math.abs(deltaX) < thresholdPx) {
       return;
@@ -83,34 +81,42 @@ export function useTabDragAndDrop({
       }
     }
 
-    const metas = fromOrder.map((id, index) => {
+    // AIDEV-NOTE: Use the last computed targetOrder as the working order during a drag.
+    const baseOrder = state.targetOrder && state.targetOrder.length === state.startOrder.length
+      ? state.targetOrder
+      : state.startOrder;
+
+    const metas = baseOrder.map((id) => {
       const el = getButtonEl(id);
       const rect = el ? el.getBoundingClientRect() : new DOMRect();
-      return { tabId: id, index, rect };
+      return { tabId: id, rect };
     });
 
-    const meta = metas.find((m) => m.tabId === draggingId);
-    if (!meta || !meta.rect) return;
+    // AIDEV-NOTE: Sort by actual DOM x-position so index arithmetic matches visual order.
+    const sorted = metas.slice().sort((a, b) => a.rect.left - b.rect.left);
+    const orderIds = sorted.map((m) => m.tabId);
+    const fromIndex = orderIds.indexOf(draggingId);
+    if (fromIndex === -1) return;
 
-    const dragCenter = meta.rect.left + meta.rect.width / 2 + deltaX;
+    const dragCenter = clientX;
 
     let targetIndex = fromIndex;
-    for (const m of metas) {
+    sorted.forEach((m, idx) => {
       const mid = m.rect.left + m.rect.width / 2;
       if (dragCenter > mid) {
-        targetIndex = Math.max(targetIndex, m.index + 1);
+        targetIndex = Math.max(targetIndex, idx + 1);
       } else if (dragCenter < mid) {
-        targetIndex = Math.min(targetIndex, m.index);
+        targetIndex = Math.min(targetIndex, idx);
       }
-    }
+    });
 
     if (targetIndex === fromIndex) {
-      state.targetOrder = fromOrder;
-      setRenderOrder(fromOrder);
+      state.targetOrder = orderIds;
+      setRenderOrder(orderIds);
       return;
     }
 
-    const next = fromOrder.slice();
+    const next = orderIds.slice();
     next.splice(fromIndex, 1);
     next.splice(targetIndex, 0, draggingId);
     state.targetOrder = next;

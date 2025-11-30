@@ -236,6 +236,7 @@ function QueryWorkspace() {
 
   const handleReorderTabs = useCallback((nextTabIds: UUIDv7[]) => {
     // AIDEV-NOTE: TabBar DnD commits ordering here; Tabbar reducer remains single source of truth.
+    console.log('handleReorderTabs', { nextTabIds });
     dispatch(reorderTabs({ tabIds: nextTabIds }));
   }, [dispatch]);
 
