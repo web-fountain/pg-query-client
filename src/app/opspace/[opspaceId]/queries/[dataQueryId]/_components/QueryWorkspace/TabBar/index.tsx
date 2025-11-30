@@ -2,10 +2,13 @@
 
 import type { UUIDv7 }  from '@Types/primitives';
 
-import { memo }         from 'react';
+import {
+  memo, useCallback, useMemo, useRef
+}                       from 'react';
 import Icon             from '@Components/Icons';
 
-import styles           from './styles.module.css';
+import { useTabDragAndDrop } from './useTabDragAndDrop';
+import styles                 from './styles.module.css';
 
 
 type Tab = { dataQueryId: UUIDv7; tabId: UUIDv7; name: string };
@@ -18,18 +21,35 @@ type Props = {
   onTabClick      : (tab: Tab) => void;
   onAddTab        : () => void;
   onCloseTab      : (tabId: UUIDv7) => void | Promise<void>;
+  onReorderTabs   : (tabIds: UUIDv7[]) => void;
 };
 type TabButtonProps = {
   tab         : Tab;
   selected    : boolean;
   isFocusable : boolean;
-  index       : number;
   setRef      : (el: HTMLButtonElement | null) => void;
   onTabClick  : (tab: Tab) => void;
   onCloseTab  : (tabId: UUIDv7) => void | Promise<void>;
+  onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerUp  : (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  isDragging  : boolean;
 };
 
-const TabButton = memo(function TabButton({ tab, selected, isFocusable, index, onTabClick, onCloseTab, setRef }: TabButtonProps) {
+const TabButton = memo(function TabButton({
+  tab,
+  selected,
+  isFocusable,
+  onTabClick,
+  onCloseTab,
+  setRef,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  isDragging
+}: TabButtonProps) {
   return (
     <button
       id={`tab-${tab.tabId}`}
@@ -37,9 +57,13 @@ const TabButton = memo(function TabButton({ tab, selected, isFocusable, index, o
       aria-selected={selected}
       aria-controls={`panel-${tab.tabId}`}
       tabIndex={isFocusable ? 0 : -1}
-      className={styles['tab']}
+      className={`${styles['tab']} ${isDragging ? styles['tab-dragging'] : ''}`}
       ref={setRef}
       onClick={() => onTabClick(tab)}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       title={tab.name}
     >
       <Icon name="file" className={styles['icon']} />
@@ -61,6 +85,7 @@ const TabButton = memo(function TabButton({ tab, selected, isFocusable, index, o
             onCloseTab(tab.tabId);
           }
         }}
+        data-tab-close="true"
       >
         <Icon name="x" />
       </span>
@@ -68,9 +93,59 @@ const TabButton = memo(function TabButton({ tab, selected, isFocusable, index, o
   );
 });
 
-function TabBar({ tabs, activeTabId, focusedTabIndex, onKeyDown, onTabClick, setTabRef, onAddTab, onCloseTab }: Props) {
+function TabBar({
+  tabs,
+  activeTabId,
+  focusedTabIndex,
+  onKeyDown,
+  onTabClick,
+  setTabRef,
+  onAddTab,
+  onCloseTab,
+  onReorderTabs
+}: Props) {
+  const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
+
+  const canonicalIndexById = useMemo(() => {
+    const map = new Map<UUIDv7, number>();
+    tabs.forEach((tab, idx) => {
+      map.set(tab.tabId, idx);
+    });
+    return map;
+  }, [tabs]);
+
+  const getButtonEl = useCallback((tabId: UUIDv7) => {
+    return refsMap.current.get(tabId) || null;
+  }, []);
+
+  const {
+    draggingTabId,
+    renderOrder,
+    beginDrag,
+    updateDrag,
+    endDrag
+  } = useTabDragAndDrop({
+    tabs,
+    activeTabId,
+    getButtonEl,
+    onActivateTab: (tabId) => {
+      const tab = tabs.find((t) => t.tabId === tabId);
+      if (tab) {
+        onTabClick(tab);
+      }
+    },
+    onCommitOrder: onReorderTabs
+  });
+
+  const orderedTabs = renderOrder
+    ? renderOrder.map((id) => tabs.find((t) => t.tabId === id) as Tab).filter(Boolean)
+    : tabs;
+
   return (
-    <div className={styles['tabs-bar']}>
+    <div
+      className={styles['tabs-bar']}
+      data-dragging={draggingTabId ? 'true' : 'false'}
+    >
       <span aria-hidden="true" className={styles['tab-separator']} />
       <div
         role="tablist"
@@ -78,23 +153,50 @@ function TabBar({ tabs, activeTabId, focusedTabIndex, onKeyDown, onTabClick, set
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
       >
-        {tabs.map((tab, idx) => {
+        {orderedTabs.map((tab, visualIndex) => {
+          const canonicalIndex = canonicalIndexById.get(tab.tabId) || 0;
           const selected = tab.tabId === activeTabId;
-          const isFocusable = idx === focusedTabIndex;
-          console.log(tab.tabId)
+          const isFocusable = canonicalIndex === focusedTabIndex;
+          const isDragging = draggingTabId === tab.tabId;
+
           return (
             <TabButton
               key={tab.tabId}
               tab={tab}
               selected={selected}
               isFocusable={isFocusable}
-              index={idx}
               onTabClick={onTabClick}
               onCloseTab={onCloseTab}
-              setRef={(el) => setTabRef(idx, el)}
+              setRef={(el) => {
+                refsMap.current.set(tab.tabId, el);
+                setTabRef(canonicalIndex, el);
+              }}
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                const target = e.target as HTMLElement;
+                if (target.closest('[data-tab-close="true"]')) return;
+                try {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                } catch {}
+                beginDrag(tab.tabId, e.clientX);
+              }}
+              onPointerMove={(e) => {
+                if (!(e.buttons & 1)) return;
+                updateDrag(e.clientX);
+              }}
+              onPointerUp={(e) => {
+                try {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                } catch {}
+                endDrag();
+              }}
+              onPointerCancel={() => {
+                endDrag();
+              }}
+              isDragging={isDragging}
             />
           );
-        }).flatMap((el, i) => (i < tabs.length - 1 ? [el, (
+        }).flatMap((el, i) => (i < orderedTabs.length - 1 ? [el, (
           <span key={`sep-${i}`} aria-hidden="true" className={styles['tab-separator']} />
         )] : [el]))}
       </div>

@@ -142,8 +142,9 @@ function UnsavedQueriesTreeInner(
   const allItems = (tree as any).getItems?.() ?? [];
   // AIDEV-NOTE: Baseline diagnostic — disable custom virtualization, render all items.
   // AIDEV-NOTE: When only a single group exists under the root, flatten it by hiding its row.
+  // AIDEV-NOTE: Additionally, mirror unsaved file row order to the TabBar tabIds for a single-group layout.
   const renderItems = useMemo(() => {
-    return allItems.filter((it: any) => {
+    const filtered = allItems.filter((it: any) => {
       const id = it?.getId?.();
       if (!id) return false;
       // Always hide the internal root row
@@ -154,7 +155,45 @@ function UnsavedQueriesTreeInner(
       }
       return true;
     });
-  }, [allItems, rootId, hasMultipleGroups, singleGroupId]);
+
+    if (!tabIds || tabIds.length === 0) {
+      return filtered;
+    }
+
+    // For now we only reorder when there is a single unsaved group under the root.
+    if (hasMultipleGroups || !singleGroupId) {
+      return filtered;
+    }
+
+    const tabIndexById = new Map<string, number>();
+    (tabIds as string[]).forEach((id, idx) => {
+      tabIndexById.set(id, idx);
+    });
+
+    const nodes = unsavedQueryTree.nodes || {};
+
+    return filtered.slice().sort((a: any, b: any) => {
+      const aId = String(a?.getId?.() ?? '');
+      const bId = String(b?.getId?.() ?? '');
+      const aNode = nodes[aId] as UnsavedTreeNode | undefined;
+      const bNode = nodes[bId] as UnsavedTreeNode | undefined;
+
+      const aIsFile = !!aNode && aNode.kind === 'file';
+      const bIsFile = !!bNode && bNode.kind === 'file';
+
+      if (!aIsFile && !bIsFile) return 0;
+      if (!aIsFile && bIsFile) return -1;
+      if (aIsFile && !bIsFile) return 1;
+
+      const ai = tabIndexById.get(aId);
+      const bi = tabIndexById.get(bId);
+
+      if (ai == null && bi == null) return 0;
+      if (ai == null) return 1;
+      if (bi == null) return -1;
+      return ai - bi;
+    });
+  }, [allItems, rootId, hasMultipleGroups, singleGroupId, tabIds, unsavedQueryTree.nodes]);
 
   // AIDEV-NOTE: Toggle scrollbar gutter only when vertical scrollbar is present.
   // This ensures `scrollbar-gutter` is unset when no scrollbar is visible.

@@ -112,6 +112,18 @@
 .tab[aria-selected='true'] .tab-close { opacity: 1; pointer-events: auto; }
 .tab:focus-visible .icon { color: var(--tabs-foreground-active); }
 
+.tab-dragging {
+  cursor: grabbing;
+  z-index: 1;
+  box-shadow: 0 0 0 1px var(--tabs-underline-color),
+    0 3px 8px rgba(0, 0, 0, 0.24);
+  background: color-mix(in oklch, var(--tabs-surface) 90%, var(--tabs-underline-color) 10%);
+}
+
+.tabs-bar[data-dragging='true'] .tab {
+  user-select: none;
+}
+
 @media (forced-colors: active) {
   .tab:focus-visible,
   .tab-add:focus-visible {

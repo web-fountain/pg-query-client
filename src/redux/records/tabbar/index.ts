@@ -9,11 +9,12 @@ import {
 
 
 // Actions
-export const setInitialTabs  = createAction<TabbarRecord>       ('tabs/setInitialTabs');
-export const addTabFromFetch = createAction<{ tab: Tab; }>      ('tabs/addTabFromFetch');
-export const closeTab        = createAction<{ tabId: UUIDv7 }>  ('tabs/closeTab');
-export const setActiveTab    = createAction<{ tabId: UUIDv7 }>  ('tabs/setActiveTab');
-export const focusTabIndex   = createAction<{ index: number }>  ('tabs/focusTabIndex');
+export const setInitialTabs  = createAction<TabbarRecord>                 ('tabs/setInitialTabs');
+export const addTabFromFetch = createAction<{ tab: Tab }>                 ('tabs/addTabFromFetch');
+export const closeTab        = createAction<{ tabId: UUIDv7 }>            ('tabs/closeTab');
+export const setActiveTab    = createAction<{ tabId: UUIDv7 }>            ('tabs/setActiveTab');
+export const focusTabIndex   = createAction<{ index: number }>            ('tabs/focusTabIndex');
+export const reorderTabs     = createAction<{ tabIds: UUIDv7[] }>('tabs/reorderTabs');
 
 // Selectors
 export const selectTabEntities      = createSelector.withTypes<RootState>()(
@@ -76,7 +77,7 @@ const reducer = createReducer(initialState, (builder) => {
       }
     )
     .addCase(addTabFromFetch,
-        function(state: TabbarRecord, action: PayloadAction<{ tab: Tab; }>) {
+      function(state: TabbarRecord, action: PayloadAction<{ tab: Tab }>) {
         const { tab } = action.payload;
         const { tabId, position } = tab;
 
@@ -134,6 +135,42 @@ const reducer = createReducer(initialState, (builder) => {
         state.focusedTabIndex = clamped;
       }
     )
+    .addCase(reorderTabs,
+      function(state: TabbarRecord, action: PayloadAction<{ tabIds: UUIDv7[] }>) {
+        const { tabIds } = action.payload;
+        if (!tabIds || tabIds.length !== state.tabIds.length) {
+          // AIDEV-NOTE: Ignore malformed reorder payloads; require same cardinality.
+          return;
+        }
+
+        // Optional sanity check: ensure same set of ids
+        const prevSet = new Set(state.tabIds);
+        const nextSet = new Set(tabIds);
+        if (prevSet.size !== nextSet.size) {
+          return;
+        }
+        for (const id of prevSet) {
+          if (!nextSet.has(id)) return;
+        }
+
+        state.tabIds = tabIds.slice();
+
+        // AIDEV-NOTE: Keep Tab.position aligned with tabIds index to support server sync.
+        state.tabIds.forEach((tabId, index) => {
+          const tab = state.entities[tabId];
+          if (tab) {
+            tab.position = index;
+          }
+        });
+
+        if (state.activeTabId) {
+          const activeIndex = state.tabIds.indexOf(state.activeTabId);
+          if (activeIndex !== -1) {
+            state.focusedTabIndex = activeIndex;
+          }
+        }
+      }
+    );
 });
 
 

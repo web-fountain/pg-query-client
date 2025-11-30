@@ -123,7 +123,6 @@ export async function closeTabAction(tabId: UUIDv7): Promise<{ success: boolean;
 type OpenTabResponse =
   | { ok: false }
   | { ok: true; data: Tab };
-
 export async function openTabAction(mountId: UUIDv7): Promise<{ success: boolean; data?: Tab }> {
   console.log('[ACTION] openSavedQueryTab', mountId);
 

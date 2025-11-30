@@ -22,7 +22,8 @@ import {
   selectDataQueryIdForTabId,
   selectTabIds,
   selectActiveTabId,
-  selectFocusedTabIndex
+  selectFocusedTabIndex,
+  reorderTabs
 }                                   from '@Redux/records/tabbar';
 import { closeTabThunk, setActiveTabThunk }        from '@Redux/records/tabbar/thunks';
 import {
@@ -233,6 +234,11 @@ function QueryWorkspace() {
     editorRef.current?.runCurrentQuery();
   }, []);
 
+  const handleReorderTabs = useCallback((nextTabIds: UUIDv7[]) => {
+    // AIDEV-NOTE: TabBar DnD commits ordering here; Tabbar reducer remains single source of truth.
+    dispatch(reorderTabs({ tabIds: nextTabIds }));
+  }, [dispatch]);
+
   const handleAddTab = useCallback(() => {
     if (isPendingTabTransition) return;
 
@@ -275,6 +281,7 @@ function QueryWorkspace() {
         setTabRef={(idx, el) => { tabButtonRefs.current[idx] = el; }}
         onAddTab={handleAddTab}
         onCloseTab={handleTabClose}
+        onReorderTabs={handleReorderTabs}
       />
 
       {/* Active tabpanel wrapping toolbar and content */}
