@@ -109,12 +109,14 @@ function TabBar({
 }: Props) {
   const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
 
-  const canonicalIndexById = useMemo(() => {
-    const map = new Map<UUIDv7, number>();
+  const { canonicalIndexById, tabById } = useMemo(() => {
+    const indexMap = new Map<UUIDv7, number>();
+    const idMap = new Map<UUIDv7, Tab>();
     tabs.forEach((tab, idx) => {
-      map.set(tab.tabId, idx);
+      indexMap.set(tab.tabId, idx);
+      idMap.set(tab.tabId, tab);
     });
-    return map;
+    return { canonicalIndexById: indexMap, tabById: idMap };
   }, [tabs]);
 
   const getButtonEl = useCallback((tabId: UUIDv7) => {
@@ -130,8 +132,8 @@ function TabBar({
   } = useTabDragAndDrop({
     tabs,
     activeTabId,
-    getButtonEl,
-    onActivateTab: (tabId) => {
+    getButtonElAction: getButtonEl,
+    onActivateTabAction: (tabId) => {
       const tab = tabs.find((t) => t.tabId === tabId);
       if (tab) {
         if (onTabActivateForDrag) {
@@ -141,11 +143,11 @@ function TabBar({
         }
       }
     },
-    onCommitOrder: onReorderTabs
+    onCommitOrderAction: onReorderTabs
   });
 
   const orderedTabs = renderOrder
-    ? renderOrder.map((id) => tabs.find((t) => t.tabId === id) as Tab).filter(Boolean)
+    ? renderOrder.map((id) => tabById.get(id) as Tab).filter(Boolean)
     : tabs;
 
   return (

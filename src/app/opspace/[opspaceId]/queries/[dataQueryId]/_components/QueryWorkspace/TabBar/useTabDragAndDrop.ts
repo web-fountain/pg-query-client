@@ -12,14 +12,16 @@ type DragState = {
   startOrder: UUIDv7[];
   targetOrder: UUIDv7[];
   didMove: boolean;
+  pendingX?: number;
+  rafId?: number | null;
 };
 
 type UseTabDragAndDropArgs = {
   tabs: { tabId: UUIDv7 }[];
   activeTabId: string;
-  getButtonEl: (tabId: UUIDv7) => HTMLButtonElement | null;
-  onActivateTab: (tabId: UUIDv7) => void;
-  onCommitOrder: (tabIds: UUIDv7[]) => void;
+  getButtonElAction: (tabId: UUIDv7) => HTMLButtonElement | null;
+  onActivateTabAction: (tabId: UUIDv7) => void;
+  onCommitOrderAction: (tabIds: UUIDv7[]) => void;
 };
 
 type UseTabDragAndDropResult = {
@@ -35,9 +37,9 @@ type UseTabDragAndDropResult = {
 export function useTabDragAndDrop({
   tabs,
   activeTabId,
-  getButtonEl,
-  onActivateTab,
-  onCommitOrder
+  getButtonElAction,
+  onActivateTabAction,
+  onCommitOrderAction
 }: UseTabDragAndDropArgs): UseTabDragAndDropResult {
   const [draggingTabId, setDraggingTabId] = useState<UUIDv7 | null>(null);
   const [renderOrder, setRenderOrder] = useState<UUIDv7[] | null>(null);
@@ -53,13 +55,15 @@ export function useTabDragAndDrop({
       currentX: clientX,
       startOrder: order,
       targetOrder: order,
-      didMove: false
+      didMove: false,
+      pendingX: undefined,
+      rafId: null
     };
     setDraggingTabId(tabId);
     setRenderOrder(order);
     // AIDEV-NOTE: Activate tab immediately on press to enable fluid press-and-drag from inactive tabs.
     if (tabId !== (activeTabId || null)) {
-      onActivateTab(tabId);
+      onActivateTabAction(tabId);
     }
   }, [tabs, activeTabId]);
 
@@ -67,62 +71,78 @@ export function useTabDragAndDrop({
     const state = dragRef.current;
     if (!state || !state.draggingTabId) return;
 
-    state.currentX = clientX;
-    const deltaX = clientX - state.startX;
-
-    const draggingId = state.draggingTabId;
-    if (!draggingId) return;
-
-    if (!state.didMove && Math.abs(deltaX) < thresholdPx) {
+    state.pendingX = clientX;
+    if (state.rafId != null) {
       return;
     }
 
-    if (!state.didMove) {
-      // AIDEV-NOTE: Threshold crossed — treat gesture as a drag from this point on.
-      state.didMove = true;
-    }
-
-    // AIDEV-NOTE: Use the last computed targetOrder as the working order during a drag.
-    const baseOrder = state.targetOrder && state.targetOrder.length === state.startOrder.length
-      ? state.targetOrder
-      : state.startOrder;
-
-    const metas = baseOrder.map((id) => {
-      const el = getButtonEl(id);
-      const rect = el ? el.getBoundingClientRect() : new DOMRect();
-      return { tabId: id, rect };
-    });
-
-    // AIDEV-NOTE: Sort by actual DOM x-position so index arithmetic matches visual order.
-    const sorted = metas.slice().sort((a, b) => a.rect.left - b.rect.left);
-    const orderIds = sorted.map((m) => m.tabId);
-    const fromIndex = orderIds.indexOf(draggingId);
-    if (fromIndex === -1) return;
-
-    const dragCenter = clientX;
-
-    let targetIndex = fromIndex;
-    sorted.forEach((m, idx) => {
-      const mid = m.rect.left + m.rect.width / 2;
-      if (dragCenter > mid) {
-        targetIndex = Math.max(targetIndex, idx + 1);
-      } else if (dragCenter < mid) {
-        targetIndex = Math.min(targetIndex, idx);
+    state.rafId = window.requestAnimationFrame(() => {
+      const s = dragRef.current;
+      if (!s || !s.draggingTabId) {
+        if (s) s.rafId = null;
+        return;
       }
+
+      const x = s.pendingX ?? clientX;
+      s.pendingX = undefined;
+      s.rafId = null;
+
+      s.currentX = x;
+      const deltaX = x - s.startX;
+
+      const draggingId = s.draggingTabId;
+      if (!draggingId) return;
+
+      if (!s.didMove && Math.abs(deltaX) < thresholdPx) {
+        return;
+      }
+
+      if (!s.didMove) {
+        // AIDEV-NOTE: Threshold crossed — treat gesture as a drag from this point on.
+        s.didMove = true;
+      }
+
+      // AIDEV-NOTE: Use the last computed targetOrder as the working order during a drag.
+      const baseOrder = s.targetOrder && s.targetOrder.length === s.startOrder.length
+        ? s.targetOrder
+        : s.startOrder;
+
+      const metas = baseOrder.map((id) => {
+        const el = getButtonElAction(id);
+        const rect = el ? el.getBoundingClientRect() : new DOMRect();
+        return { tabId: id, rect };
+      });
+
+      // AIDEV-NOTE: Sort by actual DOM x-position so index arithmetic matches visual order.
+      const sorted = metas.slice().sort((a, b) => a.rect.left - b.rect.left);
+      const orderIds = sorted.map((m) => m.tabId);
+      const fromIndex = orderIds.indexOf(draggingId);
+      if (fromIndex === -1) return;
+
+      const dragCenter = x;
+
+      let targetIndex = fromIndex;
+      sorted.forEach((m, idx) => {
+        const mid = m.rect.left + m.rect.width / 2;
+        if (dragCenter > mid) {
+          targetIndex = Math.max(targetIndex, idx + 1);
+        } else if (dragCenter < mid) {
+          targetIndex = Math.min(targetIndex, idx);
+        }
+      });
+
+      if (targetIndex === fromIndex) {
+        s.targetOrder = orderIds;
+        return;
+      }
+
+      const next = orderIds.slice();
+      next.splice(fromIndex, 1);
+      next.splice(targetIndex, 0, draggingId);
+      s.targetOrder = next;
+      setRenderOrder(next);
     });
-
-    if (targetIndex === fromIndex) {
-      state.targetOrder = orderIds;
-      setRenderOrder(orderIds);
-      return;
-    }
-
-    const next = orderIds.slice();
-    next.splice(fromIndex, 1);
-    next.splice(targetIndex, 0, draggingId);
-    state.targetOrder = next;
-    setRenderOrder(next);
-  }, [getButtonEl, onActivateTab]);
+  }, [getButtonElAction]);
 
   const endDrag = useCallback(() => {
     const state = dragRef.current;
@@ -134,6 +154,10 @@ export function useTabDragAndDrop({
     const targetOrder = state.targetOrder;
     const didMove = state.didMove;
     const currentDraggingId = state.draggingTabId;
+
+    if (state.rafId != null) {
+      try { window.cancelAnimationFrame(state.rafId); } catch {}
+    }
 
     dragRef.current = null;
     setDraggingTabId(null);
@@ -148,8 +172,8 @@ export function useTabDragAndDrop({
 
     if (!changed) return;
 
-    onCommitOrder(targetOrder);
-  }, [onCommitOrder]);
+    onCommitOrderAction(targetOrder);
+  }, [onCommitOrderAction]);
 
   return {
     draggingTabId,
