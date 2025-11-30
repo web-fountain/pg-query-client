@@ -1,7 +1,7 @@
 'use server';
 
 import type { UUIDv7 }          from '@Types/primitives';
-import type { Tabbar }          from '@Types/tabs';
+import type { Tab, Tabbar }     from '@Types/tabs';
 import type { HeadersContext }  from '@Utils/backendFetch';
 
 import { cacheLife, cacheTag, updateTag }  from 'next/cache';
@@ -118,4 +118,39 @@ export async function closeTabAction(tabId: UUIDv7): Promise<{ success: boolean;
   } catch {}
 
   return { success: true };
+}
+
+type OpenTabResponse =
+  | { ok: false }
+  | { ok: true; data: Tab };
+
+export async function openTabAction(mountId: UUIDv7): Promise<{ success: boolean; data?: Tab }> {
+  console.log('[ACTION] openSavedQueryTab', mountId);
+
+  const ctx = await getHeadersContextOrNull();
+  if (!ctx) {
+    return { success: false };
+  }
+
+  // It is assumed that the mountId is the dataQueryId
+  // Will need to update this later to accept other mount types
+  const { ok, data } = await backendFetchJSON<OpenTabResponse>({
+    path: `/tabs/open`,
+    method: 'POST',
+    scope: ['tabs-open:write'],
+    logLabel: 'openTab',
+    context: ctx,
+    body: { dataQueryId: mountId }
+  });
+
+  if (!ok || !data?.ok) {
+    return { success: false };
+  }
+
+  // Invalidate cached list of open tabs
+  try {
+    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  } catch {}
+
+  return { success: true, data: data.data };
 }

@@ -1,0 +1,159 @@
+'use client';
+
+import type { TreeNode }                          from '@Redux/records/queryTree/types';
+import type { UUIDv7 }                            from '@Types/primitives';
+import type { TreeItemApi, OnRename, OnDropMove } from '../types';
+
+import { memo, useCallback, useMemo }             from 'react';
+import { useRouter, useParams }                   from 'next/navigation';
+
+import { useReduxDispatch }                       from '@Redux/storeHooks';
+import { setActiveTabThunk, openTabThunk }        from '@Redux/records/tabbar/thunks';
+import Icon                                       from '@Components/Icons';
+
+import styles                                     from './Row.module.css';
+
+
+// AIDEV-NOTE: Presentational row; spreads item props once, renders icon and name.
+type RowProps = {
+  item                : TreeItemApi<TreeNode>;
+  indent              : number;
+  onRename            : OnRename;
+  onDropMove          : OnDropMove;
+  isTopLevel?         : boolean;
+  isTreeFocused?      : boolean;
+  isActiveFromTab?    : boolean;
+  tabId?              : UUIDv7;
+  isSelectedByTree?   : boolean;
+  onTreeFocusFromRow? : () => void;
+};
+
+function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocused, isActiveFromTab=false, tabId, isSelectedByTree=false, onTreeFocusFromRow }: RowProps) {
+  const router    = useRouter();
+  const params    = useParams<{ opspaceId: string; dataQueryId?: string }>();
+  const opspaceId = params?.opspaceId as string | undefined;
+  const dispatch  = useReduxDispatch();
+
+  // Extract stable data from item
+  const itemData  = item?.getItemData?.() as TreeNode | undefined;
+  const mountId   = itemData?.mountId as UUIDv7;
+  const id        = item.getId();
+  const isFolder  = item.isFolder();
+  const level     = (item.getItemMeta().level ?? 0) as number;
+  const itemProps = item.getProps();
+  const itemName  = item.getItemName();
+  const expanded  = item.isExpanded();
+
+  const isActive  = isSelectedByTree;
+
+  // AIDEV-NOTE: Focused vs. blurred semantics:
+  // - Folders: focused when selected AND the tree section reports focus.
+  // - Files  : focused when selected AND their tab is the active tab.
+  const useFocusedStyle = !isTopLevel && isActive && (isFolder ? !!isTreeFocused : isActiveFromTab);
+  const useBlurredStyle = !isTopLevel && isActive && !useFocusedStyle;
+
+  const mergedClassName = useMemo(() =>
+    [
+      itemProps?.className,
+      styles['row'],
+      useFocusedStyle && styles['row-selected-focused'],
+      useBlurredStyle && styles['row-selected-blurred'],
+      isTopLevel && styles['row-top-level']
+    ].filter(Boolean).join(' '),
+    [itemProps?.className, useFocusedStyle, useBlurredStyle, isTopLevel]
+  );
+
+  // AIDEV-NOTE: Indentation scheme: level 0 => indent; each deeper level adds 8px.
+  const pad = indent + Math.max(0, level) * 8;
+  const finalStyle: React.CSSProperties = { ...itemProps?.style, paddingLeft: `${pad}px` };
+
+  // AIDEV-NOTE: Row click handler — navigation for file nodes
+  const handleRowClick = useCallback(async (e: React.MouseEvent) => {
+    itemProps?.onClick?.(e);
+    onTreeFocusFromRow?.();
+
+    if (isFolder) return;
+    if (isActiveFromTab) return;
+
+    // If tab exists, just activate it
+    if (tabId) {
+      dispatch(setActiveTabThunk(tabId));
+      if (mountId && opspaceId) {
+        requestAnimationFrame(() => {
+          router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
+        });
+      }
+      return;
+    }
+
+    // No existing tab — open a new one for this saved query
+    if (!mountId || !opspaceId) {console.error('Failed to open tab: no mountId or opspaceId'); return;}
+
+    try {
+      const newTabId = await dispatch(openTabThunk(mountId)).unwrap();
+      if (newTabId) {
+        requestAnimationFrame(() => {
+          router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to open tab:', error);
+    }
+  }, [itemProps, onTreeFocusFromRow, isFolder, isActiveFromTab, tabId, dispatch, mountId, opspaceId, router]);
+
+  // AIDEV-NOTE: Memoize context menu handler
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    onRename(id);
+  }, [onRename, id]);
+
+  return (
+    <div
+      {...(itemProps as any)}
+      className={mergedClassName}
+      data-row="true"
+      style={finalStyle}
+      aria-label={isTopLevel ? itemName : undefined}
+      onClick={handleRowClick}
+      onContextMenu={handleContextMenu}
+    >
+      {isFolder ? (
+        <button
+          type="button"
+          className={`${styles['type-icon']} ${styles['type-icon-button']}`}
+          tabIndex={-1}
+          draggable={false}
+          aria-label={expanded ? 'Collapse folder' : 'Expand folder'}
+          onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onMouseDown={(e) => { e.stopPropagation(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            expanded ? item.collapse() : item.expand();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              expanded ? item.collapse() : item.expand();
+            }
+          }}
+        >
+          {isTopLevel ? (
+            expanded ? <Icon name="chevron-down" /> : <Icon name="chevron-right" />
+          ) : (
+            expanded ? <Icon name="folder-open" /> : <Icon name="folder" />
+          )}
+        </button>
+      ) : (
+        <span className={styles['type-icon']} aria-hidden="true">
+          <Icon name="file-lines" />
+        </span>
+      )}
+
+      <span className={styles['name']}>{itemName}</span>
+    </div>
+  );
+}
+
+
+export default memo(Row);

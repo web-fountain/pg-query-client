@@ -81,6 +81,7 @@ function TabBar({ tabs, activeTabId, focusedTabIndex, onKeyDown, onTabClick, set
         {tabs.map((tab, idx) => {
           const selected = tab.tabId === activeTabId;
           const isFocusable = idx === focusedTabIndex;
+          console.log(tab.tabId)
           return (
             <TabButton
               key={tab.tabId}

@@ -5,7 +5,7 @@ import { useOpSpaceLayout } from '@Components/layout/OpSpaceProvider';
 import Icon                 from '@Components/Icons';
 
 import UnsavedQueryTree     from './UnsavedQueryTree';
-import QueriesTree          from './QueriesTree';
+import QueryTree            from './QueryTree';
 
 import styles               from './styles.module.css';
 
@@ -41,7 +41,7 @@ function DirectoryPanel({ side = 'right', unsavedSlot, queriesSlot }: Props) {
           {unsavedSlot ?? <UnsavedQueryTree rootId='unsaved-queries' label='Unsaved Queries' />}
         </div>
         <div className={styles['section-wrapper']} data-expanded='true'>
-          {queriesSlot ?? <QueriesTree rootId='queries' label='Queries' />}
+          {queriesSlot ?? <QueryTree rootId='queries' label='Queries' />}
         </div>
       </div>
     </div>

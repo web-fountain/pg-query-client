@@ -48,15 +48,14 @@ export const selectDataQueryIdForTabId = createSelector.withTypes<RootState>()(
   },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-export const selectTabIdByMountId = createSelector.withTypes<RootState>()(
-  [
-    (state: RootState) => state.tabs.entities,
-    (_state: RootState, mountId: UUIDv7 | null) => mountId
-  ],
-  (entities, mountId) => {
-    if (!mountId) return null;
-    const tab = Object.values(entities).find(t => t.mountId === mountId);
-    return tab ? tab.tabId : null;
+export const selectTabIdByMountIdMap = createSelector.withTypes<RootState>()(
+  [(state) => state.tabs.entities],
+  (entities) => {
+    const map = new Map<UUIDv7, UUIDv7>();
+    for (const tab of Object.values(entities)) {
+      map.set(tab.mountId, tab.tabId);
+    }
+    return map;
   },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );

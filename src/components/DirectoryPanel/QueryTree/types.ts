@@ -13,7 +13,13 @@ export type TreeItemMeta = {
   level?: number;
 };
 
-export type TreeItemDomProps = Record<string, any>;
+export type TreeItemDomProps = {
+  'aria-selected'?: boolean | 'true' | 'false';
+  className?: string;
+  style?: React.CSSProperties;
+  onClick?: (e: React.MouseEvent) => void;
+  [key: string]: unknown;
+};
 
 // AIDEV-NOTE: Subset of Headless Tree item API that SectionTree uses. Keeps view components type-safe
 // without importing the library's internal types here.

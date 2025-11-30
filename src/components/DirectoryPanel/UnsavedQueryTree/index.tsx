@@ -26,7 +26,7 @@ import styles                                           from './styles.module.cs
 
 // AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes.
 // AIDEV-NOTE: We continue to rely on a reset key here to avoid subtle cache issues inside headless-tree.
-function UnsavedQueriesTree(props: { rootId: string; label: string; indent?: number }) {
+function UnsavedQueryTree(props: { rootId: string; label: string; indent?: number }) {
   const { isOpen, setIsOpen } = useTreeSectionState(props.rootId, false);
   const unsavedQueryTree      = useReduxSelector(selectUnsavedQueryTree);
 
@@ -316,4 +316,4 @@ function UnsavedQueriesTreeInner(
 }
 
 
-export default UnsavedQueriesTree;
+export default UnsavedQueryTree;

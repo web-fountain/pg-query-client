@@ -1,11 +1,19 @@
-import type { RootState } from '@Redux/store';
-import type { UUIDv7 }    from '@Types/primitives';
+import type { RootState }               from '@Redux/store';
+import type { UUIDv7 }                  from '@Types/primitives';
 
-import { createAsyncThunk }                   from '@reduxjs/toolkit';
-import { closeTab, setActiveTab }             from '@Redux/records/tabbar';
-import { removeUnsavedTreeNodeByTabId }       from '@Redux/records/unsavedQueryTree';
-import { selectDataQueryIdForTabId }          from '@Redux/records/tabbar/index';
-import { setActiveTabAction, closeTabAction } from '@/app/opspace/[opspaceId]/queries/[dataQueryId]/_actions/tabs/index';
+import { createAsyncThunk }             from '@reduxjs/toolkit';
+import {
+  addTabFromFetch,
+  closeTab,
+  setActiveTab
+}                                       from '@Redux/records/tabbar';
+import { removeUnsavedTreeNodeByTabId } from '@Redux/records/unsavedQueryTree';
+import { selectDataQueryIdForTabId }    from '@Redux/records/tabbar/index';
+import {
+  closeTabAction,
+  openTabAction,
+  setActiveTabAction
+}                                       from '@/app/opspace/[opspaceId]/queries/[dataQueryId]/_actions/tabs/index';
 
 
 export const setActiveTabThunk = createAsyncThunk<void, UUIDv7, { state: RootState }>(
@@ -50,5 +58,26 @@ export const closeTabThunk = createAsyncThunk<UUIDv7 | null, UUIDv7, { state: Ro
     });
 
     return nextDataQueryId;
+  }
+);
+
+export const openTabThunk = createAsyncThunk<UUIDv7 | null, UUIDv7, { state: RootState }>(
+  'tabs/openTabThunk',
+  async (mountId, { dispatch }) => {
+    try {
+      const res = await openTabAction(mountId);
+
+      if (!res.success || !res.data) {
+        console.error(`Failed to open tab: ${mountId}`);
+        return null;
+      }
+
+      dispatch(addTabFromFetch({ tab: res.data }));
+
+      return res.data.tabId;
+    } catch (error) {
+      console.error(`Error opening tab: ${mountId}`, error);
+      return null;
+    }
   }
 );

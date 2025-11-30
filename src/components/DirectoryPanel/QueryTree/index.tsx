@@ -3,24 +3,27 @@
 import type { QueryTreeRecord, TreeNode } from '@Redux/records/queryTree/types';
 import type { UUIDv7 }                    from '@Types/primitives';
 
-import { useRef, useEffect, useState }  from 'react';
-import { useTree }                      from '@headless-tree/react';
+import {
+  useCallback, useEffect,
+  useRef, useState
+}                                         from 'react';
+import { useTree }                        from '@headless-tree/react';
 import {
   asyncDataLoaderFeature,
   selectionFeature,
   hotkeysCoreFeature,
   dragAndDropFeature
-}                                       from '@headless-tree/core';
+}                                         from '@headless-tree/core';
 import {
   useReduxSelector,
   useReduxDispatch
-}                                       from '@Redux/storeHooks';
-import {
-  selectQueryTree,
-
-}                                         from '@Redux/records/queryTree';
+}                                         from '@Redux/storeHooks';
+import { selectQueryTree }                from '@Redux/records/queryTree';
 import { getQueryTreeNodeChildrenThunk }  from '@Redux/records/queryTree/thunks';
-
+import {
+  selectActiveTabId,
+  selectTabIdByMountIdMap,
+}                                         from '@Redux/records/tabbar';
 import Icon                               from '@Components/Icons';
 
 import { useTreeSectionState }            from '../hooks/useTreeSectionState';
@@ -49,6 +52,10 @@ function QueriesTreeInner(
   { rootId: string; indent?: number; label?: string; queryTree: QueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
   const dispatch      = useReduxDispatch();
+
+  // AIDEV-NOTE: Lift tab lookups to parent — single subscription for all rows
+  const activeTabId       = useReduxSelector(selectActiveTabId);
+  const mountIdToTabIdMap = useReduxSelector(selectTabIdByMountIdMap);
 
   const tree = useTree<TreeNode>({
     rootItemId: rootId,
@@ -124,6 +131,9 @@ function QueriesTreeInner(
 
   // Track whether the tree (scroller) currently contains focus
   const [isTreeFocused, setIsTreeFocused] = useState<boolean>(false);
+
+  // AIDEV-NOTE: Stable callback to avoid breaking Row memo
+  const handleTreeFocusFromRow = useCallback(() => setIsTreeFocused(true), []);
 
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
@@ -269,18 +279,34 @@ function QueriesTreeInner(
               onFocus={handleFocus}
               onBlur={handleBlur}
             >
-              {renderItems.map((it: any) => (
-                <Row
-                  key={it.getId()}
-                  item={it}
-                  indent={indent}
-                  onRename={actions.handleRename}
-                  onDropMove={actions.handleDropMove}
-                  isTopLevel={false}
-                  isTreeFocused={isTreeFocused}
-                  onTreeFocusFromRow={() => setIsTreeFocused(true)}
-                />
-              ))}
+              {renderItems.map((it: any) => {
+                 const itemData = it.getItemData?.() as TreeNode | undefined;
+                 const mountId  = itemData?.mountId as UUIDv7 | undefined;
+                 const tabId    = mountId ? mountIdToTabIdMap.get(mountId) : undefined;
+                 const isActiveFromTab = !!tabId && tabId === activeTabId;
+
+                 // AIDEV-NOTE: Extract selection state as primitive for memo comparison
+                 const itemProps = it.getProps?.();
+                 const ariaSelected = itemProps?.['aria-selected'];
+                 const isSelectedByTree = ariaSelected === true || ariaSelected === 'true';
+
+                  return (
+                    <Row
+                      key={it.getId()}
+                      item={it}
+                      indent={indent}
+                      onRename={actions.handleRename}
+                      onDropMove={actions.handleDropMove}
+                      isTopLevel={false}
+                      isTreeFocused={isTreeFocused}
+                      onTreeFocusFromRow={handleTreeFocusFromRow}
+                      isActiveFromTab={isActiveFromTab}
+                      tabId={tabId}
+                      isSelectedByTree={isSelectedByTree}
+                    />
+                  );
+                })
+              }
             </div>
           </div>
         );
@@ -288,6 +314,5 @@ function QueriesTreeInner(
     </section>
   );
 }
-
 
 export default QueriesTree;
