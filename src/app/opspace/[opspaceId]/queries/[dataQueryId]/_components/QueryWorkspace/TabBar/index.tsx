@@ -1,13 +1,14 @@
 'use client';
 
-import type { UUIDv7 }  from '@Types/primitives';
+import type { UUIDv7 }        from '@Types/primitives';
 
 import {
-  memo, useCallback, useMemo, useRef
-}                       from 'react';
-import Icon             from '@Components/Icons';
+  memo, useCallback,
+  useMemo, useRef
+}                             from 'react';
+import Icon                   from '@Components/Icons';
 
-import { useTabDragAndDrop } from './useTabDragAndDrop';
+import { useTabDragAndDrop }  from './useTabDragAndDrop';
 import styles                 from './styles.module.css';
 
 
@@ -22,6 +23,7 @@ type Props = {
   onAddTab        : () => void;
   onCloseTab      : (tabId: UUIDv7) => void | Promise<void>;
   onReorderTabs   : (tabIds: UUIDv7[]) => void;
+  onTabActivateForDrag?: (tab: Tab) => void;
 };
 type TabButtonProps = {
   tab         : Tab;
@@ -102,7 +104,8 @@ function TabBar({
   setTabRef,
   onAddTab,
   onCloseTab,
-  onReorderTabs
+  onReorderTabs,
+  onTabActivateForDrag
 }: Props) {
   const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
 
@@ -131,7 +134,11 @@ function TabBar({
     onActivateTab: (tabId) => {
       const tab = tabs.find((t) => t.tabId === tabId);
       if (tab) {
-        onTabClick(tab);
+        if (onTabActivateForDrag) {
+          onTabActivateForDrag(tab);
+        } else {
+          onTabClick(tab);
+        }
       }
     },
     onCommitOrder: onReorderTabs

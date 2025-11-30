@@ -236,9 +236,15 @@ function QueryWorkspace() {
 
   const handleReorderTabs = useCallback((nextTabIds: UUIDv7[]) => {
     // AIDEV-NOTE: TabBar DnD commits ordering here; Tabbar reducer remains single source of truth.
-    console.log('handleReorderTabs', { nextTabIds });
     dispatch(reorderTabs({ tabIds: nextTabIds }));
   }, [dispatch]);
+
+  const handleActivateTabForDrag = useCallback((tab: { dataQueryId: UUIDv7; tabId: UUIDv7; name: string }) => {
+    const { tabId } = tab;
+    if (tabId === (activeTabId || null)) return;
+    // AIDEV-NOTE: For pointer-driven DnD, activate the tab without triggering a route change.
+    dispatch(setActiveTabThunk(tabId));
+  }, [dispatch, activeTabId]);
 
   const handleAddTab = useCallback(() => {
     if (isPendingTabTransition) return;
@@ -283,6 +289,7 @@ function QueryWorkspace() {
         onAddTab={handleAddTab}
         onCloseTab={handleTabClose}
         onReorderTabs={handleReorderTabs}
+        onTabActivateForDrag={handleActivateTabForDrag}
       />
 
       {/* Active tabpanel wrapping toolbar and content */}

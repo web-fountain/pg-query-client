@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
-import type { UUIDv7 } from '@Types/primitives';
+import type { UUIDv7 }                    from '@Types/primitives';
+import { useCallback, useRef, useState }  from 'react';
 
 
 type DragState = {
@@ -57,6 +57,10 @@ export function useTabDragAndDrop({
     };
     setDraggingTabId(tabId);
     setRenderOrder(order);
+    // AIDEV-NOTE: Activate tab immediately on press to enable fluid press-and-drag from inactive tabs.
+    if (tabId !== (activeTabId || null)) {
+      onActivateTab(tabId);
+    }
   }, [tabs, activeTabId]);
 
   const updateDrag = useCallback((clientX: number) => {
@@ -74,11 +78,8 @@ export function useTabDragAndDrop({
     }
 
     if (!state.didMove) {
+      // AIDEV-NOTE: Threshold crossed — treat gesture as a drag from this point on.
       state.didMove = true;
-      if (draggingId !== (state.activeTabId || null)) {
-        // AIDEV-NOTE: Enforce rule that a tab must be active/focused before reordering.
-        onActivateTab(draggingId);
-      }
     }
 
     // AIDEV-NOTE: Use the last computed targetOrder as the working order during a drag.
