@@ -1,13 +1,11 @@
 import type { RootState }               from '@Redux/store';
-import type { DataQuery }               from '@Redux/records/dataQuery/types';
-import type { Base64Url22, UUIDv7 }     from '@Types/primitives';
+import type { UUIDv7 }                  from '@Types/primitives';
 
 import { createAsyncThunk }             from '@reduxjs/toolkit';
 import {
   createNewUnsavedDataQuery,
   createNewUnsavedDataQueryFromFetch,
-  markDataQuerySaved,
-  updateDataQueryText
+  markDataQuerySaved
 }                                       from '@Redux/records/dataQuery';
 import { addTabFromFetch }              from '@Redux/records/tabbar';
 import { addUnsavedTreeNodeFromFetch }  from '@Redux/records/unsavedQueryTree';
@@ -44,17 +42,17 @@ export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQuery
   }
 );
 
-export const saveDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7, queryText: string }, { state: RootState }>(
+export const saveDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7 }, { state: RootState }>(
   'dataQuery/saveDataQueryThunk',
-  async ({ dataQueryId, queryText }, { getState, dispatch }) => {
-    if (typeof queryText === 'string') {
-      dispatch(updateDataQueryText({ dataQueryId, queryText }));
-    }
-
+  async ({ dataQueryId }, { getState, dispatch }) => {
+    // AIDEV-NOTE: This thunk assumes all pending edits (name, queryText) have already been
+    // dispatched to Redux via updateDataQueryName/updateDataQueryText before being called.
     const { dataQueryRecords } = getState();
     const record = dataQueryRecords[dataQueryId];
     if (!record || !record.unsaved?.update) return;
 
+    // AIDEV-NOTE: At this point, latest name/queryText edits should already be captured
+    // in record.unsaved.update via write-time reducers (e.g., updateDataQueryName/Text).
     const payload = record.unsaved.update;
 
     // AIDEV-NOTE: Optimistic update - update queryTree immediately if name changed.

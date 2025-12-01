@@ -42,7 +42,11 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
     setNameValidationError
   ]                             = useState<string | null>(null);
   const queryNameRef            = useRef(queryName);
+  const recordRef               = useRef(record);
+
   queryNameRef.current          = queryName;
+  recordRef.current             = record;
+
   const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
@@ -57,13 +61,24 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   }, [dataQueryId, debouncedCommit]);
 
   const handleSaveClick = useCallback(async () => {
+    const currentRecord = recordRef.current;
+    if (!currentRecord) return;
+
     // Flush any pending name changes immediately
     debouncedCommit.flush(dataQueryId, queryNameRef.current);
 
+    // AIDEV-NOTE: Only dispatch text update if editor text differs from Redux state.
+    // This bridges the gap between SQLEditor's debounced writes and an immediate Save click.
+    const latestText = getCurrentEditorText?.();
+    const currentText = currentRecord.current?.queryText;
+
+    if (latestText !== currentText) {
+      dispatch(updateDataQueryText({ dataQueryId, queryText: latestText }));
+    }
+
     setIsSaving(true);
     try {
-      const latestText = getCurrentEditorText?.() || '';
-      await dispatch(saveDataQueryThunk({ dataQueryId, queryText: latestText }));
+      await dispatch(saveDataQueryThunk({ dataQueryId }));
     } finally {
       setIsSaving(false);
     }

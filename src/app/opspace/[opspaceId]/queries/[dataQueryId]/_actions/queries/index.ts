@@ -137,7 +137,7 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
 
   const { dataQueryId, name, queryText } = payload;
 
-  const { ok, context } = await backendFetchJSON<ResponsePayload05>({
+  const { ok } = await backendFetchJSON<ResponsePayload05>({
     path    : `/queries/${dataQueryId}`,
     method  : 'PATCH',
     scope   : ['queries:write'],
@@ -150,8 +150,8 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
     return { success: false };
   }
 
-  // AIDEV-NOTE: Invalidate cached QUERIES children on successful save (only if name changed)
   if (name !== undefined) {
+    // AIDEV-NOTE: Invalidate cached QUERIES children on successful save if name changed
     try {
       updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialQueryTree`);
     } catch {}
