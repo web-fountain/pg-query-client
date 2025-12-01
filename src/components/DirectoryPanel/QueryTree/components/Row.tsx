@@ -7,7 +7,7 @@ import type { TreeItemApi, OnRename, OnDropMove } from '../types';
 import { memo, useCallback, useMemo }             from 'react';
 import { useRouter, useParams }                   from 'next/navigation';
 
-import { useReduxDispatch }                       from '@Redux/storeHooks';
+import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
 import { setActiveTabThunk, openTabThunk }        from '@Redux/records/tabbar/thunks';
 import Icon                                       from '@Components/Icons';
 
@@ -36,13 +36,20 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
 
   // Extract stable data from item
   const itemData  = item?.getItemData?.() as TreeNode | undefined;
+  const nodeId    = item.getId() as UUIDv7;
   const mountId   = itemData?.mountId as UUIDv7;
-  const id        = item.getId();
   const isFolder  = item.isFolder();
   const level     = (item.getItemMeta().level ?? 0) as number;
   const itemProps = item.getProps();
-  const itemName  = item.getItemName();
   const expanded  = item.isExpanded();
+
+  // AIDEV-NOTE: Direct Redux subscription for label - source of truth.
+  // This ensures immediate UI update when Redux changes, independent of headless-tree cache.
+  // Using inline selector avoids createSelector overhead and directly reads the label.
+  const label = useReduxSelector(
+    (state) => state.queryTree.nodes[nodeId]?.label
+  );
+  const itemName = label ?? item.getItemName();
 
   const isActive  = isSelectedByTree;
 
@@ -104,8 +111,8 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
   // AIDEV-NOTE: Memoize context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    onRename(id);
-  }, [onRename, id]);
+    onRename(nodeId);
+  }, [onRename, nodeId]);
 
   return (
     <div

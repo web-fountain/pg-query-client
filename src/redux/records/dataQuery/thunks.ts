@@ -11,7 +11,7 @@ import {
 }                                       from '@Redux/records/dataQuery';
 import { addTabFromFetch }              from '@Redux/records/tabbar';
 import { addUnsavedTreeNodeFromFetch }  from '@Redux/records/unsavedQueryTree';
-import { renameNode, resortChildren }   from '@Redux/records/queryTree';
+import { renameNodeWithInvalidation }   from '@Redux/records/queryTree';
 import {
   createNewUnsavedDataQueryAction,
   updateDataQuery
@@ -57,6 +57,13 @@ export const saveDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7, 
 
     const payload = record.unsaved.update;
 
+    // AIDEV-NOTE: Optimistic update - update queryTree immediately if name changed.
+    // This gives instant UI feedback before the backend call completes.
+    // The reducer computes if resort is needed and sets pendingInvalidations.
+    if (payload.name) {
+      dispatch(renameNodeWithInvalidation({ dataQueryId, name: payload.name }));
+    }
+
     try {
       console.log('[saveDataQueryThunk] updateDataQuery', payload);
       const res = await updateDataQuery(payload);
@@ -64,10 +71,12 @@ export const saveDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7, 
         dispatch(markDataQuerySaved(payload));
       } else {
         console.error(`Save failed for dataQueryId: ${dataQueryId}`);
+        // AIDEV-TODO: Consider rollback of optimistic update on failure
         return;
       }
     } catch (error) {
       console.error(`Server Error saving dataQueryId: ${dataQueryId}`, error);
+      // AIDEV-TODO: Consider rollback of optimistic update on failure
       return;
     }
   }

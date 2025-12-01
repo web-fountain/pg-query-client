@@ -23,8 +23,10 @@ type QueryTreeNode = {
 
 type TreeNode = QueryTreeFolderNode | QueryTreeNode;
 
+// AIDEV-NOTE: Using string index signatures for compatibility with runtime access patterns.
+// UUIDv7 is a branded string type, but object keys are always strings at runtime.
 type Nodes = {
-  [nodeId: UUIDv7]: QueryTreeNode;
+  [nodeId: string]: TreeNode;
 };
 
 type ChildrenByParentId = {

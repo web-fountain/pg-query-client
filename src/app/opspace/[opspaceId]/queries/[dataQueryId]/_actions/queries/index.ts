@@ -150,19 +150,21 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
     return { success: false };
   }
 
-  // AIDEV-NOTE: Invalidate cached QUERIES children on successful save
-  try {
-    updateTag(`tree:children:${(context || ctx).opspacePublicId}:buildInitialQueryTree`);
-  } catch {}
+  // AIDEV-NOTE: Invalidate cached QUERIES children on successful save (only if name changed)
+  if (name !== undefined) {
+    try {
+      updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialQueryTree`);
+    } catch {}
 
-  // AIDEV-NOTE: Invalidate cached unsaved query tree on successful save
-  try {
-    updateTag(`tree:children:${(context || ctx).opspacePublicId}:buildInitialUnsavedQueryTree`);
-  } catch {}
+    // AIDEV-NOTE: Invalidate cached unsaved query tree on successful save (only if name changed)
+    try {
+      updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
+    } catch {}
+  }
 
    // AIDEV-NOTE: Invalidate cached listDataQueries results for this opspace.
   try {
-    updateTag(`queries:list:${(context || ctx).opspacePublicId}`);
+    updateTag(`queries:list:${ctx.opspacePublicId}`);
   } catch {}
 
   return { success: true };

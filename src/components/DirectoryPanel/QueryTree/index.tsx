@@ -18,7 +18,10 @@ import {
   useReduxSelector,
   useReduxDispatch
 }                                         from '@Redux/storeHooks';
-import { selectQueryTree }                from '@Redux/records/queryTree';
+import {
+  selectQueryTree,
+  clearInvalidations
+}                                         from '@Redux/records/queryTree';
 import { getQueryTreeNodeChildrenThunk }  from '@Redux/records/queryTree/thunks';
 import {
   selectActiveTabId,
@@ -35,14 +38,15 @@ import { createLoadingItemData as adapterCreateLoadingItemData } from './adapter
 import styles                             from './styles.module.css';
 
 
-// AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes
+// AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes.
+// Only remount on node count changes (add/delete). Renames and reordering are handled
+// by surgical invalidation in QueriesTreeInner via pendingInvalidations.
 function QueriesTree(props: { rootId: string; indent?: number; label?: string }) {
   const { isOpen, setIsOpen } = useTreeSectionState(props.rootId, true);
   const queryTree             = useReduxSelector(selectQueryTree);
 
   const nodeCount = Object.keys(queryTree.nodes || {}).length;
-  const edgeCount = Object.keys(queryTree.childrenByParentId || {}).length;
-  const resetKey = `${props.rootId}:${nodeCount}:${edgeCount}`;
+  const resetKey  = `${props.rootId}:${nodeCount}`;
 
   return <QueriesTreeInner key={resetKey} queryTree={queryTree} isOpen={isOpen} setIsOpen={setIsOpen} {...props} />;
 }
@@ -52,6 +56,11 @@ function QueriesTreeInner(
   { rootId: string; indent?: number; label?: string; queryTree: QueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
   const dispatch      = useReduxDispatch();
+
+  // AIDEV-NOTE: Ref ensures dataLoader always reads latest queryTree,
+  // avoiding stale closure issues with useTree config.
+  const queryTreeRef = useRef(queryTree);
+  queryTreeRef.current = queryTree;
 
   // AIDEV-NOTE: Lift tab lookups to parent — single subscription for all rows
   const activeTabId       = useReduxSelector(selectActiveTabId);
@@ -65,15 +74,17 @@ function QueriesTreeInner(
     features: [asyncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
     dataLoader: {
       getItem: async (nodeId) => {
-        const item = queryTree?.nodes?.[nodeId as UUIDv7];
+        // Read from ref instead of closure to get latest data
+        const item = queryTreeRef.current?.nodes?.[nodeId as UUIDv7];
         return item as TreeNode;
       },
       getChildrenWithData: async (nodeId) => {
-        const childrenNodeIds = queryTree?.childrenByParentId?.[nodeId as UUIDv7];
+        const currentTree = queryTreeRef.current;
+        const childrenNodeIds = currentTree?.childrenByParentId?.[nodeId as UUIDv7];
 
         // If children are already in the tree, return them
         if (childrenNodeIds !== undefined) {
-          const rows = (childrenNodeIds || []).map((cid: UUIDv7) => ({ id: cid, data: queryTree.nodes[cid] }));
+          const rows = (childrenNodeIds || []).map((cid: string) => ({ id: cid, data: currentTree.nodes[cid] }));
           return rows as { id: string; data: TreeNode }[];
         }
 
@@ -125,6 +136,41 @@ function QueriesTreeInner(
 
   // AIDEV-NOTE: Row actions scoped to this section root
   const actions = useItemActions(tree as any, rootId);
+
+  // AIDEV-NOTE: Process pending invalidations from Redux - O(k) where k = invalidations.
+  // This tells headless-tree to refresh its internal cache for affected items.
+  useEffect(() => {
+    const inv = queryTree.pendingInvalidations;
+    if (!inv) return;
+
+    const hasItems = inv.items?.length > 0;
+    const hasParents = inv.parents?.length > 0;
+
+    if (!hasItems && !hasParents) return;
+
+    // Capture what we're processing (for race-safe clear)
+    const itemsToProcess = [...(inv.items || [])];
+    const parentsToProcess = [...(inv.parents || [])];
+
+    // Process item invalidations (label changes)
+    for (const nodeId of itemsToProcess) {
+      try {
+        const item = tree.getItemInstance(nodeId);
+        (item as any)?.invalidateItemData?.();
+      } catch {}
+    }
+
+    // Process parent invalidations (sort order changes)
+    for (const parentId of parentsToProcess) {
+      try {
+        const item = tree.getItemInstance(parentId);
+        (item as any)?.invalidateChildrenIds?.();
+      } catch {}
+    }
+
+    // Clear only what we processed (race-safe)
+    dispatch(clearInvalidations({ items: itemsToProcess, parents: parentsToProcess }));
+  }, [queryTree.pendingInvalidations, tree, dispatch]);
 
   // AIDEV-NOTE: Ref for scroll host (used for scrollbar gutter detection).
   const scrollerRef = useRef<HTMLDivElement | null>(null);
