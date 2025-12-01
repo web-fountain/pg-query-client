@@ -22,7 +22,8 @@ import {
   selectTabIds,
   selectActiveTabId,
   selectFocusedTabIndex,
-  reorderTabs
+  reorderTabs,
+  setActiveTab
 }                                   from '@Redux/records/tabbar';
 import { closeTabThunk, setActiveTabThunk }        from '@Redux/records/tabbar/thunks';
 import {
@@ -169,12 +170,12 @@ function QueryWorkspace() {
     return editorRef.current?.getCurrentText() || '';
   }, []);
 
-  // AIDEV-NOTE: Do not push nameDraft to saved tabs until explicit Save is clicked
+  // AIDEV-NOTE: Do not push nameDraft to saved tabs until explicit Save is clicked.
+  // AIDEV-NOTE: Always navigate on click; TabBar suppresses clicks that originated from a drag gesture.
   const handleTabClick = useCallback((tab: { dataQueryId: UUIDv7; tabId: UUIDv7; name: string }) => {
+    console.log('handleTabClick', tab);
     const { dataQueryId, tabId } = tab;
-    if (tabId === (activeTabId || null)) return;
-
-    dispatch(setActiveTabThunk(tabId))
+    dispatch(setActiveTabThunk(tabId));
 
     // Defer navigation by one frame to allow Redux state to render before route remount
     requestAnimationFrame(() => {
@@ -235,8 +236,8 @@ function QueryWorkspace() {
   const handleActivateTabForDrag = useCallback((tab: { dataQueryId: UUIDv7; tabId: UUIDv7; name: string }) => {
     const { tabId } = tab;
     if (tabId === (activeTabId || null)) return;
-    // AIDEV-NOTE: For pointer-driven DnD, activate the tab without triggering a route change.
-    dispatch(setActiveTabThunk(tabId));
+    // AIDEV-NOTE: For pointer-driven DnD, update local Redux selection only; no server call or navigation.
+    dispatch(setActiveTab({ tabId }));
   }, [dispatch, activeTabId]);
 
   const handleAddTab = useCallback(() => {
