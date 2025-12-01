@@ -23,7 +23,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@ai-sdk/openai": "2.0.74",
+    "@ai-sdk/openai": "2.0.75",
     "@ai-sdk/react": "2.0.104",
     "@ai-sdk/rsc": "1.0.105",
     "@codemirror/commands": "6.10.0",
@@ -47,13 +47,13 @@
     "ajv-errors": "3.0.0",
     "ajv-formats": "3.0.1",
     "jose": "6.1.2",
-    "next": "16.0.5",
+    "next": "16.0.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-markdown": "10.1.0",
     "react-redux": "9.2.0",
     "rehype-pretty-code": "0.14.1",
-    "shiki": "3.17.0",
+    "shiki": "3.17.1",
     "uuid": "13.0.0"
   },
   "scripts": {
