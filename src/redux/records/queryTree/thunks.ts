@@ -9,13 +9,12 @@ type GetNodeChildren = {
 
 export const getQueryTreeNodeChildrenThunk = createAsyncThunk<TreeNode[], GetNodeChildren, { state: RootState }>(
   'queryTree/getQueryTreeNodeChildren',
-  async ({ nodeId }, { getState, dispatch }) => {
+  async ({ nodeId }, { getState }) => {
     console.log('[getQueryTreeNodeChildrenThunk] nodeId', nodeId);
 
-    const { queryTree, url } = getState();
+    const { queryTree } = getState();
     console.log('[getQueryTreeNodeChildrenThunk] queryTree', queryTree);
-    const opspaceId = url.opspaceId as string;
-    const node = queryTree?.nodes?.[nodeId];
+    const node = queryTree?.nodes?.[nodeId as any];
 
     const children: TreeNode[] = [];
     return children;

@@ -15,7 +15,6 @@ import {
   useReduxDispatch,
   useReduxSelector
 }                                   from '@Redux/storeHooks';
-import { rehydrateUrl }             from '@Redux/records/url';
 import {
   focusTabIndex     as focusTabIndexAction,
   selectTabEntities,
@@ -115,12 +114,6 @@ function QueryWorkspace() {
       }
     } catch {}
   }, []);
-
-  // AIDEV-NOTE: Keyboard shortcuts for run/save.
-  useEffect(() => {
-    // Rehydrate route into Redux on first mount
-    dispatch(rehydrateUrl({ opspaceId, dataQueryId: initialActiveId }));
-  }, [dispatch, opspaceId, initialActiveId]);
 
   // AIDEV-NOTE: Keep DOM focus synced with Redux roving tabindex to avoid double-click behavior
   useEffect(() => {

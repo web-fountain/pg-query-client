@@ -7,7 +7,6 @@ import queryFolderReducer     from './records/queryFolder';
 import queryTreeReducer       from './records/queryTree';
 import tabbarReducer          from './records/tabbar';
 import unsavedQueryTreeReducer from './records/unsavedQueryTree';
-import urlReducer             from './records/url';
 
 
 // AIDEV-NOTE: Combine reducers to guide TS inference and avoid object-vs-function reducer confusion
@@ -17,8 +16,7 @@ const rootReducer = combineReducers({
   queryFolderRecords  : queryFolderReducer,
   queryTree           : queryTreeReducer,
   tabs                : tabbarReducer,
-  unsavedQueryTree    : unsavedQueryTreeReducer,
-  url                 : urlReducer
+  unsavedQueryTree    : unsavedQueryTreeReducer
 });
 
 const makeStore = (preloadedState?: Partial<RootState>) => {
