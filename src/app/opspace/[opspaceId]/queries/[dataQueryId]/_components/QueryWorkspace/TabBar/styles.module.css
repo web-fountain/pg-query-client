@@ -132,15 +132,19 @@
 
 /* vertical separators between tabs and plus button */
 .tab-separator {
-  width     : var(--border-1);
-  height    : calc(var(--tab-strip-height) - (var(--space-2) * 2));
-  background: var(--tabs-separator-border);
-  margin    : 0 var(--space-3);
-  display   : inline-block;
-  flex      : 0 0 auto;
+  width           : var(--border-1);
+  height          : calc(var(--tab-strip-height) - (var(--space-2) * 2));
+  background      : var(--tabs-separator-border);
+  margin          : 0 var(--space-3);
+  display         : inline-block;
+  flex            : 0 0 auto;
+  transform-origin: center;
+  transition      :
+    transform var(--duration-150) var(--ease-standard),
+    background-color var(--duration-150) var(--ease-standard);
 }
 
 .tab-separator-drop-target {
   background: var(--tabs-separator-drop-target);
-  width     : var(--border-2);
+  transform : scaleX(2);
 }
