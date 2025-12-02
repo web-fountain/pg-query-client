@@ -178,8 +178,10 @@ function QueryWorkspace() {
   // AIDEV-NOTE: Do not push nameDraft to saved tabs until explicit Save is clicked.
   // AIDEV-NOTE: Always navigate on click; TabBar suppresses clicks that originated from a drag gesture.
   const handleTabClick = useCallback((tab: { dataQueryId: UUIDv7; tabId: UUIDv7; name: string }) => {
-    console.log('handleTabClick', tab);
     const { dataQueryId, tabId } = tab;
+
+    if (tabId === (activeTabId || null)) return;
+
     dispatch(setActiveTabThunk(tabId));
 
     // Defer navigation by one frame to allow Redux state to render before route remount
