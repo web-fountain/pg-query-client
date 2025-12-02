@@ -1,25 +1,25 @@
 .tabs-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--tab-gap);
+  display      : flex;
+  align-items  : center;
+  gap          : var(--tab-gap);
   /* padding-block: var(--space-3); */
   /* padding-inline: var(--tab-padding-inline) 0; */
-  height: var(--tab-strip-height);
+  height       : var(--tab-strip-height);
   border-bottom: var(--border-1) solid var(--tabs-strip-border-bottom);
-  background: var(--tabs-surface);
-  white-space: nowrap;
-  overflow: visible;
+  background   : var(--tabs-surface);
+  white-space  : nowrap;
+  overflow     : visible;
 }
 
 .tabs-bar > [role='tablist'] {
-  display: flex;
-  align-items: center;
-  gap: 0;
+  display        : flex;
+  align-items    : center;
+  gap            : 0;
   /* flex: 1 1 auto; */
-  min-width: 0; /* allow scroll area to shrink and overflow */
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
+  min-width      : 0; /* allow scroll area to shrink and overflow */
+  overflow-x     : auto;
+  overflow-y     : hidden;
+  white-space    : nowrap;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   /* hide scrollbar cross-browser while preserving scroll */
@@ -29,36 +29,36 @@
 .tabs-bar > [role='tablist']::-webkit-scrollbar { display: none; } /* WebKit */
 
 .tab {
-  position: relative;
-  appearance: none;
-  display: inline-flex;
+  position   : relative;
+  appearance : none;
+  display    : inline-flex;
   align-items: center;
-  gap: var(--tab-gap);
-  height: var(--tab-strip-height);
-  padding: 0 var(--tab-padding-inline);
-  color: var(--tabs-foreground);
-  font-size: var(--text-xs);
-  border: none;
-  cursor: pointer;
-  background: transparent;
-  flex: 0 0 auto; /* prevent shrinking; allow horizontal scroll */
+  gap        : var(--tab-gap);
+  height     : var(--tab-strip-height);
+  padding    : 0 var(--tab-padding-inline);
+  color      : var(--tabs-foreground);
+  font-size  : var(--text-xs);
+  border     : none;
+  cursor     : pointer;
+  background : transparent;
+  flex       : 0 0 auto; /* prevent shrinking; allow horizontal scroll */
 }
 
 .tab .icon {
-  width: var(--icon-size-md);
+  width : var(--icon-size-md);
   height: var(--icon-size-md);
-  color: var(--tabs-icon-foreground);
+  color : var(--tabs-icon-foreground);
 }
 
 .tab[aria-selected='true'] { color: var(--tabs-foreground-active); }
 .tab[aria-selected='true'] .icon { color: var(--tabs-foreground-active); }
 .tab[aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--tab-underline-height);
+  content   : '';
+  position  : absolute;
+  left      : 0;
+  right     : 0;
+  bottom    : 0;
+  height    : var(--tab-underline-height);
   background: var(--tabs-underline-color);
 }
 .tab:focus-visible {
@@ -66,26 +66,26 @@
 }
 
 .tab-add {
-  border-radius: 0;
+  border-radius  : 0;
 
-  display: inline-flex;
-  align-items: center;
+  display        : inline-flex;
+  align-items    : center;
   justify-content: center;
-  width: var(--tab-strip-height);
-  height: var(--tab-strip-height);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--tabs-icon-foreground);
-  cursor: pointer;
-  flex: 0 0 auto; /* never shrink; always visible */
+  width          : var(--tab-strip-height);
+  height         : var(--tab-strip-height);
+  padding        : 0;
+  border         : none;
+  background     : transparent;
+  color          : var(--tabs-icon-foreground);
+  cursor         : pointer;
+  flex           : 0 0 auto; /* never shrink; always visible */
 }
 .tab-add:hover { background: var(--surface-hover); }
 .tab-add:focus-visible {
-  outline: none;
+  outline      : none;
   border-radius: var(--radius-4);
-  background: color-mix(in oklch, var(--tabs-surface) 92%, var(--tabs-underline-color) 8%);
-  box-shadow:
+  background   : color-mix(in oklch, var(--tabs-surface) 92%, var(--tabs-underline-color) 8%);
+  box-shadow   :
     inset 0 0 0 var(--border-1) color-mix(in oklch, var(--tabs-underline-color) 100%, transparent),
     0 0 0 var(--space-0_5) color-mix(in oklch, var(--tabs-underline-color) 0%, transparent);
 }
@@ -95,17 +95,17 @@
   border-radius: 0;
   background: transparent; */
 
-  display: inline-flex;
-  align-items: center;
+  display        : inline-flex;
+  align-items    : center;
   justify-content: center;
 
-  width: 16px;
-  height: 16px;
-  margin-left: var(--space-1);
+  width          : 16px;
+  height         : 16px;
+  margin-left    : var(--space-1);
 
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s ease-in-out;
+  opacity        : 0;
+  pointer-events : none;
+  transition     : opacity .12s ease-in-out;
 }
 
 .tab:hover .tab-close, .tab:focus-within .tab-close { opacity: 1; pointer-events: auto; }
@@ -114,10 +114,6 @@
 
 .tab-dragging {
   cursor: grabbing;
-  z-index: 1;
-  box-shadow: 0 0 0 1px var(--tabs-underline-color),
-    0 3px 8px rgba(0, 0, 0, 0.24);
-  background: color-mix(in oklch, var(--tabs-surface) 90%, var(--tabs-underline-color) 10%);
 }
 
 .tabs-bar[data-dragging='true'] .tab {
@@ -127,19 +123,24 @@
 @media (forced-colors: active) {
   .tab:focus-visible,
   .tab-add:focus-visible {
-    outline: 2px solid CanvasText;
+    outline       : 2px solid CanvasText;
     outline-offset: 2px;
-    background: transparent;
-    box-shadow: none;
+    background    : transparent;
+    box-shadow    : none;
   }
 }
 
 /* vertical separators between tabs and plus button */
 .tab-separator {
-  width: var(--border-1);
-  height: calc(var(--tab-strip-height) - (var(--space-2) * 2));
+  width     : var(--border-1);
+  height    : calc(var(--tab-strip-height) - (var(--space-2) * 2));
   background: var(--tabs-separator-border);
-  margin: 0 var(--space-3);
-  display: inline-block;
-  flex: 0 0 auto;
+  margin    : 0 var(--space-3);
+  display   : inline-block;
+  flex      : 0 0 auto;
+}
+
+.tab-separator-drop-target {
+  background: var(--tabs-separator-drop-target);
+  width     : var(--border-2);
 }

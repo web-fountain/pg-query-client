@@ -2,63 +2,64 @@
   /* Semantic roles map component usage to theme primitives in themes.css */
   :root {
     /* brand/status roles */
-    --color-primary:        #5189cb;
-    --color-primary-hover:  #326aac;
-    --color-primary-muted:  #335075;
+    --color-primary      : #5189cb;
+    --color-primary-hover: #326aac;
+    --color-primary-muted: #335075;
+
     /* optional alias */
     --accent: var(--color-primary);
 
     /* foreground roles */
     --text-secondary: #888995;
-    --text-disabled:  #585967;
-    --text-muted:     color-mix(in oklch, var(--foreground) 65%, transparent);
-    --text-subtle:    color-mix(in oklch, var(--foreground) 45%, transparent);
-    --text-tertiary:  color-mix(in oklch, var(--foreground) 30%, transparent);
+    --text-disabled : #585967;
+    --text-muted    : color-mix(in oklch, var(--foreground) 65%, transparent);
+    --text-subtle   : color-mix(in oklch, var(--foreground) 45%, transparent);
+    --text-tertiary : color-mix(in oklch, var(--foreground) 30%, transparent);
 
     /* borders */
-    --border-primary:   #2a2b36;
+    --border-primary  : #2a2b36;
     --border-secondary: #32333e;
-    --border-tertiary:  color-mix(in oklch, var(--foreground) 15%, transparent);
+    --border-tertiary : color-mix(in oklch, var(--foreground) 15%, transparent);
     --border-tree-item: var(--border-tertiary);
 
     /* surfaces: helpers */
-    --surface-canvas:     var(--surface-0);
-    --surface-sidebar:    var(--surface-1);
-    --surface-modal:      var(--surface-1);
-    --surface-hover:      var(--surface-2);
-    --surface-input:      var(--surface-3);
+    --surface-canvas    : var(--surface-0);
+    --surface-sidebar   : var(--surface-1);
+    --surface-modal     : var(--surface-1);
+    --surface-hover     : var(--surface-2);
+    --surface-input     : var(--surface-3);
     /* AIDEV-NOTE: Selected/active surface used for selected list/options, etc. */
-    --surface-selected:   #23242f;
-    --surface-control:    var(--surface-1);
-    --surface-disabled:   color-mix(in oklch, var(--surface-1) 92%, black);
+    --surface-selected  : #23242f;
+    --surface-control   : var(--surface-1);
+    --surface-disabled  : color-mix(in oklch, var(--surface-1) 92%, black);
     --surface-sql-editor: var(--surface-4);
 
     /* component roles: buttons */
-    --button-primary:        var(--color-primary);
-    --button-hover:          var(--color-primary-hover);
-    --button-disabled:       var(--color-primary-muted);
+    --button-primary       : var(--color-primary);
+    --button-hover         : var(--color-primary-hover);
+    --button-disabled      : var(--color-primary-muted);
     --button-border-primary: transparent;
-    --button-text:           var(--text-primary);
-    --button-text-disabled:  #aeb2b8;
+    --button-text          : var(--text-primary);
+    --button-text-disabled : #aeb2b8;
 
     /* component roles: toolbar buttons */
     /* AIDEV-NOTE: Dedicated tokens for toolbar button surfaces */
-    --toolbar-button-bg:            var(--surface-2);
-    --toolbar-button-hover-bg:      #393a47;
-    --toolbar-button-disabled-bg:   #22232e;
+    --toolbar-button-bg         : var(--surface-2);
+    --toolbar-button-hover-bg   : #393a47;
+    --toolbar-button-disabled-bg: #22232e;
 
     /* component roles: icons */
-    --icon-fill:      #888995;
-    --icon-hover:     color-mix(in oklch, var(--foreground) 95%, transparent);
-    --icon-active:    var(--foreground);
-    --icon-disabled:  #555555;
-    --icon-blue:      #5189cb;
+    --icon-fill    : #888995;
+    --icon-hover   : color-mix(in oklch, var(--foreground) 95%, transparent);
+    --icon-active  : var(--foreground);
+    --icon-disabled: #555555;
+    --icon-blue    : #5189cb;
 
     /* component roles: resizers */
     --resizer-hover: #0078d4;
 
     /* icon sizing tokens (semantic mapping to scale) */
-    --icon-size:    1em;             /* default: scale with text */
+    --icon-size   : 1em;             /* default: scale with text */
     --icon-size-sm: var(--space-3);  /* 12px */
     --icon-size-md: var(--space-4);  /* 16px */
     --icon-size-lg: var(--space-5);  /* 20px */
@@ -67,20 +68,21 @@
     --focus-ring: var(--border-2) solid var(--color-primary);
 
     /* tabs strip tokens (theme-ready) */
-    --tabs-surface:             var(--surface-canvas);
-    --tabs-foreground:          var(--text-secondary);
-    --tabs-foreground-active:   var(--text-primary);
-    --tabs-icon-foreground:     var(--icon-fill);
-    --tabs-separator-border:    var(--border-secondary);
-    --tabs-strip-border-bottom: var(--border-primary);
-    --tabs-underline-color:     var(--color-primary);
+    --tabs-surface              : var(--surface-canvas);
+    --tabs-foreground           : var(--text-secondary);
+    --tabs-foreground-active    : var(--text-primary);
+    --tabs-icon-foreground      : var(--icon-fill);
+    --tabs-separator-border     : var(--border-secondary);
+    --tabs-strip-border-bottom  : var(--border-primary);
+    --tabs-underline-color      : var(--color-primary);
+    --tabs-separator-drop-target: var(--white);
 
     /* tabs sizing tokens */
-    --tab-strip-height:     38px;
-    --tab-padding-inline:   var(--space-4);
-    --tab-gap:              var(--space-2);
+    --tab-strip-height    : 38px;
+    --tab-padding-inline  : var(--space-4);
+    --tab-gap             : var(--space-2);
     --tab-underline-height: var(--border-2);
-    --tab-width:            116px;
+    --tab-width           : 116px;
 
     /* syntax highlighting tokens consumed by editors (CodeMirror, etc.) */
     --syntax-brace: #e5c07b;

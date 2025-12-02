@@ -1,15 +1,15 @@
 'use client';
 
-import type { UUIDv7 }        from '@Types/primitives';
+import type { UUIDv7 }          from '@Types/primitives';
 
 import {
-  memo, useCallback,
+  Fragment, memo, useCallback,
   useMemo, useRef
-}                             from 'react';
-import Icon                   from '@Components/Icons';
+}                               from 'react';
+import Icon                     from '@Components/Icons';
 
-import { useTabDragAndDrop }  from './useTabDragAndDrop';
-import styles                 from './styles.module.css';
+import { useTabDragAndDrop }    from './useTabDragAndDrop';
+import styles                   from './styles.module.css';
 
 
 type Tab = { dataQueryId: UUIDv7; tabId: UUIDv7; name: string };
@@ -125,7 +125,7 @@ function TabBar({
 
   const {
     draggingTabId,
-    renderOrder,
+    dropSeparatorIndex,
     beginDrag,
     updateDrag,
     endDrag
@@ -146,70 +146,87 @@ function TabBar({
     onCommitOrderAction: onReorderTabs
   });
 
-  const orderedTabs = renderOrder
-    ? renderOrder.map((id) => tabById.get(id) as Tab).filter(Boolean)
-    : tabs;
-
   return (
     <div
       className={styles['tabs-bar']}
       data-dragging={draggingTabId ? 'true' : 'false'}
     >
-      <span aria-hidden="true" className={styles['tab-separator']} />
+      <span
+        aria-hidden="true"
+        className={`${styles['tab-separator']} ${
+          draggingTabId && dropSeparatorIndex === 0 ? styles['tab-separator-drop-target'] : ''
+        }`}
+      />
       <div
         role="tablist"
         aria-label="Query tabs"
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
       >
-        {orderedTabs.map((tab, visualIndex) => {
+        {tabs.map((tab) => {
           const canonicalIndex = canonicalIndexById.get(tab.tabId) || 0;
           const selected = tab.tabId === activeTabId;
           const isFocusable = canonicalIndex === focusedTabIndex;
           const isDragging = draggingTabId === tab.tabId;
+          const isLastTab = canonicalIndex === tabs.length - 1;
+          const separatorIndex = canonicalIndex + 1;
+          const isSeparatorDropTarget = draggingTabId
+            && dropSeparatorIndex === separatorIndex;
 
           return (
-            <TabButton
-              key={tab.tabId}
-              tab={tab}
-              selected={selected}
-              isFocusable={isFocusable}
-              onTabClick={onTabClick}
-              onCloseTab={onCloseTab}
-              setRef={(el) => {
-                refsMap.current.set(tab.tabId, el);
-                setTabRef(canonicalIndex, el);
-              }}
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-tab-close="true"]')) return;
-                try {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                } catch {}
-                beginDrag(tab.tabId, e.clientX);
-              }}
-              onPointerMove={(e) => {
-                if (!(e.buttons & 1)) return;
-                updateDrag(e.clientX);
-              }}
-              onPointerUp={(e) => {
-                try {
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                } catch {}
-                endDrag();
-              }}
-              onPointerCancel={() => {
-                endDrag();
-              }}
-              isDragging={isDragging}
-            />
+            <Fragment key={tab.tabId}>
+              <TabButton
+                tab={tab}
+                selected={selected}
+                isFocusable={isFocusable}
+                onTabClick={onTabClick}
+                onCloseTab={onCloseTab}
+                setRef={(el) => {
+                  refsMap.current.set(tab.tabId, el);
+                  setTabRef(canonicalIndex, el);
+                }}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  const target = e.target as HTMLElement;
+                  if (target.closest('[data-tab-close="true"]')) return;
+                  try {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  } catch {}
+                  beginDrag(tab.tabId, e.clientX);
+                }}
+                onPointerMove={(e) => {
+                  if (!(e.buttons & 1)) return;
+                  updateDrag(e.clientX);
+                }}
+                onPointerUp={(e) => {
+                  try {
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                  } catch {}
+                  endDrag();
+                }}
+                onPointerCancel={() => {
+                  endDrag();
+                }}
+                isDragging={isDragging}
+              />
+              {!isLastTab && (
+                <span
+                  aria-hidden="true"
+                  className={`${styles['tab-separator']} ${
+                    isSeparatorDropTarget ? styles['tab-separator-drop-target'] : ''
+                  }`}
+                />
+              )}
+            </Fragment>
           );
-        }).flatMap((el, i) => (i < orderedTabs.length - 1 ? [el, (
-          <span key={`sep-${i}`} aria-hidden="true" className={styles['tab-separator']} />
-        )] : [el]))}
+        })}
       </div>
-      <span aria-hidden="true" className={styles['tab-separator']} />
+      <span
+        aria-hidden="true"
+        className={`${styles['tab-separator']} ${
+          draggingTabId && dropSeparatorIndex === tabs.length ? styles['tab-separator-drop-target'] : ''
+        }`}
+      />
       <button
         className={styles['tab-add']}
         aria-label="New tab"

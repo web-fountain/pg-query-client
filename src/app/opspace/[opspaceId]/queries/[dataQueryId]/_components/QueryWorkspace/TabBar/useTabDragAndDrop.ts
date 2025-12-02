@@ -10,8 +10,9 @@ type DragState = {
   startX: number;
   currentX: number;
   startOrder: UUIDv7[];
-  targetOrder: UUIDv7[];
   didMove: boolean;
+  // AIDEV-NOTE: Boundary index in [0..tabs.length] representing the gap where the tab would be inserted.
+  boundaryIndex: number | null;
   pendingX?: number;
   rafId?: number | null;
 };
@@ -26,7 +27,8 @@ type UseTabDragAndDropArgs = {
 
 type UseTabDragAndDropResult = {
   draggingTabId: UUIDv7 | null;
-  renderOrder: UUIDv7[] | null;
+  // AIDEV-NOTE: Separator index in [0..tabs.length]; used only for visual drop indication.
+  dropSeparatorIndex: number | null;
   beginDrag: (tabId: UUIDv7, clientX: number) => void;
   updateDrag: (clientX: number) => void;
   endDrag: () => void;
@@ -42,7 +44,7 @@ export function useTabDragAndDrop({
   onCommitOrderAction
 }: UseTabDragAndDropArgs): UseTabDragAndDropResult {
   const [draggingTabId, setDraggingTabId] = useState<UUIDv7 | null>(null);
-  const [renderOrder, setRenderOrder] = useState<UUIDv7[] | null>(null);
+  const [dropSeparatorIndex, setDropSeparatorIndex] = useState<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const thresholdPx = 4;
 
@@ -54,13 +56,13 @@ export function useTabDragAndDrop({
       startX: clientX,
       currentX: clientX,
       startOrder: order,
-      targetOrder: order,
       didMove: false,
+      boundaryIndex: null,
       pendingX: undefined,
       rafId: null
     };
     setDraggingTabId(tabId);
-    setRenderOrder(order);
+    setDropSeparatorIndex(null);
     // AIDEV-NOTE: Activate tab immediately on press to enable fluid press-and-drag from inactive tabs.
     if (tabId !== (activeTabId || null)) {
       onActivateTabAction(tabId);
@@ -102,46 +104,52 @@ export function useTabDragAndDrop({
         s.didMove = true;
       }
 
-      // AIDEV-NOTE: Use the last computed targetOrder as the working order during a drag.
-      const baseOrder = s.targetOrder && s.targetOrder.length === s.startOrder.length
-        ? s.targetOrder
-        : s.startOrder;
+      // AIDEV-NOTE: Compute the visual insertion boundary (0..tabs.length) based on tab midpoints.
+      const baseOrder = s.startOrder;
+      if (!baseOrder.length) {
+        s.boundaryIndex = null;
+        setDropSeparatorIndex(null);
+        return;
+      }
 
-      // AIDEV-NOTE: Remove the dragging tab from the anchor list so only stable tabs define insertion thresholds.
-      const staticIds = baseOrder.filter((id) => id !== draggingId);
-      const metas = staticIds.map((id) => {
+      const metas = baseOrder.map((id) => {
         const el = getButtonElAction(id);
         const rect = el ? el.getBoundingClientRect() : new DOMRect();
         return { tabId: id, rect };
       });
 
-      // AIDEV-NOTE: Sort non-dragging tabs by actual DOM x-position; their order remains stable as we drag.
+      // AIDEV-NOTE: Sort tabs by actual DOM x-position; this reflects the current visual order.
       const sorted = metas.slice().sort((a, b) => a.rect.left - b.rect.left);
-      const staticOrder = sorted.map((m) => m.tabId);
-      const dragCenter = x;
-
-      let insertIndex = 0;
-      sorted.forEach((m, idx) => {
-        const mid = m.rect.left + m.rect.width / 2;
-        if (dragCenter > mid) {
-          insertIndex = idx + 1;
-        }
-      });
-
-      const next = staticOrder.slice();
-      next.splice(insertIndex, 0, draggingId);
-
-      const unchanged =
-        next.length === baseOrder.length
-        && next.every((id, idx) => id === baseOrder[idx]);
-
-      if (unchanged) {
-        s.targetOrder = baseOrder;
+      if (!sorted.length) {
+        s.boundaryIndex = null;
+        setDropSeparatorIndex(null);
         return;
       }
 
-      s.targetOrder = next;
-      setRenderOrder(next);
+      const mids = sorted.map((m) => m.rect.left + m.rect.width / 2);
+      const dragCenter = x;
+      let boundaryIndex = 0;
+
+      if (dragCenter < mids[0]) {
+        boundaryIndex = 0;
+      } else if (dragCenter >= mids[mids.length - 1]) {
+        boundaryIndex = mids.length;
+      } else {
+        boundaryIndex = mids.length;
+        for (let i = 1; i < mids.length; i += 1) {
+          if (dragCenter < mids[i]) {
+            boundaryIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (boundaryIndex === s.boundaryIndex) {
+        return;
+      }
+
+      s.boundaryIndex = boundaryIndex;
+      setDropSeparatorIndex(boundaryIndex);
     });
   }, [getButtonElAction]);
 
@@ -152,11 +160,9 @@ export function useTabDragAndDrop({
     }
 
     const startOrder = state.startOrder;
-    const targetOrder = state.targetOrder;
     const didMove = state.didMove;
     const currentDraggingId = state.draggingTabId;
-     const startedActiveId = state.activeTabId;
-     const selectionChanged = !!currentDraggingId && startedActiveId !== currentDraggingId;
+    const boundaryIndex = state.boundaryIndex;
 
     if (state.rafId != null) {
       try { window.cancelAnimationFrame(state.rafId); } catch {}
@@ -164,23 +170,41 @@ export function useTabDragAndDrop({
 
     dragRef.current = null;
     setDraggingTabId(null);
-    setRenderOrder(null);
+    setDropSeparatorIndex(null);
 
-    if (!didMove || !currentDraggingId) {
+    if (!didMove || !currentDraggingId || boundaryIndex == null) {
       return;
     }
 
-    const changed = startOrder.length !== targetOrder.length
-      || startOrder.some((id, idx) => id !== targetOrder[idx]);
+    const fromIndex = startOrder.indexOf(currentDraggingId);
+    if (fromIndex === -1) {
+      return;
+    }
+
+    // AIDEV-NOTE: Convert visual boundary index into final target index for the dragged tab.
+    const maxIndex = startOrder.length - 1;
+    const clampedBoundary = Math.max(0, Math.min(boundaryIndex, startOrder.length));
+    let targetIndex = clampedBoundary;
+    if (clampedBoundary > fromIndex) {
+      targetIndex = clampedBoundary - 1;
+    }
+    targetIndex = Math.max(0, Math.min(targetIndex, maxIndex));
+
+    const next = startOrder.slice();
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(targetIndex, 0, moved);
+
+    const changed = next.length !== startOrder.length
+      || next.some((id, idx) => id !== startOrder[idx]);
 
     if (changed) {
-      onCommitOrderAction(targetOrder);
+      onCommitOrderAction(next);
     }
   }, [onCommitOrderAction]);
 
   return {
     draggingTabId,
-    renderOrder,
+    dropSeparatorIndex,
     beginDrag,
     updateDrag,
     endDrag
