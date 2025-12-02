@@ -64,6 +64,8 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
     const currentRecord = recordRef.current;
     if (!currentRecord) return;
 
+    setIsSaving(true);
+
     // Flush any pending name changes immediately
     debouncedCommit.flush(dataQueryId, queryNameRef.current);
 
@@ -76,7 +78,6 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
       dispatch(updateDataQueryText({ dataQueryId, queryText: latestText }));
     }
 
-    setIsSaving(true);
     try {
       await dispatch(saveDataQueryThunk({ dataQueryId }));
     } finally {
