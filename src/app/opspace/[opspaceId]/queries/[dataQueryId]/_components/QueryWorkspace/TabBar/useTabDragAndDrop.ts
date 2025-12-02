@@ -21,7 +21,6 @@ type UseTabDragAndDropArgs = {
   tabs: { tabId: UUIDv7 }[];
   activeTabId: string;
   getButtonElAction: (tabId: UUIDv7) => HTMLButtonElement | null;
-  onActivateTabAction: (tabId: UUIDv7) => void;
   onCommitOrderAction: (tabIds: UUIDv7[]) => void;
 };
 
@@ -39,7 +38,6 @@ export function useTabDragAndDrop({
   tabs,
   activeTabId,
   getButtonElAction,
-  onActivateTabAction,
   onCommitOrderAction
 }: UseTabDragAndDropArgs): UseTabDragAndDropResult {
   const [draggingTabId, setDraggingTabId] = useState<UUIDv7 | null>(null);
@@ -62,11 +60,9 @@ export function useTabDragAndDrop({
     };
     setDraggingTabId(tabId);
     setDropSeparatorIndex(null);
-    // AIDEV-NOTE: Activate tab immediately on press to enable fluid press-and-drag from inactive tabs.
-    if (tabId !== (activeTabId || null)) {
-      onActivateTabAction(tabId);
-    }
-  }, [tabs, activeTabId, onActivateTabAction]);
+    // AIDEV-NOTE: beginDrag only sets up drag state; activation on press is now handled
+    // by the TabBar/QueryWorkspace pointer-down path.
+  }, [tabs, activeTabId]);
 
   const updateDrag = useCallback((clientX: number) => {
     const state = dragRef.current;

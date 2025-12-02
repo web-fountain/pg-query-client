@@ -16,24 +16,14 @@ import {
   useReduxSelector
 }                                   from '@Redux/storeHooks';
 import {
-  focusTabIndex     as focusTabIndexAction,
-  selectTabEntities,
   selectDataQueryIdForTabId,
   selectTabIds,
-  selectActiveTabId,
-  selectFocusedTabIndex,
-  reorderTabs,
-  setActiveTab
+  selectActiveTabId
 }                                   from '@Redux/records/tabbar';
-import { closeTabThunk, setActiveTabThunk }        from '@Redux/records/tabbar/thunks';
 import {
   setDataQueryRecord,
   selectDataQueryRecord,
-  selectDataQueries
 }                                   from '@Redux/records/dataQuery';
-import { createNewUnsavedDataQueryThunk } from '@Redux/records/dataQuery/thunks';
-import { selectNextUntitledName }        from '@Redux/records/unsavedQueryTree';
-import { generateUUIDv7 }                 from '@Utils/generateId';
 
 import { useOpSpaceRoute }          from '../../_providers/OpSpaceRouteProvider';
 
@@ -70,40 +60,20 @@ function QueryWorkspace() {
   const containerRef            = useRef<HTMLDivElement  | null>(null);
   const topPanelRef             = useRef<HTMLDivElement  | null>(null);
   const bottomPanelRef          = useRef<HTMLDivElement  | null>(null);
-  const tabButtonRefs           = useRef<Array<HTMLButtonElement | null>>([]);
   const isLoadingContent        = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
   const lastUserInputAtRef      = useRef<number>(0);  // gate restore-on-empty to avoid racing user edits
   const allowRestoreUntilRef    = useRef<number>(0);  // gate restore-on-empty to avoid racing user edits
 
-  const tabEntities             = useReduxSelector(selectTabEntities);
   const tabIds                  = useReduxSelector(selectTabIds);
   const activeTabId             = useReduxSelector(selectActiveTabId);
-  const focusedTabIndex         = useReduxSelector(selectFocusedTabIndex);
   const activeDataQueryIdFromTabs = useReduxSelector(selectDataQueryIdForTabId, (activeTabId || null) as UUIDv7 | null);
   const activeDataQueryId       = (activeDataQueryIdFromTabs || initialActiveId || '') as string;
   const activeDataQueryRecord   = useReduxSelector(selectDataQueryRecord, activeDataQueryId);
-  const dataQueryRecords        = useReduxSelector(selectDataQueries);
-  const nextUntitledName        = useReduxSelector(selectNextUntitledName);
   const dispatch                = useReduxDispatch();
 
   const [topRatio, setTopRatio] = useState<number>(0.5);    // split ratio is local; we persist only on commit.
   const topStyle                = useMemo(() => ({ height: `${Math.round(topRatio * 100)}%` }), [topRatio]);
   const bottomStyle             = useMemo(() => ({ height: `${Math.round((1 - topRatio) * 100)}%` }), [topRatio]);
-  const [
-    isPendingTabTransition,
-    startTabTransition
-  ]                             = useTransition();
-
-  const tabsForBar = useMemo(() => {
-    return (tabIds as Array<UUIDv7>).map((t) => {
-      const tab = tabEntities[t];
-      const dataQueryId = tab?.mountId;
-      const rec = dataQueryId ? dataQueryRecords?.[dataQueryId] : undefined;
-      const name = (rec?.current?.name as string) || (rec?.persisted?.name as string) || 'Untitled';
-      return { dataQueryId: (dataQueryId || t) as UUIDv7, tabId: t, name };
-    });
-  }, [tabIds, tabEntities, dataQueryRecords]);
-
   // Hydrate ratio from localStorage after mount
   useEffect(() => {
     try {
@@ -115,20 +85,6 @@ function QueryWorkspace() {
       }
     } catch {}
   }, []);
-
-  // AIDEV-NOTE: Keep DOM focus synced with Redux roving tabindex to avoid double-click behavior
-  useEffect(() => {
-    const count = (tabIds as Array<UUIDv7>).length;
-    if (count === 0) return;
-    const clamped = (((focusedTabIndex || 0) % count) + count) % count;
-    const btn = tabButtonRefs.current[clamped] || null;
-    if (!btn) return;
-    try {
-      (btn as any).focus?.({ preventScroll: true });
-    } catch {
-      try { btn.focus(); } catch {}
-    }
-  }, [focusedTabIndex, tabIds]);
 
   // AIDEV-NOTE: Keyboard shortcuts for run. Use React 19.2 useEffectEvent to avoid effect re-runs
   const onHotkey = useEffectEvent((e: KeyboardEvent) => {
@@ -175,54 +131,6 @@ function QueryWorkspace() {
     return editorRef.current?.getCurrentText() || '';
   }, []);
 
-  // AIDEV-NOTE: Do not push nameDraft to saved tabs until explicit Save is clicked.
-  // AIDEV-NOTE: Always navigate on click; TabBar suppresses clicks that originated from a drag gesture.
-  const handleTabClick = useCallback((tab: { dataQueryId: UUIDv7; tabId: UUIDv7; name: string }) => {
-    const { dataQueryId, tabId } = tab;
-
-    if (tabId === (activeTabId || null)) return;
-
-    dispatch(setActiveTabThunk(tabId));
-
-    // Defer navigation by one frame to allow Redux state to render before route remount
-    requestAnimationFrame(() => {
-      router.replace(`/opspace/${opspaceId}/queries/${dataQueryId}`);
-    });
-  }, [opspaceId, router, dispatch, activeTabId]);
-
-  const handleTablistKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (tabIds.length === 0) return;
-    const key = e.key;
-    if (key === 'ArrowRight') {
-      e.preventDefault();
-      dispatch(focusTabIndexAction({ index: (focusedTabIndex || 0) + 1 }));
-    } else if (key === 'ArrowLeft') {
-      e.preventDefault();
-      dispatch(focusTabIndexAction({ index: (focusedTabIndex || 0) - 1 }));
-    } else if (key === 'Home') {
-      e.preventDefault();
-      dispatch(focusTabIndexAction({ index: 0 }));
-    } else if (key === 'End') {
-      e.preventDefault();
-      dispatch(focusTabIndexAction({ index: tabIds.length - 1 }));
-    } else if (key === 'Enter' || key === ' ') {
-      e.preventDefault();
-     const safeFocused = focusedTabIndex ?? 0;
-     const nextTabId = tabIds[(safeFocused + tabIds.length) % tabIds.length] as UUIDv7 | undefined;
-     if (!nextTabId || nextTabId === (activeTabId || null)) return;
-
-     const nextTab = tabEntities[nextTabId];
-     const nextDataQueryId = (nextTab?.mountId || initialActiveId) as UUIDv7 | undefined;
-     if (!nextDataQueryId) return;
-
-     // Keep Redux and server in sync with the new active tab
-     dispatch(setActiveTabThunk(nextTabId));
-
-     // Navigate by dataQueryId (query identity), not tabId
-     router.replace(`/opspace/${opspaceId}/queries/${nextDataQueryId}`);
-    }
-  }, [tabIds.length, focusedTabIndex, dispatch, opspaceId, router]);
-
   const activeIndex = Math.max(0, tabIds.findIndex((t) => t === (activeTabId || '')));
   const activeTab   = tabIds[activeIndex] || tabIds[0];
 
@@ -235,63 +143,10 @@ function QueryWorkspace() {
     editorRef.current?.runCurrentQuery();
   }, []);
 
-  const handleReorderTabs = useCallback((nextTabIds: UUIDv7[]) => {
-    // AIDEV-NOTE: TabBar DnD commits ordering here; Tabbar reducer remains single source of truth.
-    dispatch(reorderTabs({ tabIds: nextTabIds }));
-  }, [dispatch]);
-
-  const handleActivateTabForDrag = useCallback((tab: { dataQueryId: UUIDv7; tabId: UUIDv7; name: string }) => {
-    const { tabId } = tab;
-    if (tabId === (activeTabId || null)) return;
-    // AIDEV-NOTE: For pointer-driven DnD, update local Redux selection only; no server call or navigation.
-    dispatch(setActiveTab({ tabId }));
-  }, [dispatch, activeTabId]);
-
-  const handleAddTab = useCallback(() => {
-    if (isPendingTabTransition) return;
-
-    const dataQueryId = generateUUIDv7();
-
-    dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
-
-    startTabTransition(() => {
-      router.replace(`/opspace/${opspaceId}/queries/${dataQueryId}`);
-    });
-  }, [dispatch, router, opspaceId, isPendingTabTransition, nextUntitledName]);
-
-  const handleTabClose = useCallback(async (tabId: UUIDv7) => {
-    if (isPendingTabTransition) return;
-
-    try {
-      const navigateToDataQueryId = await dispatch(closeTabThunk(tabId)).unwrap();
-
-      startTabTransition(() => {
-        if (navigateToDataQueryId) {
-          router.replace(`/opspace/${opspaceId}/queries/${navigateToDataQueryId}`);
-        } else {
-          router.replace(`/opspace/${opspaceId}`);
-        }
-      });
-    } catch (error) {
-      console.error('handleTabClose: failed to close tab', { tabId, error });
-    }
-  }, [dispatch, router, opspaceId, isPendingTabTransition]);
-
   return (
     <div className={styles['query-workspace']} ref={containerRef}>
       {/* Tabs bar */}
-      <TabBar
-        tabs={tabsForBar}
-        activeTabId={(activeTabId || '') as string}
-        focusedTabIndex={focusedTabIndex ?? 0}
-        onKeyDown={handleTablistKeyDown}
-        onTabClick={handleTabClick}
-        setTabRef={(idx, el) => { tabButtonRefs.current[idx] = el; }}
-        onAddTab={handleAddTab}
-        onCloseTab={handleTabClose}
-        onReorderTabs={handleReorderTabs}
-        onTabActivateForDrag={handleActivateTabForDrag}
-      />
+      <TabBar />
 
       {/* Active tabpanel wrapping toolbar and content */}
       <div

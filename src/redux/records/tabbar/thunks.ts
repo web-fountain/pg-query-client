@@ -5,6 +5,7 @@ import { createAsyncThunk }             from '@reduxjs/toolkit';
 import {
   addTabFromFetch,
   closeTab,
+  reorderTabs,
   setActiveTab
 }                                       from '@Redux/records/tabbar';
 import { removeUnsavedTreeNodeByTabId } from '@Redux/records/unsavedQueryTree';
@@ -12,14 +13,19 @@ import { selectDataQueryIdForTabId }    from '@Redux/records/tabbar/index';
 import {
   closeTabAction,
   openTabAction,
+  reorderTabAction,
   setActiveTabAction
 }                                       from '@/app/opspace/[opspaceId]/queries/[dataQueryId]/_actions/tabs/index';
 
 
 export const setActiveTabThunk = createAsyncThunk<void, UUIDv7, { state: RootState }>(
   'tabs/setActiveTabThunk',
-  async (tabId, { dispatch }) => {
-    dispatch(setActiveTab({ tabId }));
+  async (tabId, { dispatch, getState }) => {
+    const { tabs } = getState();
+
+    if (tabs.activeTabId !== tabId) {
+      dispatch(setActiveTab({ tabId }));
+    }
 
     try {
       const res = await setActiveTabAction(tabId);
@@ -78,6 +84,29 @@ export const openTabThunk = createAsyncThunk<UUIDv7 | null, UUIDv7, { state: Roo
     } catch (error) {
       console.error(`Error opening tab: ${mountId}`, error);
       return null;
+    }
+  }
+);
+
+export const reorderTabsThunk = createAsyncThunk<void, UUIDv7[], { state: RootState }>(
+  'tabs/reorderTabsThunk',
+  async (tabIds, { dispatch, getState }) => {
+    dispatch(reorderTabs({ tabIds }));
+
+    const { tabs } = getState();
+    const tabId = tabs.activeTabId as UUIDv7;
+    const newPosition = tabs.focusedTabIndex as number;
+
+    try {
+      const res = await reorderTabAction(tabId, newPosition);
+
+      if (!res.success) {
+        console.error(`Failed to reorder tab: ${tabId}`);
+        return;
+      }
+    } catch (error) {
+      console.error(`Error reordering tabs: ${tabIds}`, error);
+      return;
     }
   }
 );

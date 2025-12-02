@@ -69,7 +69,7 @@ export async function setActiveTabAction(tabId: UUIDv7): Promise<{ success: bool
     path: `/tabs/${tabId}/focus`,
     method: 'POST',
     contentType: null,
-    scope: ['tab-focus:write'],
+    scope: ['tabs-focus:write'],
     logLabel: 'setActiveTab',
     context: ctx
   });
@@ -98,7 +98,7 @@ export async function closeTabAction(tabId: UUIDv7): Promise<{ success: boolean;
     path: `/tabs/${tabId}/close`,
     method: 'POST',
     contentType: null,
-    scope: ['tab-close:write'],
+    scope: ['tabs-close:write'],
     logLabel: 'closeTab',
     context: ctx
   });
@@ -150,6 +150,33 @@ export async function openTabAction(mountId: UUIDv7): Promise<{ success: boolean
   try {
     updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
   } catch {}
+
+  return { success: true, data: data.data };
+}
+
+type ReorderTabsResponse =
+  | { ok: false }
+  | { ok: true; data: { from: number; to: number; } };
+export async function reorderTabAction(tabId: UUIDv7, newPosition: number, tabGroup?: number): Promise<{ success: boolean; data?: { from: number; to: number; } }> {
+  console.log('[ACTION] reorderTab', tabId, newPosition, tabGroup);
+
+  const ctx = await getHeadersContextOrNull();
+  if (!ctx) {
+    return { success: false };
+  }
+
+  const { ok, data } = await backendFetchJSON<ReorderTabsResponse>({
+    path: `/tabs/${tabId}/reorder`,
+    method: 'POST',
+    scope: ['tabs-reorder:write'],
+    logLabel: 'reorderTab',
+    context: ctx,
+    body: { tabId, newPosition }
+  });
+
+  if (!ok || !data?.ok) {
+    return { success: false };
+  }
 
   return { success: true, data: data.data };
 }
