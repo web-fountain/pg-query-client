@@ -1,9 +1,9 @@
 import { createHmac } from 'crypto';
 
 
-const TENANT_PUBLIC_ID   = 'J6nkguuTAbjJH7mPolZf-A';
-const OPSPACE_PUBLIC_ID  = '1pu9CZozvO5RyzkxqIhiPQ';
-const OPERATOR_PUBLIC_ID = 'tLv8knWpV2AxqQQF8lhR4w';
+const TENANT_PUBLIC_ID   = 'obTZtReA1S4JJkW6PjwEJg';
+const OPSPACE_PUBLIC_ID  = 'serJX0WuEpdJVxfSWSYJRg';
+const OPERATOR_PUBLIC_ID = '-oI-nfsSger02FpiUY4oWQ';
 
 // AIDEV-NOTE: Base64url helpers kept local to this route for isolation.
 function base64url(input: Buffer | string): string {

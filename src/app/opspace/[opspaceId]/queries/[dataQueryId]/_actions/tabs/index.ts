@@ -178,5 +178,11 @@ export async function reorderTabAction(tabId: UUIDv7, newPosition: number, tabGr
     return { success: false };
   }
 
+  // AIDEV-NOTE: Reordering changes the logical "open tabs" resource (positions),
+  // so invalidate the cached list just like open/close/focus do.
+  try {
+    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  } catch {}
+
   return { success: true, data: data.data };
 }

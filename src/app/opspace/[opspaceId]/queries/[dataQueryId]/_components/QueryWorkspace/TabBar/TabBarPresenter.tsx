@@ -161,9 +161,9 @@ function TabBarPresenter({
   // AIDEV-NOTE: Keep DOM focus synced with Redux roving tabindex to avoid
   // double-click behavior when moving selection via keyboard.
   useEffect(() => {
-    if (tabs.length === 0) return;
-
     const count = tabs.length;
+    if (count === 0) return;
+
     const clamped = (((focusedTabIndex || 0) % count) + count) % count;
     const focusedTab = tabs[clamped];
     if (!focusedTab) return;
@@ -176,7 +176,10 @@ function TabBarPresenter({
     } catch {
       try { btn.focus(); } catch {}
     }
-  }, [focusedTabIndex, tabs]);
+    // AIDEV-NOTE: Intentionally depend only on focusedTabIndex and tabs.length to
+    // avoid stealing focus (e.g., from the Toolbar input) on every rename that
+    // changes tab labels but not tab structure.
+  }, [focusedTabIndex, tabs.length]);
 
   const handleSetRef = useCallback((index: number, el: HTMLButtonElement | null) => {
     const tab = tabs[index];
