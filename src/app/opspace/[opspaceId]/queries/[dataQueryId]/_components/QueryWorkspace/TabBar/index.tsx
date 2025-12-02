@@ -4,10 +4,11 @@ import type { UUIDv7 }          from '@Types/primitives';
 
 import {
   Fragment, memo, useCallback,
-  useMemo, useRef
+  useLayoutEffect, useMemo, useRef
 }                               from 'react';
 import Icon                     from '@Components/Icons';
 
+import { useOpSpaceRoute }      from '../../../_providers/OpSpaceRouteProvider';
 import { useTabDragAndDrop }    from './useTabDragAndDrop';
 import styles                   from './styles.module.css';
 
@@ -38,6 +39,11 @@ type TabButtonProps = {
   onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => void;
   isDragging  : boolean;
 };
+
+// AIDEV-NOTE: Persist horizontal scroll position per opspace so that TabBar can
+// restore the user's scroll offset across QueryWorkspace remounts (route changes
+// between different dataQueryIds in the same opspace).
+const lastScrollLeftByOpSpace = new Map<string, number>();
 
 const TabButton = memo(function TabButton({
   tab,
@@ -107,7 +113,9 @@ function TabBar({
   onReorderTabs,
   onTabActivateForDrag
 }: Props) {
+  const { opspaceId } = useOpSpaceRoute();
   const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
+  const tablistRef = useRef<HTMLDivElement | null>(null);
 
   const { canonicalIndexById, tabById } = useMemo(() => {
     const indexMap = new Map<UUIDv7, number>();
@@ -146,6 +154,87 @@ function TabBar({
     onCommitOrderAction: onReorderTabs
   });
 
+  // AIDEV-NOTE: Restore prior horizontal scroll position for this opspace's tab strip
+  // so that route-driven remounts (navigating between queries) do not snap the bar
+  // back to the left before scroll-into-view logic runs.
+  useLayoutEffect(() => {
+    const container = tablistRef.current;
+    if (!container) return;
+
+    const key = String(opspaceId || '');
+    const last = lastScrollLeftByOpSpace.get(key);
+    if (typeof last === 'number' && last > 0) {
+      container.scrollLeft = last;
+    }
+  }, [opspaceId]);
+
+  // AIDEV-NOTE: Keep the focused/active tab fully visible within the horizontal strip.
+  // AIDEV-NOTE: useLayoutEffect ensures scroll adjustments happen before paint on mount,
+  //             avoiding a flash at scrollLeft=0 followed by a jump to the active tab.
+  useLayoutEffect(() => {
+    if (!tabs || tabs.length === 0) return;
+
+    // Prefer focused tab index when available; fall back to activeTabId.
+    let targetButton: HTMLButtonElement | null = null;
+
+    if (typeof focusedTabIndex === 'number') {
+      const count = tabs.length;
+      const clamped = (((focusedTabIndex || 0) % count) + count) % count;
+      const focusedTab = tabs[clamped];
+      if (focusedTab) {
+        targetButton = refsMap.current.get(focusedTab.tabId) || null;
+      }
+    }
+
+    if (!targetButton && activeTabId) {
+      targetButton = refsMap.current.get(activeTabId as UUIDv7) || null;
+    }
+
+    const container = tablistRef.current;
+    if (!targetButton || !container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const buttonRect = targetButton.getBoundingClientRect();
+
+    const intersectionWidth = Math.min(buttonRect.right, containerRect.right)
+      - Math.max(buttonRect.left, containerRect.left);
+    const tabWidth = buttonRect.width;
+
+    // AIDEV-NOTE: Derive visibility semantics from the intersection between the tab
+    // and the viewport:
+    // - intersection <= 0        => fully off-screen
+    // - intersection ~ tabWidth  => fully visible (within epsilon)
+    // - 0 < intersection < width => partially visible
+    const epsilon = 1;
+    const isOffscreen = intersectionWidth <= 0;
+    const isFullyVisible = !isOffscreen && intersectionWidth >= (tabWidth - epsilon);
+
+    // AIDEV-NOTE: Only scroll when the tab is completely off-screen or only
+    // partially visible. Tabs that are already fully visible are left as-is
+    // to avoid unnecessary horizontal jumps when activating them.
+    if (isFullyVisible) {
+      return;
+    }
+
+    try {
+      targetButton.scrollIntoView({
+        behavior: 'auto',
+        block: 'nearest',
+        inline: 'nearest'
+      });
+    } catch {
+      // AIDEV-NOTE: Fallback for older browsers without scrollIntoView options.
+      targetButton.scrollIntoView();
+    }
+
+    // AIDEV-NOTE: Persist the new scroll offset so subsequent remounts within this
+    // opspace start from the same visible region.
+    try {
+      const key = String(opspaceId || '');
+      lastScrollLeftByOpSpace.set(key, container.scrollLeft);
+    } catch {}
+  }, [tabs.length, activeTabId, focusedTabIndex]);
+
   return (
     <div
       className={styles['tabs-bar']}
@@ -158,10 +247,17 @@ function TabBar({
         }`}
       />
       <div
+        ref={tablistRef}
         role="tablist"
         aria-label="Query tabs"
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
+        onScroll={(e) => {
+          try {
+            const key = String(opspaceId || '');
+            lastScrollLeftByOpSpace.set(key, e.currentTarget.scrollLeft);
+          } catch {}
+        }}
       >
         {tabs.map((tab) => {
           const canonicalIndex = canonicalIndexById.get(tab.tabId) || 0;

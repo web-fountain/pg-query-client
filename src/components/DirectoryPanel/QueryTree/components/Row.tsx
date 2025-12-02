@@ -80,7 +80,19 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
     onTreeFocusFromRow?.();
 
     if (isFolder) return;
-    if (isActiveFromTab) return;
+
+    if (isActiveFromTab) {
+      // AIDEV-NOTE: When the corresponding tab is already active but may be off-screen
+      // in the TabBar, bring it back into view without re-triggering navigation or
+      // server-side tab activation.
+      if (tabId) {
+        try {
+          const btn = document.getElementById(`tab-${tabId}`) as HTMLButtonElement | null;
+          btn?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+        } catch {}
+      }
+      return;
+    }
 
     // If tab exists, just activate it
     if (tabId) {

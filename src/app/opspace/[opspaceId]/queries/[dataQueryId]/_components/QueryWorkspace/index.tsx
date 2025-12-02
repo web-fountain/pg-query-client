@@ -122,7 +122,12 @@ function QueryWorkspace() {
     if (count === 0) return;
     const clamped = (((focusedTabIndex || 0) % count) + count) % count;
     const btn = tabButtonRefs.current[clamped] || null;
-    try { btn?.focus(); } catch {}
+    if (!btn) return;
+    try {
+      (btn as any).focus?.({ preventScroll: true });
+    } catch {
+      try { btn.focus(); } catch {}
+    }
   }, [focusedTabIndex, tabIds]);
 
   // AIDEV-NOTE: Keyboard shortcuts for run. Use React 19.2 useEffectEvent to avoid effect re-runs

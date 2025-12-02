@@ -84,10 +84,18 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
     } catch {}
     if (isFolder) return;
 
-    // AIDEV-NOTE: When this row already reflects the focused tab, avoid redundant tab activation + navigation.
-    if (isActiveFromTab) return;
-
     const { mountId, nodeId } = item?.getItemData?.() as TreeNode;
+
+    // AIDEV-NOTE: When this row already reflects the focused tab, avoid redundant tab
+    // activation + navigation, but still ensure the associated TabBar tab is visible
+    // if the user has scrolled it off-screen.
+    if (isActiveFromTab) {
+      try {
+        const btn = document.getElementById(`tab-${nodeId}`) as HTMLButtonElement | null;
+        btn?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+      } catch {}
+      return;
+    }
 
     dispatch(setActiveTabThunk(nodeId as UUIDv7));
 
