@@ -34,7 +34,6 @@ type UseTabDragAndDropResult = {
   endDrag: () => void;
 };
 
-
 // AIDEV-NOTE: Pointer-based horizontal DnD for the tab strip; keeps Redux as source of truth.
 export function useTabDragAndDrop({
   tabs,
@@ -67,7 +66,7 @@ export function useTabDragAndDrop({
     if (tabId !== (activeTabId || null)) {
       onActivateTabAction(tabId);
     }
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, onActivateTabAction]);
 
   const updateDrag = useCallback((clientX: number) => {
     const state = dragRef.current;

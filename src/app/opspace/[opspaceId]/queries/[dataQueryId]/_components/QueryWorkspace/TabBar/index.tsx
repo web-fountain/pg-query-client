@@ -28,15 +28,15 @@ type Props = {
 };
 type TabButtonProps = {
   tab         : Tab;
+  index       : number;
   selected    : boolean;
   isFocusable : boolean;
-  setRef      : (el: HTMLButtonElement | null) => void;
+  setRef      : (index: number, el: HTMLButtonElement | null) => void;
   onTabClick  : (tab: Tab) => void;
   onCloseTab  : (tabId: UUIDv7) => void | Promise<void>;
-  onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => void;
-  onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => void;
-  onPointerUp  : (e: React.PointerEvent<HTMLButtonElement>) => void;
-  onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  beginDrag   : (tabId: UUIDv7, clientX: number) => void;
+  updateDrag  : (clientX: number) => void;
+  endDrag     : () => void;
   isDragging  : boolean;
 };
 
@@ -47,17 +47,43 @@ const lastScrollLeftByOpSpace = new Map<string, number>();
 
 const TabButton = memo(function TabButton({
   tab,
+  index,
   selected,
   isFocusable,
   onTabClick,
   onCloseTab,
   setRef,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
+  beginDrag,
+  updateDrag,
+  endDrag,
   isDragging
 }: TabButtonProps) {
+  const handleSetRef = useCallback((el: HTMLButtonElement | null) => {
+    setRef(index, el);
+  }, [setRef, index]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-tab-close="true"]')) return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    beginDrag(tab.tabId, e.clientX);
+  }, [beginDrag, tab.tabId]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!(e.buttons & 1)) return;
+    updateDrag(e.clientX);
+  }, [updateDrag]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    endDrag();
+  }, [endDrag]);
+
+  const handlePointerCancel = useCallback(() => {
+    endDrag();
+  }, [endDrag]);
+
   return (
     <button
       id={`tab-${tab.tabId}`}
@@ -66,12 +92,12 @@ const TabButton = memo(function TabButton({
       aria-controls={`panel-${tab.tabId}`}
       tabIndex={isFocusable ? 0 : -1}
       className={`${styles['tab']} ${isDragging ? styles['tab-dragging'] : ''}`}
-      ref={setRef}
+      ref={handleSetRef}
       onClick={() => onTabClick(tab)}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       title={tab.name}
     >
       <Icon name="file" className={styles['icon']} />
@@ -117,19 +143,35 @@ function TabBar({
   const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
   const tablistRef = useRef<HTMLDivElement | null>(null);
 
-  const { canonicalIndexById, tabById } = useMemo(() => {
-    const indexMap = new Map<UUIDv7, number>();
+  const { tabById } = useMemo(() => {
     const idMap = new Map<UUIDv7, Tab>();
-    tabs.forEach((tab, idx) => {
-      indexMap.set(tab.tabId, idx);
+    tabs.forEach((tab) => {
       idMap.set(tab.tabId, tab);
     });
-    return { canonicalIndexById: indexMap, tabById: idMap };
+    return { tabById: idMap };
   }, [tabs]);
 
   const getButtonEl = useCallback((tabId: UUIDv7) => {
     return refsMap.current.get(tabId) || null;
   }, []);
+
+  const handleSetRef = useCallback((index: number, el: HTMLButtonElement | null) => {
+    const tab = tabs[index];
+    if (!tab) return;
+    refsMap.current.set(tab.tabId, el);
+    setTabRef(index, el);
+  }, [tabs, setTabRef]);
+
+  const onActivateTabAction = useCallback((tabId: UUIDv7) => {
+    const tab = tabById.get(tabId);
+    if (tab) {
+      if (onTabActivateForDrag) {
+        onTabActivateForDrag(tab);
+      } else {
+        onTabClick(tab);
+      }
+    }
+  }, [tabById, onTabActivateForDrag, onTabClick]);
 
   const {
     draggingTabId,
@@ -140,39 +182,35 @@ function TabBar({
   } = useTabDragAndDrop({
     tabs,
     activeTabId,
+    onActivateTabAction,
     getButtonElAction: getButtonEl,
-    onActivateTabAction: (tabId) => {
-      const tab = tabs.find((t) => t.tabId === tabId);
-      if (tab) {
-        if (onTabActivateForDrag) {
-          onTabActivateForDrag(tab);
-        } else {
-          onTabClick(tab);
-        }
-      }
-    },
     onCommitOrderAction: onReorderTabs
   });
 
-  // AIDEV-NOTE: Restore prior horizontal scroll position for this opspace's tab strip
-  // so that route-driven remounts (navigating between queries) do not snap the bar
-  // back to the left before scroll-into-view logic runs.
+  // AIDEV-NOTE: Ref to avoid stale closures for scroll persistence key.
+  const opspaceKeyRef = useRef(String(opspaceId || ''));
+  opspaceKeyRef.current = String(opspaceId || '');
+
+  // AIDEV-NOTE: Combined scroll restoration + scroll-into-view.
+  // useLayoutEffect ensures adjustments happen before paint, avoiding a flash
+  // at scrollLeft=0 followed by a jump to the active tab.
   useLayoutEffect(() => {
     const container = tablistRef.current;
     if (!container) return;
 
-    const key = String(opspaceId || '');
-    const last = lastScrollLeftByOpSpace.get(key);
-    if (typeof last === 'number' && last > 0) {
-      container.scrollLeft = last;
-    }
-  }, [opspaceId]);
+    const key = opspaceKeyRef.current;
 
-  // AIDEV-NOTE: Keep the focused/active tab fully visible within the horizontal strip.
-  // AIDEV-NOTE: useLayoutEffect ensures scroll adjustments happen before paint on mount,
-  //             avoiding a flash at scrollLeft=0 followed by a jump to the active tab.
-  useLayoutEffect(() => {
-    if (!tabs || tabs.length === 0) return;
+    // 1) Restore prior scroll position for this opspace, if any.
+    const lastScrollLeft = lastScrollLeftByOpSpace.get(key);
+    if (typeof lastScrollLeft === 'number' && lastScrollLeft > 0) {
+      container.scrollLeft = lastScrollLeft;
+    }
+
+    // 2) If content does not overflow horizontally, skip further work.
+    if (container.scrollWidth <= container.clientWidth + 1) return;
+
+    // 3) Determine which tab button we want to ensure is visible.
+    if (tabs.length === 0) return;
 
     // Prefer focused tab index when available; fall back to activeTabId.
     let targetButton: HTMLButtonElement | null = null;
@@ -190,14 +228,12 @@ function TabBar({
       targetButton = refsMap.current.get(activeTabId as UUIDv7) || null;
     }
 
-    const container = tablistRef.current;
-    if (!targetButton || !container) return;
+    if (!targetButton) return;
 
     const containerRect = container.getBoundingClientRect();
     const buttonRect = targetButton.getBoundingClientRect();
 
-    const intersectionWidth = Math.min(buttonRect.right, containerRect.right)
-      - Math.max(buttonRect.left, containerRect.left);
+    const intersectionWidth = Math.min(buttonRect.right, containerRect.right) - Math.max(buttonRect.left, containerRect.left);
     const tabWidth = buttonRect.width;
 
     // AIDEV-NOTE: Derive visibility semantics from the intersection between the tab
@@ -212,9 +248,7 @@ function TabBar({
     // AIDEV-NOTE: Only scroll when the tab is completely off-screen or only
     // partially visible. Tabs that are already fully visible are left as-is
     // to avoid unnecessary horizontal jumps when activating them.
-    if (isFullyVisible) {
-      return;
-    }
+    if (isFullyVisible) return;
 
     try {
       targetButton.scrollIntoView({
@@ -227,13 +261,18 @@ function TabBar({
       targetButton.scrollIntoView();
     }
 
-    // AIDEV-NOTE: Persist the new scroll offset so subsequent remounts within this
+    // 4) Persist the new scroll offset so subsequent remounts within this
     // opspace start from the same visible region.
     try {
-      const key = String(opspaceId || '');
       lastScrollLeftByOpSpace.set(key, container.scrollLeft);
     } catch {}
-  }, [tabs.length, activeTabId, focusedTabIndex]);
+  }, [opspaceId, tabs.length, activeTabId, focusedTabIndex]);
+
+  const handleTablistScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    try {
+      lastScrollLeftByOpSpace.set(opspaceKeyRef.current, e.currentTarget.scrollLeft);
+    } catch {}
+  }, []);
 
   return (
     <div
@@ -252,20 +291,14 @@ function TabBar({
         aria-label="Query tabs"
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
-        onScroll={(e) => {
-          try {
-            const key = String(opspaceId || '');
-            lastScrollLeftByOpSpace.set(key, e.currentTarget.scrollLeft);
-          } catch {}
-        }}
+        onScroll={handleTablistScroll}
       >
-        {tabs.map((tab) => {
-          const canonicalIndex = canonicalIndexById.get(tab.tabId) || 0;
+        {tabs.map((tab, index) => {
           const selected = tab.tabId === activeTabId;
-          const isFocusable = canonicalIndex === focusedTabIndex;
+          const isFocusable = index === focusedTabIndex;
           const isDragging = draggingTabId === tab.tabId;
-          const isLastTab = canonicalIndex === tabs.length - 1;
-          const separatorIndex = canonicalIndex + 1;
+          const isLastTab = index === tabs.length - 1;
+          const separatorIndex = index + 1;
           const isSeparatorDropTarget = draggingTabId
             && dropSeparatorIndex === separatorIndex;
 
@@ -273,36 +306,15 @@ function TabBar({
             <Fragment key={tab.tabId}>
               <TabButton
                 tab={tab}
+                index={index}
                 selected={selected}
                 isFocusable={isFocusable}
                 onTabClick={onTabClick}
                 onCloseTab={onCloseTab}
-                setRef={(el) => {
-                  refsMap.current.set(tab.tabId, el);
-                  setTabRef(canonicalIndex, el);
-                }}
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return;
-                  const target = e.target as HTMLElement;
-                  if (target.closest('[data-tab-close="true"]')) return;
-                  try {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  } catch {}
-                  beginDrag(tab.tabId, e.clientX);
-                }}
-                onPointerMove={(e) => {
-                  if (!(e.buttons & 1)) return;
-                  updateDrag(e.clientX);
-                }}
-                onPointerUp={(e) => {
-                  try {
-                    e.currentTarget.releasePointerCapture(e.pointerId);
-                  } catch {}
-                  endDrag();
-                }}
-                onPointerCancel={() => {
-                  endDrag();
-                }}
+                setRef={handleSetRef}
+                beginDrag={beginDrag}
+                updateDrag={updateDrag}
+                endDrag={endDrag}
                 isDragging={isDragging}
               />
               {!isLastTab && (
