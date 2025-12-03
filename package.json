@@ -23,7 +23,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@ai-sdk/openai": "2.0.76",
+    "@ai-sdk/openai": "2.0.77",
     "@ai-sdk/react": "2.0.106",
     "@ai-sdk/rsc": "1.0.107",
     "@codemirror/commands": "6.10.0",
