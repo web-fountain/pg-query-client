@@ -28,8 +28,9 @@ async function listDataQueriesCached(ctx: HeadersContext): Promise<DataQuery[] |
     revalidate: 60, // 1 minute
     expire    : 300 // 5 minutes
   });
-
   cacheTag(`queries:list:${ctx.opspacePublicId}`);
+
+  console.log('[ACTION] listDataQueries');
 
   const { ok, data } = await backendFetchJSON<ResponsePayload04>({
     path    : '/queries',
@@ -47,8 +48,6 @@ async function listDataQueriesCached(ctx: HeadersContext): Promise<DataQuery[] |
 }
 
 export async function listDataQueries() : Promise<{ success: boolean; data?: DataQuery[] }> {
-  console.log('[ACTION] listDataQueries');
-
   const ctx = await getHeadersContextOrNull();
   if (!ctx) {
     return { success: false };

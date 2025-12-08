@@ -17,7 +17,7 @@ import {
 import { saveDataQueryThunk }   from '@Redux/records/dataQuery/thunks';
 import { useDebouncedCallback } from '@Hooks/useDebounce';
 import Icon                     from '@Components/Icons';
-import { useSqlRunner }         from '../../../../../_providers/SQLRunnerProvider';
+import { useSqlRunner }         from '../../../../_providers/SQLRunnerProvider';
 
 import styles                   from './styles.module.css';
 

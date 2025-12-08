@@ -13,6 +13,7 @@ type Tabbar = {
   activeTabId     : UUIDv7 | null;
   focusedTabIndex : number | null;
   entities        : Record<UUIDv7, Tab>;
+  lastActiveUnsavedTabId : UUIDv7 | null;
 };
 
 

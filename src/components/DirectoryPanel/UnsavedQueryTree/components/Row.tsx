@@ -102,7 +102,7 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
     // AIDEV-NOTE: Defer one frame so selected styling paints before route remount.
     try {
       requestAnimationFrame(() => {
-        router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
+        router.replace(`/opspace/${opspaceId}/queries/new`);
       });
     } catch {}
   };
@@ -118,13 +118,15 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
     const tabId = data.nodeId as UUIDv7;
 
     try {
-      const navigateToTabId = await dispatch(closeTabThunk(tabId)).unwrap();
+      const result = await dispatch(closeTabThunk(tabId)).unwrap();
 
       requestAnimationFrame(() => {
-        if (navigateToTabId) {
-          router.replace(`/opspace/${opspaceId}/queries/${navigateToTabId}`);
-        } else if (opspaceId) {
+        if (!result.hasRemainingTabs) {
           router.replace(`/opspace/${opspaceId}`);
+        } else if (result.nextTabIsUnsaved) {
+          router.replace(`/opspace/${opspaceId}/queries/new`);
+        } else if (result.nextDataQueryId) {
+          router.replace(`/opspace/${opspaceId}/queries/${result.nextDataQueryId}`);
         }
       });
     } catch (error) {

@@ -18,7 +18,7 @@ import { useReduxDispatch }                       from '@Redux/storeHooks';
 import { updateDataQueryText }                    from '@Redux/records/dataQuery';
 import { useDebouncedCallback }                   from '@Hooks/useDebounce';
 
-import { useSqlRunner }                           from '../../../../_providers/SQLRunnerProvider';
+import { useSqlRunner }                           from '../../../_providers/SQLRunnerProvider';
 import { useSQLValidator }                        from '../../_providers/SQLValidatorProvider';
 import { useOpSpaceRoute }                        from '../../_providers/OpSpaceRouteProvider';
 import styles                                     from './styles.module.css';

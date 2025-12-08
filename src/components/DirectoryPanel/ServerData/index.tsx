@@ -8,7 +8,7 @@ import QueryTree          from '../QueryTree';
 import HydrateQueryTree   from './HydrateQueryTree';
 import HydrateUnsavedTree from './HydrateUnsavedTree';
 
-import { buildInitialQueryTree, buildInitialUnsavedQueryTree } from '../../../app/opspace/[opspaceId]/queries/[dataQueryId]/_actions/queryTree';
+import { buildInitialQueryTree, buildInitialUnsavedQueryTree } from '../../../app/opspace/[opspaceId]/queries/_actions/queryTree';
 
 
 async function SavedQueriesLoader() {

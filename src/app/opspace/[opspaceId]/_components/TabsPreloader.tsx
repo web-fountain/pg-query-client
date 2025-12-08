@@ -1,6 +1,6 @@
 'use server';
 
-import { listOpenTabs }       from '../queries/[dataQueryId]/_actions/tabs';
+import { listOpenTabs }       from '../queries/_actions/tabs';
 import TabsStoreInitializer   from './TabsStoreInitializer';
 
 

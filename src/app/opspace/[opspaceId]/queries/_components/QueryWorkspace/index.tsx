@@ -6,9 +6,8 @@ import type { SQLEditorHandle }     from '../SQLEditor';
 import {
   useCallback, useEffect, useEffectEvent,
   useMemo, useRef, useState,
-  useTransition, Suspense
+  Suspense
 }                                   from 'react';
-import { useRouter }                from 'next/navigation';
 import dynamic                      from 'next/dynamic';
 
 import {
@@ -21,9 +20,11 @@ import {
   selectActiveTabId
 }                                   from '@Redux/records/tabbar';
 import {
-  setDataQueryRecord,
-  selectDataQueryRecord,
+  selectDataQueryRecord
 }                                   from '@Redux/records/dataQuery';
+import { selectNextUntitledName }   from '@Redux/records/unsavedQueryTree';
+import { createNewUnsavedDataQueryThunk } from '@Redux/records/dataQuery/thunks';
+import { generateUUIDv7 }                from '@Utils/generateId';
 
 import { useOpSpaceRoute }          from '../../_providers/OpSpaceRouteProvider';
 
@@ -52,28 +53,47 @@ const QueryResults = dynamic(() => import('../QueryResults'), {
 function QueryWorkspace() {
   const {
     opspaceId,
-    dataQueryId: initialActiveId
+    routeMode,
+    dataQueryId: routeDataQueryId
   }                             = useOpSpaceRoute();
+  const dispatch                = useReduxDispatch();
 
-  const router                  = useRouter();
   const editorRef               = useRef<SQLEditorHandle | null>(null);
   const containerRef            = useRef<HTMLDivElement  | null>(null);
   const topPanelRef             = useRef<HTMLDivElement  | null>(null);
   const bottomPanelRef          = useRef<HTMLDivElement  | null>(null);
   const isLoadingContent        = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
-  const lastUserInputAtRef      = useRef<number>(0);  // gate restore-on-empty to avoid racing user edits
-  const allowRestoreUntilRef    = useRef<number>(0);  // gate restore-on-empty to avoid racing user edits
+  const hasCreatedInitialUnsaved = useRef(false);
 
   const tabIds                  = useReduxSelector(selectTabIds);
   const activeTabId             = useReduxSelector(selectActiveTabId);
   const activeDataQueryIdFromTabs = useReduxSelector(selectDataQueryIdForTabId, (activeTabId || null) as UUIDv7 | null);
-  const activeDataQueryId       = (activeDataQueryIdFromTabs || initialActiveId || '') as string;
+  const nextUntitledName        = useReduxSelector(selectNextUntitledName);
+
+  // AIDEV-NOTE: Prefer the dataQueryId derived from the active tab once tab state
+  // has hydrated. Fallback to the route segment (routeDataQueryId) on initial load
+  // so deep links still work even before TabsPreloader has populated Redux.
+  const activeDataQueryId       = (activeDataQueryIdFromTabs || routeDataQueryId || '') as string;
   const activeDataQueryRecord   = useReduxSelector(selectDataQueryRecord, activeDataQueryId);
-  const dispatch                = useReduxDispatch();
 
   const [topRatio, setTopRatio] = useState<number>(0.5);    // split ratio is local; we persist only on commit.
   const topStyle                = useMemo(() => ({ height: `${Math.round(topRatio * 100)}%` }), [topRatio]);
   const bottomStyle             = useMemo(() => ({ height: `${Math.round((1 - topRatio) * 100)}%` }), [topRatio]);
+
+  // If on /queries/new and no unsaved tab exists yet, create one
+  useEffect(() => {
+    if (hasCreatedInitialUnsaved.current) return;
+    if (routeMode !== 'new') return;
+    if (activeDataQueryIdFromTabs) {
+      hasCreatedInitialUnsaved.current = true;
+      return;
+    }
+
+    const dataQueryId = generateUUIDv7();
+    dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
+    hasCreatedInitialUnsaved.current = true;
+  }, [routeMode, activeDataQueryIdFromTabs, dispatch, nextUntitledName]);
+
   // Hydrate ratio from localStorage after mount
   useEffect(() => {
     try {
@@ -105,17 +125,31 @@ function QueryWorkspace() {
   // AIDEV-NOTE: Persist last visited location for root page resume behavior
   useEffect(() => {
     try {
+      const payload =
+        routeMode === 'saved'
+          ? {
+              opspaceId,
+              routeMode,                    // 'saved'
+              dataQueryId: activeDataQueryId || null,
+              v: 2,
+              updatedAt: Date.now()
+            }
+          : {
+              opspaceId,
+              routeMode,                    // 'new'
+              // AIDEV-NOTE: For /queries/new we don't pin a specific dataQueryId here;
+              // restoration should use lastActiveUnsavedTabId + /queries/new.
+              dataQueryId: null,
+              v: 2,
+              updatedAt: Date.now()
+            };
+
       window.localStorage.setItem(
         STORAGE_KEY_LAST_VISITED,
-        JSON.stringify({
-          opspaceId,
-          dataQueryId: activeDataQueryId || null,
-          v: 1,
-          updatedAt: Date.now()
-        })
+        JSON.stringify(payload)
       );
     } catch {}
-  }, [opspaceId, activeDataQueryId]);
+  }, [opspaceId, routeMode, activeDataQueryId]);
 
   useEffect(() => {
     // AIDEV-NOTE: Hydrate editor only on active tab changes.
@@ -123,7 +157,6 @@ function QueryWorkspace() {
     // Redux is the source of truth for query text; SQLEditor receives value from Redux.
     isLoadingContent.current = true;
     // Allow restore within a short window after hydration
-    allowRestoreUntilRef.current = Date.now() + 1500;
     setTimeout(() => { isLoadingContent.current = false; }, 200);
   }, [activeTabId]);
 
@@ -136,7 +169,6 @@ function QueryWorkspace() {
 
   const editorOnChange = useEvent((text: string) => {
     if (isLoadingContent.current) return;
-    lastUserInputAtRef.current = Date.now();
   });
 
   const runFromToolbar = useCallback(() => {

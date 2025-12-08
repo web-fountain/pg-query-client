@@ -26,7 +26,7 @@ function CreateNewQueryButton() {
     dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
 
     startTransition(() => {
-      router.replace(`/opspace/${opspaceId}/queries/${dataQueryId}`);
+      router.replace(`/opspace/${opspaceId}/queries/new`);
     });
   }, [dispatch, isPending, opspaceId, router, nextUntitledName]);
 

@@ -118,7 +118,7 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
     let responsePayload: T;
     try {
       responsePayload = await res.json();
-      console.log('[backendFetchJSON] responsePayload', responsePayload);
+      // console.log('[backendFetchJSON] responsePayload', responsePayload);
     } catch (jsonError) {
       console.error(`[${logLabel}] failed to parse JSON response`, formatError(jsonError));
       return { ok: false, status: res.status, error: formatError(jsonError), context: ctx };

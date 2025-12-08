@@ -7,13 +7,16 @@ import {
   createNewUnsavedDataQueryFromFetch,
   markDataQuerySaved
 }                                       from '@Redux/records/dataQuery';
-import { addTabFromFetch }              from '@Redux/records/tabbar';
+import {
+  addTabFromFetch,
+  setLastActiveUnsavedTabId
+}                                       from '@Redux/records/tabbar';
 import { addUnsavedTreeNodeFromFetch }  from '@Redux/records/unsavedQueryTree';
 import { renameNodeWithInvalidation }   from '@Redux/records/queryTree';
 import {
   createNewUnsavedDataQueryAction,
   updateDataQuery
-}                                       from '@/app/opspace/[opspaceId]/queries/[dataQueryId]/_actions/queries';
+}                                       from '@/app/opspace/[opspaceId]/queries/_actions/queries';
 
 
 export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string }, { state: RootState }>(
@@ -31,6 +34,7 @@ export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQuery
         dispatch(createNewUnsavedDataQueryFromFetch({ dataQueryId, name, ext }));
         dispatch(addTabFromFetch({ tab }));
         dispatch(addUnsavedTreeNodeFromFetch({ tree }));
+        dispatch(setLastActiveUnsavedTabId({ tabId: tab.tabId }));
       } else {
         console.error(`Create failed for dataQueryId: ${dataQueryId}`);
         return;

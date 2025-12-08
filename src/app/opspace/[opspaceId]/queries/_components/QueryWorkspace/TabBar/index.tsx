@@ -21,8 +21,7 @@ import {
 }                       from '@Redux/records/tabbar';
 import {
   closeTabThunk,
-  reorderTabsThunk,
-  setActiveTabThunk
+  reorderTabsThunk
 }                       from '@Redux/records/tabbar/thunks';
 import {
   selectDataQueries
@@ -33,6 +32,7 @@ import { generateUUIDv7 }                from '@Utils/generateId';
 
 import { useOpSpaceRoute } from '../../../_providers/OpSpaceRouteProvider';
 
+import { useActivateTab } from '../hooks/useActivateTab';
 import TabBarPresenter    from './TabBarPresenter';
 
 
@@ -42,7 +42,7 @@ export type Tab = { dataQueryId: UUIDv7; tabId: UUIDv7; name: string };
 // all tab-strip behavior (activation, keyboard, add/close, DnD commit) and
 // delegates pure rendering to TabBarPresenter.
 function TabBar() {
-  const { opspaceId, dataQueryId: initialActiveId } = useOpSpaceRoute();
+  const { opspaceId, navigateToNew } = useOpSpaceRoute();
 
   const router   = useRouter();
   const dispatch = useReduxDispatch();
@@ -56,6 +56,8 @@ function TabBar() {
   const dataQueryRecords  = useReduxSelector(selectDataQueries);
   const nextUntitledName  = useReduxSelector(selectNextUntitledName);
 
+  const activateTab       = useActivateTab();
+
   const tabs = useMemo<Tab[]>(() => {
     return tabIds.map((t) => {
       const tab = tabEntities[t];
@@ -68,20 +70,8 @@ function TabBar() {
 
   const handleTabClick = useEffectEvent((tab: Tab) => {
     const { dataQueryId, tabId } = tab;
-
-    const currentUrlDataQueryId = initialActiveId;
-
-    // AIDEV-NOTE: Only sync backend + navigate when the tab's mountId (dataQueryId)
-    // differs from the current URL dataQueryId. Pointer-down already keeps
-    // local Redux activeTabId in sync for simple highlight.
-    const willChangeQuery = dataQueryId !== currentUrlDataQueryId;
-    if (!willChangeQuery) return;
-
-    dispatch(setActiveTabThunk(tabId));
-
-    requestAnimationFrame(() => {
-      router.replace(`/opspace/${opspaceId}/queries/${dataQueryId}`);
-    });
+    if (tabId === activeTabId) return;
+    activateTab({ tabId, dataQueryId });
   });
 
   const handleTabPointerDown = useEffectEvent((tab: Tab) => {
@@ -127,11 +117,10 @@ function TabBar() {
     if (isPendingTabTransition) return;
 
     const dataQueryId = generateUUIDv7();
-
     dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
 
     startTabTransition(() => {
-      router.replace(`/opspace/${opspaceId}/queries/${dataQueryId}`);
+      navigateToNew();
     });
   });
 
@@ -139,13 +128,15 @@ function TabBar() {
     if (isPendingTabTransition) return;
 
     try {
-      const navigateToDataQueryId = await dispatch(closeTabThunk(tabId)).unwrap();
+      const result = await dispatch(closeTabThunk(tabId)).unwrap();
 
       startTabTransition(() => {
-        if (navigateToDataQueryId) {
-          router.replace(`/opspace/${opspaceId}/queries/${navigateToDataQueryId}`);
-        } else {
+        if (!result.hasRemainingTabs) {
           router.replace(`/opspace/${opspaceId}`);
+        } else if (result.nextTabIsUnsaved) {
+          navigateToNew();
+        } else if (result.nextDataQueryId) {
+          router.replace(`/opspace/${opspaceId}/queries/${result.nextDataQueryId}`);
         }
       });
     } catch (error) {

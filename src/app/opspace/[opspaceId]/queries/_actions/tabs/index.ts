@@ -23,8 +23,9 @@ async function listOpenTabsCached(ctx: HeadersContext): Promise<Tabbar | null> {
     revalidate: 60,     // 1 minute
     expire    : 300     // 5 minutes
   });
-
   cacheTag(`tabs-open:list:${ctx.opspacePublicId}`);
+
+  console.log('[ACTION] listOpenTabs');
 
   const { ok, data } = await backendFetchJSON<ResponsePayload05>({
     path: '/tabs/open',
@@ -42,8 +43,6 @@ async function listOpenTabsCached(ctx: HeadersContext): Promise<Tabbar | null> {
 }
 
 export async function listOpenTabs() : Promise<{ success: boolean; data?: Tabbar }> {
-  console.log('[ACTION] listOpenTabs');
-
   const ctx = await getHeadersContextOrNull();
   if (!ctx) {
     return { success: false };
@@ -78,10 +77,9 @@ export async function setActiveTabAction(tabId: UUIDv7): Promise<{ success: bool
     return { success: false };
   }
 
-  // AIDEV-NOTE: Invalidate cached list of open tabs on successful focus
-  try {
-    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
-  } catch {}
+  // AIDEV-NOTE: We intentionally do NOT invalidate the tabs-open:list cache here.
+  // Focus changes only activeTabId/focusedTabIndex, which the client already
+  // tracks in Redux. Cache busting is reserved for structural changes (open/close/reorder).
 
   return { success: true };
 }

@@ -15,6 +15,7 @@ export const closeTab        = createAction<{ tabId: UUIDv7 }>            ('tabs
 export const setActiveTab    = createAction<{ tabId: UUIDv7 }>            ('tabs/setActiveTab');
 export const focusTabIndex   = createAction<{ index: number }>            ('tabs/focusTabIndex');
 export const reorderTabs     = createAction<{ tabIds: UUIDv7[] }>('tabs/reorderTabs');
+export const setLastActiveUnsavedTabId = createAction<{ tabId: UUIDv7 | null }>('tabs/setLastActiveUnsavedTabId');
 
 // Selectors
 export const selectTabEntities      = createSelector.withTypes<RootState>()(
@@ -60,12 +61,18 @@ export const selectTabIdByMountIdMap = createSelector.withTypes<RootState>()(
   },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
+export const selectLastActiveUnsavedTabId = createSelector.withTypes<RootState>()(
+  [state => state.tabs.lastActiveUnsavedTabId],
+  last => last,
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
 
 const initialState: TabbarRecord = {
   tabIds          : [],
   activeTabId     : null,
   focusedTabIndex : null,
-  entities        : {}
+  entities        : {},
+  lastActiveUnsavedTabId : null
 };
 
 // Reducer
@@ -169,6 +176,11 @@ const reducer = createReducer(initialState, (builder) => {
             state.focusedTabIndex = activeIndex;
           }
         }
+      }
+    )
+    .addCase(setLastActiveUnsavedTabId,
+      function(state: TabbarRecord, action: PayloadAction<{ tabId: UUIDv7 | null }>) {
+        state.lastActiveUnsavedTabId = action.payload.tabId;
       }
     );
 });

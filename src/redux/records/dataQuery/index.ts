@@ -164,6 +164,7 @@ export const updateDataQueryText        = createAction(
 );
 export const updateDataQueryIsUnsaved   = createAction<{ dataQueryId: UUIDv7 }    >   ('dataQuery/updateDataQueryIsUnsaved');
 export const markDataQuerySaved         = createAction<{ dataQueryId: UUIDv7, name?: string, queryText?: string }>   ('dataQuery/markDataQuerySaved');
+export const removeDataQueryRecord      = createAction<{ dataQueryId: UUIDv7 }>('dataQuery/removeDataQueryRecord');
 
 // Selectors
 export const selectDataQueries      = createSelector.withTypes<RootState>()(
@@ -468,6 +469,19 @@ export default createReducer(initialState, (builder) => {
           dataQuery.unsaved = {};
           try { if (state.changesById) delete state.changesById[dataQueryId]; } catch {}
         }
+      }
+    )
+    .addCase(removeDataQueryRecord,
+      function(state: DataQueryRecord, action: PayloadAction<{ dataQueryId: UUIDv7 }>) {
+        const { dataQueryId } = action.payload;
+
+        try {
+          if (state.changesById) {
+            delete state.changesById[dataQueryId];
+          }
+        } catch {}
+
+        delete state[dataQueryId];
       }
     )
 });

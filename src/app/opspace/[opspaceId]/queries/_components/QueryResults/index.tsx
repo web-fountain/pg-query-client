@@ -7,7 +7,7 @@ import { useMemo, useState }              from 'react';
 import { useReduxSelector }               from '@Redux/storeHooks';
 import { selectDataQueryRecord }          from '@Redux/records/dataQuery';
 
-import { useSqlRunner }                   from '../../../../_providers/SQLRunnerProvider';
+import { useSqlRunner }                   from '../../../_providers/SQLRunnerProvider';
 import { useOpSpaceRoute }                from '../../_providers/OpSpaceRouteProvider';
 import JSONEditor                         from '../JSONEditor';
 

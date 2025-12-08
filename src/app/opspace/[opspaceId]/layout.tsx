@@ -22,7 +22,7 @@ import RightPanel             from '@Components/layout/PanelLayout/RightPanel';
 import ChatPanelData          from '@Components/ChatPanel/ServerData';
 import DirectoryPanelData     from '@Components/DirectoryPanel/ServerData';
 
-import { listDataQueries }    from './queries/[dataQueryId]/_actions/queries';
+import { listDataQueries }    from './queries/_actions/queries';
 import  TabsPreloader         from './_components/TabsPreloader';
 
 
