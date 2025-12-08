@@ -1,7 +1,6 @@
 import type { Metadata }                from 'next';
 import { interVariable, interDisplay }  from '@Lib/fonts';
 import OpSpaceLayoutProvider            from '@Components/layout/OpSpaceProvider';
-import StoreProvider                    from '@Redux/StoreProvider';
 import DevJwtBootstrapClient            from './_components/DevJwtBootstrapClient';
 
 import '@Styles/scale.css';
@@ -98,11 +97,9 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
 
       <body>
         {process.env.NODE_ENV !== 'production' ? <DevJwtBootstrapClient /> : null}
-        <StoreProvider>
-          <OpSpaceLayoutProvider>
-            {children}
-          </OpSpaceLayoutProvider>
-        </StoreProvider>
+        <OpSpaceLayoutProvider>
+          {children}
+        </OpSpaceLayoutProvider>
       </body>
 
     </html>
