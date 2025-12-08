@@ -21,7 +21,10 @@ function ChatPanel({ side = 'left' }: { side?: 'left' | 'right' }) {
   const contentRef              = useRef<HTMLDivElement | null>(null);
   const [isScrollableY, setIsScrollableY] = useState<boolean>(false);
 
-  // AIDEV-NOTE: Recompute scrollability using Effect Event
+  // AIDEV-NOTE: Recompute scrollability using Effect Event.
+  // In Firefox, using ResizeObserver here can cause a layout ↔ state feedback
+  // loop. This version only ever turns the flag on once overflow exists while
+  // the panel is open.
   const recomputeScrollable = useEffectEvent(() => {
     const contentEl = contentRef.current;
     if (!contentEl || collapsed) {
@@ -35,35 +38,35 @@ function ChatPanel({ side = 'left' }: { side?: 'left' | 'right' }) {
     }
     try {
       const scrollable = scroller.scrollHeight > scroller.clientHeight + 1;
-      setIsScrollableY(scrollable);
+      if (scrollable) {
+        setIsScrollableY(true);
+      }
     } catch {}
   });
 
   useEffect(() => {
     const contentEl = contentRef.current;
-    if (!contentEl) return;
+    if (!contentEl || collapsed) {
+      setIsScrollableY(false);
+      return;
+    }
+
     const scroller = contentEl.querySelector(`.${messageListStyles['virtual-scroller']}`) as HTMLDivElement | null;
+    const handle = () => recomputeScrollable();
 
-    let ro: ResizeObserver | null = null;
-    try {
-      ro = new ResizeObserver(() => recomputeScrollable());
-      if (scroller) ro.observe(scroller);
-    } catch {}
+    // Initial compute when panel opens or messages change.
+    handle();
 
-    // Initial compute
-    recomputeScrollable();
-
-    const onResize = () => recomputeScrollable();
-    window.addEventListener('resize', onResize);
-    const onScroll = () => recomputeScrollable();
-    try { scroller?.addEventListener('scroll', onScroll, { passive: true }); } catch {}
+    // AIDEV-NOTE: We intentionally avoid ResizeObserver here; scroll + resize
+    // events are sufficient and avoid layout/state feedback loops in Firefox.
+    window.addEventListener('resize', handle);
+    try { scroller?.addEventListener('scroll', handle, { passive: true }); } catch {}
 
     return () => {
-      try { scroller?.removeEventListener('scroll', onScroll as EventListener); } catch {}
-      window.removeEventListener('resize', onResize);
-      if (ro) { try { ro.disconnect(); } catch {} }
+      window.removeEventListener('resize', handle);
+      try { scroller?.removeEventListener('scroll', handle as EventListener); } catch {}
     };
-  }, [collapsed]);
+  }, [collapsed, messages.length]);
 
   const handleSend = useCallback((text: string) => {
     send(text);

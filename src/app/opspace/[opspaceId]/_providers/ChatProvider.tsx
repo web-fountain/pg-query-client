@@ -12,6 +12,7 @@ import { generateUUIDv7 }                       from '@Utils/generateId';
    while the QueryWorkspace tabs change. */
 type ChatRole = 'user' | 'assistant';
 type ChatMessage = {
+  id: UUIDv7;
   dataQueryId: UUIDv7;
   role: ChatRole;
   content: string;
@@ -33,8 +34,20 @@ function ChatProvider({ children }: { children: ReactNode }) {
     const now = new Date().toISOString();
     setMessages((prev) => [
       ...prev,
-      { dataQueryId: generateUUIDv7(), role: 'user', content: text, createdAt: now },
-      { dataQueryId: generateUUIDv7(), role: 'assistant', content: 'Mocked assistant reply. (Markdown supported; code fences will render later.)', createdAt: new Date().toISOString() }
+      {
+        id: generateUUIDv7(),
+        dataQueryId: generateUUIDv7(),
+        role: 'user',
+        content: text,
+        createdAt: now
+      },
+      {
+        id: generateUUIDv7(),
+        dataQueryId: generateUUIDv7(),
+        role: 'assistant',
+        content: 'Mocked assistant reply. (Markdown supported; code fences will render later.)',
+        createdAt: new Date().toISOString()
+      }
     ]);
   }
 
@@ -56,4 +69,5 @@ function useChat(): ChatContextValue {
 }
 
 
+export type { ChatMessage, ChatRole };
 export { ChatProvider, useChat };

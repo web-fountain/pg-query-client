@@ -1,7 +1,8 @@
 'use client';
 
-import { memo, useEffect, useEffectEvent, useRef, useState }  from 'react';
-import { useVirtualizer }                     from '@tanstack/react-virtual';
+import type { ChatMessage, ChatRole }         from '@/app/opspace/[opspaceId]/_providers/ChatProvider';
+
+import { memo, useCallback, useEffect, useEffectEvent, useRef, useState }  from 'react';
 
 import { areEditorsReady, preloadEditors }    from '../preloadEditors';
 import MessageComposer                        from '../MessageComposer';
@@ -9,14 +10,6 @@ import styles                                 from './styles.module.css';
 
 /* AIDEV-NOTE: Renderer scaffold. In a later task we'll swap the assistant
    content to use react-markdown + rehype-pretty-code (Shiki). */
-
-type ChatRole = 'user' | 'assistant';
-type ChatMessage = {
-  id: string;
-  role: ChatRole;
-  content: string;
-  createdAt: string;
-};
 
 type Props = {
   messages?: ChatMessage[];
@@ -39,55 +32,61 @@ function MessageList({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const expandedIdsRef = useRef<Set<string>>(new Set());
   const [overflowIds, setOverflowIds] = useState<Set<string>>(new Set());
-  const roMapRef = useRef(new Map<string, ResizeObserver>());
 
-  // AIDEV-NOTE: TanStack Virtualizer setup
+  // AIDEV-NOTE: Root scroll container for the chat history.
   const parentRef = useRef<HTMLDivElement | null>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 80,
-    overscan: 6,
-    getItemKey: (index) => messages[index]?.id ?? String(index),
-    measureElement: (el) => {
-      const rect = el.getBoundingClientRect();
-      const mb = parseFloat(getComputedStyle(el).marginBottom || '0');
-      return rect.height + (Number.isFinite(mb) ? mb : 0);
-    }
-  });
-  const virtualItems = rowVirtualizer.getVirtualItems();
 
-  const setNode = (id: string) => (el: HTMLDivElement | null) => {
+  // AIDEV-NOTE: Simple ref setter map (no ResizeObserver). Overflow is computed
+  // in a batched effect based on current DOM heights to avoid layout/state
+  // feedback loops across browsers.
+  const setNode = useCallback((id: string) => (el: HTMLDivElement | null) => {
     const map = nodeMapRef.current;
-    const roMap = roMapRef.current;
-
-    // Clean up existing observer
-    const prev = roMap.get(id);
-    if (prev) { try { prev.disconnect(); } catch {} roMap.delete(id); }
-
     if (el) {
       map.set(id, el);
-      // Observe this bubble only (virtualized list => visible only)
-      const ro = new ResizeObserver(() => {
-        try {
-          const rootFontPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-          const maxHeightPx = 5.5 * rootFontPx; // var(--space-22)
-          const isOverflow = el.scrollHeight > maxHeightPx + 1;
-          setOverflowIds(prev => {
-            const next = new Set(prev);
-            const has = next.has(id);
-            if (isOverflow && !has) next.add(id);
-            if (!isOverflow && has) next.delete(id);
-            return has === isOverflow ? prev : next;
-          });
-        } catch {}
-      });
-      ro.observe(el);
-      roMap.set(id, ro);
     } else {
       map.delete(id);
     }
-  };
+  }, []);
+
+  // AIDEV-NOTE: Recompute which user bubbles overflow whenever the messages
+  // array changes. This runs after paint and compares to the previous Set so
+  // we only trigger a React re-render when the overflow membership changes.
+  useEffect(() => {
+    const map = nodeMapRef.current;
+    if (map.size === 0) {
+      setOverflowIds(prev => (prev.size === 0 ? prev : new Set()));
+      return;
+    }
+
+    let rootFontPx = 16;
+    try {
+      rootFontPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    } catch {}
+    const maxHeightPx = 5.5 * rootFontPx; // var(--space-22)
+
+    setOverflowIds(prev => {
+      const next = new Set<string>();
+      for (const [id, el] of map.entries()) {
+        if (!el) continue;
+        try {
+          const isOverflow = el.scrollHeight > maxHeightPx + 1;
+          if (isOverflow) next.add(id);
+        } catch {}
+      }
+
+      if (next.size === prev.size) {
+        let same = true;
+        for (const id of next) {
+          if (!prev.has(id)) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return prev;
+      }
+      return next;
+    });
+  }, [messages]);
 
   // Expansion can happen for ANY message (even those not overflowing)
   const isExpanded  = (id: string) => expandedIds.has(id);
@@ -133,11 +132,11 @@ function MessageList({
   const preloadedRef = useRef(false);
   useEffect(() => {
     if (preloadedRef.current) return;
-    if (virtualItems.some(v => v.index === 0)) {
+    if (messages.length > 0) {
       try { preloadEditors(); } catch {}
       preloadedRef.current = true;
     }
-  }, [virtualItems]);
+  }, [messages.length]);
 
   // AIDEV-NOTE: Follow output if near bottom (similar to followOutput="auto").
   useEffect(() => {
@@ -145,36 +144,26 @@ function MessageList({
     if (!el || messages.length === 0) return;
     const nearBottom = el.scrollHeight - (el.scrollTop + el.clientHeight) < 48;
     if (nearBottom) {
-      try { rowVirtualizer.scrollToIndex(messages.length - 1, { align: 'end' }); } catch {}
+      try {
+        el.scrollTop = el.scrollHeight;
+      } catch {}
     }
-  }, [messages.length, rowVirtualizer]);
+  }, [messages.length]);
 
   return (
     <div ref={parentRef} className={styles['virtual-scroller']} tabIndex={0}>
       <div
         className={styles['virtual-list']}
-        style={{
-          height: rowVirtualizer.getTotalSize(),
-          width: '100%',
-          position: 'relative'
-        }}
       >
-        {virtualItems.map(vItem => {
-          const index = vItem.index;
-          const msg = messages[index];
+        {messages.map((msg, index) => {
           if (!msg) return null;
 
           return (
             <div
-              key={vItem.key}
-              ref={(el) => { if (el) rowVirtualizer.measureElement(el); }}
+              key={msg.id ?? index}
               className={styles['message']}
               style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${vItem.start}px)`
+                width: '100%'
               }}
               data-index={index}
             >

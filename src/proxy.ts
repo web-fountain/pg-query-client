@@ -119,9 +119,11 @@ export default async function proxy(request: NextRequest) {
 }
 
 
-// AIDEV-NOTE: Run for all non-static paths; exclude common asset/metadata paths.
+// AIDEV-NOTE: Run for all non-static paths; exclude common asset/metadata paths and
+// dev-only tooling like React DevTools' installHook source map. This avoids noisy
+// "Missing required headers" logs when tools request these resources without JWTs.
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)'
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|opspace/installHook.js.map|queries/installHook.js.map).*)'
   ]
 };

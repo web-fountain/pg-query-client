@@ -1,5 +1,3 @@
-export const runtime = 'nodejs';
-
 type Payload = {
   rows: unknown[];
   rowCount: number;
