@@ -1,72 +1,92 @@
-'use server';
-
 import type { ReactNode }     from 'react';
-import type { UUIDv7 }        from '@Types/primitives';
 import type { RootState }     from '@Redux/store';
-import type {
-  DataQueryRecord,
-  DataQueryRecordItem
-}                             from '@Redux/records/dataQuery/types';
 
 import { Suspense }           from 'react';
+import { connection }         from 'next/server';
 
 import StoreProvider          from '@Redux/StoreProvider';
 import { ChatProvider }       from '@OpSpaceProviders/ChatProvider';
 import { SQLRunnerProvider }  from '@OpSpaceProviders/SQLRunnerProvider';
 
+import OpSpaceShellSkeleton   from '@Components/layout/OpSpaceShellSkeleton';
 import Titlebar               from '@Components/layout/Titlebar';
 import PanelLayout            from '@Components/layout/PanelLayout';
 import LeftPanel              from '@Components/layout/PanelLayout/LeftPanel';
 import MainPanel              from '@Components/layout/PanelLayout/MainPanel';
 import RightPanel             from '@Components/layout/PanelLayout/RightPanel';
+import BootstrapError         from '@Components/layout/BootstrapError';
 
-import ChatPanelData          from '@Components/ChatPanel/ServerData';
-import DirectoryPanelData     from '@Components/DirectoryPanel/ServerData';
+import ChatPanel              from '@Components/ChatPanel';
+import DirectoryPanel         from '@Components/DirectoryPanel';
 
-import { listDataQueries }    from './queries/_actions/queries';
-import { listOpenTabs }       from './queries/_actions/tabs';
+import OpSpacePreloadClient   from './_components/OpSpacePreloadClient';
+import { bootstrapWorkspace } from './queries/_actions/bootstrap';
 
 
-function Layout({ children }: { children: ReactNode }) {
+type LayoutParams = Promise<{ opspaceId: string }>;
+function Layout({ children, params }: { children: ReactNode, params: LayoutParams }) {
   return (
-    <Suspense fallback={null}>
-      <LayoutWithData>
+    <Suspense fallback={<OpSpaceShellSkeleton />}>
+      <LayoutWithData params={params}>
         {children}
       </LayoutWithData>
     </Suspense>
   );
 }
 
-async function LayoutWithData({ children }: { children: ReactNode }) {
-  const [queries, tabs] = await Promise.all([
-    listDataQueries(),
-    listOpenTabs()
-  ]);
+async function LayoutWithData({ children, params }: { children: ReactNode, params: LayoutParams }) {
+  // AIDEV-NOTE: Opt into dynamic rendering - this component requires request headers
+  await connection();
 
-  const preloadedState: Partial<RootState> = {
-    dataQueryRecords: queries?.data?.reduce((acc, query) => {
-      acc[query.dataQueryId as UUIDv7] = {
-        current: query,
-        persisted: query,
-        unsaved: {},
-        isUnsaved: false,
-        isInvalid: false
-      } as DataQueryRecordItem;
+  const { opspaceId } = await params;
+  const bootstrap     = await bootstrapWorkspace();
 
-      return acc;
-    }, {} as DataQueryRecord) ?? {},
-    ...(tabs.success && tabs.data ? { tabs: tabs.data } : {})
-  };
+  if (!bootstrap.success) {
+    return <BootstrapError />;
+  }
+
+  // AIDEV-NOTE: Use WorkspaceBootstrap data when available; otherwise fall back
+  // to reducer-equivalent defaults for each slice so the client store starts
+  // from a known-good empty state.
+  const preloadedState: Partial<RootState> = bootstrap.success && bootstrap.data
+    ? {
+        dataQueryRecords  : bootstrap.data.dataQueryRecords,
+        tabs              : bootstrap.data.tabs,
+        queryTree         : bootstrap.data.queryTree,
+        unsavedQueryTree  : bootstrap.data.unsavedQueryTree
+      }
+    : {
+        dataQueryRecords: {},
+        tabs: {
+          tabIds                 : [],
+          activeTabId            : null,
+          focusedTabIndex        : null,
+          entities               : {},
+          lastActiveUnsavedTabId : null
+        },
+        queryTree: {
+          nodes                 : {},
+          childrenByParentId    : {},
+          nodeIdsByFolderId     : {},
+          nodeIdsByDataQueryId  : {}
+        },
+        unsavedQueryTree: {
+          rootId              : 'unsaved-root',
+          nodes               : {},
+          childrenByParentId  : {}
+        }
+      }; { /* fallback - never reached since we already checked bootstrap.success */ };
 
   return (
-    <StoreProvider preloadedState={preloadedState}>
+    <StoreProvider key={opspaceId} preloadedState={preloadedState}>
       <SQLRunnerProvider>
         <ChatProvider>
+          <OpSpacePreloadClient />
           <Titlebar />
 
           <PanelLayout>
             <LeftPanel>
-              <ChatPanelData />
+              <ChatPanel side="left" />
             </LeftPanel>
 
             <MainPanel>
@@ -76,7 +96,7 @@ async function LayoutWithData({ children }: { children: ReactNode }) {
             </MainPanel>
 
             <RightPanel>
-              <DirectoryPanelData />
+              <DirectoryPanel side="right" />
             </RightPanel>
           </PanelLayout>
 

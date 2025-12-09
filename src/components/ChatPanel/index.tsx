@@ -7,7 +7,6 @@ import Composer             from './Composer';
 import MessageList          from './MessageList';
 import styles               from './styles.module.css';
 import messageListStyles    from './MessageList/styles.module.css';
-import { preloadEditors }   from './preloadEditors';
 
 
 function ChatPanel({ side = 'left' }: { side?: 'left' | 'right' }) {
@@ -70,7 +69,6 @@ function ChatPanel({ side = 'left' }: { side?: 'left' | 'right' }) {
 
   const handleSend = useCallback((text: string) => {
     send(text);
-    preloadEditors();
   }, [send]);
 
   const handleModelChange = useCallback((m: string) => { setModel(m); }, []);

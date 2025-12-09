@@ -1,0 +1,61 @@
+.container {
+  display: grid;
+  place-items: center;
+  height: calc(var(--available-height));
+  min-height: 0;
+  padding: var(--space-4);
+  background: var(--background);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 400px;
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  text-align: center;
+}
+
+.icon {
+  font-size: var(--font-size-3xl);
+  line-height: 1;
+  color: var(--warning);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--semi-bold);
+  color: var(--text-primary);
+}
+
+.message {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+.button {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--white);
+  font-size: var(--font-size-sm);
+  font-weight: var(--medium);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.button:hover {
+  background: var(--accent-hover, color-mix(in oklch, var(--accent) 85%, black));
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

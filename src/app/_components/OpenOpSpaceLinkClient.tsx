@@ -3,6 +3,7 @@
 import type { Base64Url22, UUIDv7 } from '@Types/primitives';
 import { useEffect, useState }      from 'react';
 import { STORAGE_KEY_LAST_VISITED } from '@Constants';
+import { preloadAllEditors }        from '@/app/opspace/[opspaceId]/_components/editorPreloaders';
 
 
 type OpenOpSpaceLinkClientProps = Record<string, never>;
@@ -48,9 +49,19 @@ function OpenOpSpaceLinkClient({}: OpenOpSpaceLinkClientProps) {
   }, []);
 
   if (!href) return null;
+
   return (
-    <a id="open-opspace-link" href={href} data-href-origin={origin}>Open your OpSpace</a>
+    <a
+      id="open-opspace-link"
+      href={href}
+      data-href-origin={origin}
+      onMouseEnter={() => { try { preloadAllEditors(); } catch {} }}
+      onFocus={() => { try { preloadAllEditors(); } catch {} }}
+    >
+      Open your OpSpace
+    </a>
   );
 }
+
 
 export default OpenOpSpaceLinkClient;

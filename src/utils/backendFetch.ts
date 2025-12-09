@@ -13,7 +13,7 @@ export type HeadersContext = {
 
 // AIDEV-NOTE: Extract multitenancy context from request headers. Returns null if any are missing.
 export async function getHeadersContextOrNull(): Promise<HeadersContext | null> {
-  const hdrs = await headers();
+  const hdrs              = await headers();
   const tenantPublicId    = hdrs.get('x-tenant-id')   || '';
   const opspacePublicId   = hdrs.get('x-opspace-id')  || '';
   const operatorPublicId  = hdrs.get('x-operator-id') || '';

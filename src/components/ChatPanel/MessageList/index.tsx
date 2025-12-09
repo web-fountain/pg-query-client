@@ -1,12 +1,14 @@
 'use client';
 
-import type { ChatMessage, ChatRole }         from '@/app/opspace/[opspaceId]/_providers/ChatProvider';
+import type { ChatMessage, ChatRole } from '@/app/opspace/[opspaceId]/_providers/ChatProvider';
 
-import { memo, useCallback, useEffect, useEffectEvent, useRef, useState }  from 'react';
+import {
+  memo, useCallback, useEffect,
+  useEffectEvent, useRef, useState
+}                                     from 'react';
 
-import { areEditorsReady, preloadEditors }    from '../preloadEditors';
-import MessageComposer                        from '../MessageComposer';
-import styles                                 from './styles.module.css';
+import MessageComposer                from '../MessageComposer';
+import styles                         from './styles.module.css';
 
 /* AIDEV-NOTE: Renderer scaffold. In a later task we'll swap the assistant
    content to use react-markdown + rehype-pretty-code (Shiki). */
@@ -128,16 +130,6 @@ function MessageList({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // AIDEV-NOTE: Preload editor bundles when the first item becomes visible.
-  const preloadedRef = useRef(false);
-  useEffect(() => {
-    if (preloadedRef.current) return;
-    if (messages.length > 0) {
-      try { preloadEditors(); } catch {}
-      preloadedRef.current = true;
-    }
-  }, [messages.length]);
-
   // AIDEV-NOTE: Follow output if near bottom (similar to followOutput="auto").
   useEffect(() => {
     const el = parentRef.current;
@@ -177,14 +169,8 @@ function MessageList({
                       className={styles['user-bubble']}
                       data-collapsed={(overflowIds.has(msg.id) && collapsed) || undefined}
                       data-expanded={(overflowIds.has(msg.id) && expanded) || undefined}
-                      onClick={async () => {
+                      onClick={() => {
                         if (!collapsed) return;
-                        if (!areEditorsReady()) {
-                          try { await preloadEditors(); } catch (err) {
-                            // eslint-disable-next-line no-console
-                            console.warn('[ChatPanel] editor preload on-click failed', err);
-                          }
-                        }
                         toggleExpand(msg.id);
                       }}
                       title={collapsed ? 'Click to expand' : undefined}

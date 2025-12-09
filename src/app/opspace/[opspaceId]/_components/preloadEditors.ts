@@ -8,7 +8,7 @@ export function preloadEditors(): Promise<void> {
   try {
     // preloading editors bundles
     __preloadPromise = Promise.all([
-      import('./MessageComposer'),
+      import('../../../../components/ChatPanel/MessageComposer'),
       import('@uiw/react-codemirror')
     ]).then(() => {
       __editorsReady = true;
