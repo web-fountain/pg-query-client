@@ -3,7 +3,7 @@
 import type { UUIDv7 } from '@Types/primitives';
 
 import {
-  useMemo, useTransition, useEffectEvent
+  useMemo, useTransition, useEffectEvent, useRef
 }                       from 'react';
 import { useRouter }    from 'next/navigation';
 
@@ -58,6 +58,12 @@ function TabBar() {
 
   const activateTab       = useActivateTab();
 
+  // AIDEV-NOTE: Track the last tabId that was activated via pointerdown so that
+  // click can distinguish between:
+  // - a real tab change (mouse down on a different tab), vs
+  // - redundant clicks on the already-active tab.
+  const pendingPointerActivateRef = useRef<UUIDv7 | null>(null);
+
   const tabs = useMemo<Tab[]>(() => {
     return tabIds.map((t) => {
       const tab = tabEntities[t];
@@ -70,13 +76,34 @@ function TabBar() {
 
   const handleTabClick = useEffectEvent((tab: Tab) => {
     const { dataQueryId, tabId } = tab;
-    if (tabId === activeTabId) return;
+
+    const pendingId = pendingPointerActivateRef.current;
+    pendingPointerActivateRef.current = null;
+
+    // AIDEV-NOTE: Early-return only when the tab is already active and this
+    // click was not preceded by a pointerdown that switched to this tab.
+    // This preserves the \"no-op click on active tab\" behavior while still
+    // allowing pointerdown→click sequences that changed the tab to call the
+    // thunk and update backend/route state.
+    if (tabId === activeTabId && pendingId !== tabId) {
+      return;
+    }
+
     activateTab({ tabId, dataQueryId });
   });
 
   const handleTabPointerDown = useEffectEvent((tab: Tab) => {
     const { tabId } = tab;
-    if (tabId === (activeTabId || null)) return;
+
+    if (tabId === (activeTabId || null)) {
+      // Pointer down on the already-active tab – no pending activation.
+      pendingPointerActivateRef.current = null;
+      return;
+    }
+
+    // Pointer down on a different tab – optimistically set it active in Redux
+    // and remember that this pointer sequence changed the active tab.
+    pendingPointerActivateRef.current = tabId;
     dispatch(setActiveTab({ tabId }));
   });
 

@@ -74,7 +74,7 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
   const pad = indent + Math.max(0, level) * 8;
   const finalStyle: React.CSSProperties = { ...itemProps?.style, paddingLeft: `${pad}px` };
 
-  // AIDEV-NOTE: Row click handler — navigation for file nodes
+  // AIDEV-NOTE: Row click handler — activate or open the corresponding tab for file nodes.
   const handleRowClick = useCallback(async (e: React.MouseEvent) => {
     itemProps?.onClick?.(e);
     onTreeFocusFromRow?.();
@@ -83,8 +83,7 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
 
     if (isActiveFromTab) {
       // AIDEV-NOTE: When the corresponding tab is already active but may be off-screen
-      // in the TabBar, bring it back into view without re-triggering navigation or
-      // server-side tab activation.
+      // in the TabBar, bring it back into view without re-triggering navigation.
       if (tabId) {
         try {
           const btn = document.getElementById(`tab-${tabId}`) as HTMLButtonElement | null;
@@ -94,26 +93,30 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
       return;
     }
 
-    // If tab exists, just activate it
+    // If tab exists, just activate it and navigate to the saved query.
     if (tabId) {
-      dispatch(setActiveTabThunk(tabId));
+      await dispatch(setActiveTabThunk(tabId));
       if (mountId && opspaceId) {
-        requestAnimationFrame(() => {
-          router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
-        });
+        try {
+          requestAnimationFrame(() => {
+            router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
+          });
+        } catch {}
       }
       return;
     }
 
     // No existing tab — open a new one for this saved query
-    if (!mountId || !opspaceId) {console.error('Failed to open tab: no mountId or opspaceId'); return;}
+    if (!mountId) {console.error('Failed to open tab: no mountId'); return;}
 
     try {
       const newTabId = await dispatch(openTabThunk(mountId)).unwrap();
-      if (newTabId) {
-        requestAnimationFrame(() => {
-          router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
-        });
+      if (newTabId && opspaceId) {
+        try {
+          requestAnimationFrame(() => {
+            router.replace(`/opspace/${opspaceId}/queries/${mountId}`);
+          });
+        } catch {}
       }
     } catch (error) {
       console.error('Failed to open tab:', error);

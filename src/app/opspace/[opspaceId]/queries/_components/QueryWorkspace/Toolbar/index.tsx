@@ -43,6 +43,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   ]                             = useState<string | null>(null);
   const queryNameRef            = useRef(queryName);
   const recordRef               = useRef(record);
+  const hasPendingNameCommitRef = useRef(false);
 
   queryNameRef.current          = queryName;
   recordRef.current             = record;
@@ -50,6 +51,10 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
+    // AIDEV-NOTE: Debounced write site for query name changes. When this runs
+    // we clear the pending flag because there is no longer an outstanding
+    // debounce for this id/value pair.
+    hasPendingNameCommitRef.current = false;
     dispatch(updateDataQueryName({ dataQueryId: id, name: next }));
   }, [dispatch]);
   const debouncedCommit = useDebouncedCallback(commitNameChange, 200);
@@ -57,6 +62,9 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const onNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setQueryName(name);
+    // AIDEV-NOTE: Mark that we have a pending debounced write for this name.
+    // This lets unmount/Save distinguish between \"no edits\" and \"unsent edits\".
+    hasPendingNameCommitRef.current = true;
     debouncedCommit(dataQueryId, name);
   }, [dataQueryId, debouncedCommit]);
 
@@ -66,8 +74,13 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
 
     setIsSaving(true);
 
-    // Flush any pending name changes immediately
-    debouncedCommit.flush(dataQueryId, queryNameRef.current);
+    // Flush any pending name changes immediately, but only if a debounce is
+    // actually outstanding. This avoids dispatching no-op name updates when
+    // the user simply switches tabs without editing the name.
+    if (hasPendingNameCommitRef.current) {
+      debouncedCommit.flush(dataQueryId, queryNameRef.current);
+      hasPendingNameCommitRef.current = false;
+    }
 
     // AIDEV-NOTE: Only dispatch text update if editor text differs from Redux state.
     // This bridges the gap between SQLEditor's debounced writes and an immediate Save click.
@@ -92,7 +105,13 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
 
   useEffect(() => {
     return () => {
-      debouncedCommit.flush(dataQueryId, queryNameRef.current);
+      // AIDEV-NOTE: On unmount (or dataQueryId change) only flush if there is
+      // a pending debounced write. This prevents spurious updateDataQueryName
+      // actions when the user is just switching between tabs.
+      if (hasPendingNameCommitRef.current) {
+        debouncedCommit.flush(dataQueryId, queryNameRef.current);
+        hasPendingNameCommitRef.current = false;
+      }
     };
   }, [dataQueryId, debouncedCommit]);
 

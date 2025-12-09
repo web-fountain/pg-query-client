@@ -17,7 +17,8 @@ import {
 import {
   selectDataQueryIdForTabId,
   selectTabIds,
-  selectActiveTabId
+  selectActiveTabId,
+  selectLastActiveUnsavedTabId
 }                                   from '@Redux/records/tabbar';
 import {
   selectDataQueryRecord
@@ -58,21 +59,23 @@ function QueryWorkspace() {
   }                             = useOpSpaceRoute();
   const dispatch                = useReduxDispatch();
 
-  const editorRef               = useRef<SQLEditorHandle | null>(null);
-  const containerRef            = useRef<HTMLDivElement  | null>(null);
-  const topPanelRef             = useRef<HTMLDivElement  | null>(null);
-  const bottomPanelRef          = useRef<HTMLDivElement  | null>(null);
-  const isLoadingContent        = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
+  const editorRef                = useRef<SQLEditorHandle | null>(null);
+  const containerRef             = useRef<HTMLDivElement  | null>(null);
+  const topPanelRef              = useRef<HTMLDivElement  | null>(null);
+  const bottomPanelRef           = useRef<HTMLDivElement  | null>(null);
+  const isLoadingContent         = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
   const hasCreatedInitialUnsaved = useRef(false);
+  const lastActiveDataQueryIdRef = useRef<string | null>(null);
 
-  const tabIds                  = useReduxSelector(selectTabIds);
-  const activeTabId             = useReduxSelector(selectActiveTabId);
+  const tabIds                   = useReduxSelector(selectTabIds);
+  const activeTabId              = useReduxSelector(selectActiveTabId);
   const activeDataQueryIdFromTabs = useReduxSelector(selectDataQueryIdForTabId, (activeTabId || null) as UUIDv7 | null);
-  const nextUntitledName        = useReduxSelector(selectNextUntitledName);
+  const lastActiveUnsavedTabId   = useReduxSelector(selectLastActiveUnsavedTabId);
+  const nextUntitledName         = useReduxSelector(selectNextUntitledName);
 
-  // AIDEV-NOTE: Prefer the dataQueryId derived from the active tab once tab state
-  // has hydrated. Fallback to the route segment (routeDataQueryId) on initial load
-  // so deep links still work even before TabsPreloader has populated Redux.
+  // AIDEV-NOTE: Prefer the dataQueryId derived from the active tab once tab
+  // state has hydrated from SSR. Fallback to the route segment
+  // (routeDataQueryId) on initial load so deep links still work.
   const activeDataQueryId       = (activeDataQueryIdFromTabs || routeDataQueryId || '') as string;
   const activeDataQueryRecord   = useReduxSelector(selectDataQueryRecord, activeDataQueryId);
 
@@ -80,11 +83,30 @@ function QueryWorkspace() {
   const topStyle                = useMemo(() => ({ height: `${Math.round(topRatio * 100)}%` }), [topRatio]);
   const bottomStyle             = useMemo(() => ({ height: `${Math.round((1 - topRatio) * 100)}%` }), [topRatio]);
 
-  // If on /queries/new and no unsaved tab exists yet, create one
+  // AIDEV-NOTE: Treat the first render after an activeDataQueryId change as a
+  // hydration pass for SQLEditor. We suppress debounced writes during this
+  // render so that programmatic document loads (e.g., switching tabs between
+  // saved/unsaved queries) do not dispatch updateDataQueryText actions.
+  const isHydratingText         = lastActiveDataQueryIdRef.current !== activeDataQueryId;
+  lastActiveDataQueryIdRef.current = activeDataQueryId;
+
+  // AIDEV-NOTE: If on /queries/new and no unsaved tab exists yet, create one.
+  // With tabs preloaded on the server, this runs against the true tabs state
+  // on first render and avoids creating an extra unsaved tab on refresh when
+  // unsaved tabs already exist.
   useEffect(() => {
     if (hasCreatedInitialUnsaved.current) return;
     if (routeMode !== 'new') return;
+
+    // If there's an active data query from tabs, do not create a new one.
     if (activeDataQueryIdFromTabs) {
+      hasCreatedInitialUnsaved.current = true;
+      return;
+    }
+
+    // If there's a known last active unsaved tab that OpSpaceRouteProvider will
+    // align to, avoid creating another unsaved query and let alignment happen.
+    if (lastActiveUnsavedTabId) {
       hasCreatedInitialUnsaved.current = true;
       return;
     }
@@ -92,7 +114,7 @@ function QueryWorkspace() {
     const dataQueryId = generateUUIDv7();
     dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
     hasCreatedInitialUnsaved.current = true;
-  }, [routeMode, activeDataQueryIdFromTabs, dispatch, nextUntitledName]);
+  }, [routeMode, activeDataQueryIdFromTabs, lastActiveUnsavedTabId, dispatch, nextUntitledName]);
 
   // Hydrate ratio from localStorage after mount
   useEffect(() => {
@@ -203,7 +225,7 @@ function QueryWorkspace() {
                 editorRef={editorRef}
                 onChange={editorOnChange}
                 value={(activeDataQueryRecord?.current?.queryText || '') as string}
-                suppressDispatch={isLoadingContent.current}
+                suppressDispatch={isHydratingText}
               />
             </Suspense>
           )}

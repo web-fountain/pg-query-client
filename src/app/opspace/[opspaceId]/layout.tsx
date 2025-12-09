@@ -2,6 +2,7 @@
 
 import type { ReactNode }     from 'react';
 import type { UUIDv7 }        from '@Types/primitives';
+import type { RootState }     from '@Redux/store';
 import type {
   DataQueryRecord,
   DataQueryRecordItem
@@ -23,7 +24,7 @@ import ChatPanelData          from '@Components/ChatPanel/ServerData';
 import DirectoryPanelData     from '@Components/DirectoryPanel/ServerData';
 
 import { listDataQueries }    from './queries/_actions/queries';
-import  TabsPreloader         from './_components/TabsPreloader';
+import { listOpenTabs }       from './queries/_actions/tabs';
 
 
 function Layout({ children }: { children: ReactNode }) {
@@ -37,10 +38,13 @@ function Layout({ children }: { children: ReactNode }) {
 }
 
 async function LayoutWithData({ children }: { children: ReactNode }) {
-  const data = await listDataQueries();
+  const [queries, tabs] = await Promise.all([
+    listDataQueries(),
+    listOpenTabs()
+  ]);
 
-  const preloadedState = {
-    dataQueryRecords: data?.data?.reduce((acc, query) => {
+  const preloadedState: Partial<RootState> = {
+    dataQueryRecords: queries?.data?.reduce((acc, query) => {
       acc[query.dataQueryId as UUIDv7] = {
         current: query,
         persisted: query,
@@ -50,21 +54,14 @@ async function LayoutWithData({ children }: { children: ReactNode }) {
       } as DataQueryRecordItem;
 
       return acc;
-    }, {} as DataQueryRecord) ?? {}
+    }, {} as DataQueryRecord) ?? {},
+    ...(tabs.success && tabs.data ? { tabs: tabs.data } : {})
   };
 
   return (
     <StoreProvider preloadedState={preloadedState}>
       <SQLRunnerProvider>
         <ChatProvider>
-          {/*
-            AIDEV-NOTE: Non-blocking background fetch for tabs.
-            Valid composition: Server Component (Layout) -> Client (StoreProvider) -> Server (Suspense/TabsPreloader)
-          */}
-          <Suspense fallback={null}>
-            <TabsPreloader />
-          </Suspense>
-
           <Titlebar />
 
           <PanelLayout>

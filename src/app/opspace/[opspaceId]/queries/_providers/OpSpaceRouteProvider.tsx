@@ -17,6 +17,7 @@ import {
   selectTabIdByMountIdMap
 }                                             from '@Redux/records/tabbar';
 import { setActiveTabThunk }                  from '@Redux/records/tabbar/thunks';
+import { selectUnsavedQueryTree }             from '@Redux/records/unsavedQueryTree';
 
 
 type RouteMode = 'saved' | 'new';
@@ -42,7 +43,7 @@ type HistoryStateShape = {
 const OpSpaceRouteCtx = createContext<OpSpaceRouteContextValue | null>(null);
 
 function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22; children: ReactNode }) {
-  const pathname  = usePathname();
+  const pathname  = usePathname() || '';
   const router    = useRouter();
   const dispatch  = useReduxDispatch();
   const hasAlignedInitialRef = useRef(false);
@@ -53,6 +54,7 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
   const activeDataQueryIdFromTabs = useReduxSelector(selectDataQueryIdForTabId, (activeTabId || null) as UUIDv7 | null);
   const lastActiveUnsavedTabId    = useReduxSelector(selectLastActiveUnsavedTabId);
   const tabIdByMountIdMap         = useReduxSelector(selectTabIdByMountIdMap);
+  const unsavedQueryTree          = useReduxSelector(selectUnsavedQueryTree);
 
   // Derive dataQueryId:
   // - saved: from URL or active tab
@@ -93,7 +95,7 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
       OPSPACE_ROUTE: { opspaceId, routeMode: 'saved', dataQueryId: id },
     };
     window.history.pushState(state, '', url);
-    router.replace(url);
+    router.replace(url as any);
   });
 
   const navigateToNew = useEffectEvent(() => {
@@ -105,7 +107,7 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
     };
     window.history.replaceState(state, '', url);
     if (!pathname.endsWith('/new')) {
-      router.replace(url);
+      router.replace(url as any);
     }
   });
 

@@ -7,6 +7,7 @@ import {
   useCallback, useEffect,
   useRef, useState
 }                                         from 'react';
+import { usePathname }                    from 'next/navigation';
 import { useTree }                        from '@headless-tree/react';
 import {
   asyncDataLoaderFeature,
@@ -65,6 +66,10 @@ function QueriesTreeInner(
   // AIDEV-NOTE: Lift tab lookups to parent — single subscription for all rows
   const activeTabId       = useReduxSelector(selectActiveTabId);
   const mountIdToTabIdMap = useReduxSelector(selectTabIdByMountIdMap);
+  const pathname          = usePathname();
+  // AIDEV-NOTE: Only treat rows as "active from tabbar" when the QueryWorkspace route is mounted.
+  // On the opspace landing page (/opspace/{id}) we always want a click to navigate.
+  const isOnQueriesRoute  = (pathname || '').split('/').filter(Boolean).includes('queries');
 
   const tree = useTree<TreeNode>({
     rootItemId: rootId,
@@ -326,33 +331,32 @@ function QueriesTreeInner(
               onBlur={handleBlur}
             >
               {renderItems.map((it: any) => {
-                 const itemData = it.getItemData?.() as TreeNode | undefined;
-                 const mountId  = itemData?.mountId as UUIDv7 | undefined;
-                 const tabId    = mountId ? mountIdToTabIdMap.get(mountId) : undefined;
-                 const isActiveFromTab = !!tabId && tabId === activeTabId;
+                const itemData = it.getItemData?.() as TreeNode | undefined;
+                const mountId  = itemData?.mountId as UUIDv7 | undefined;
+                const tabId    = mountId ? mountIdToTabIdMap.get(mountId) : undefined;
+                const isActiveFromTab = isOnQueriesRoute && !!tabId && tabId === activeTabId;
 
-                 // AIDEV-NOTE: Extract selection state as primitive for memo comparison
-                 const itemProps = it.getProps?.();
-                 const ariaSelected = itemProps?.['aria-selected'];
-                 const isSelectedByTree = ariaSelected === true || ariaSelected === 'true';
+                // AIDEV-NOTE: Extract selection state as primitive for memo comparison
+                const itemProps = it.getProps?.();
+                const ariaSelected = itemProps?.['aria-selected'];
+                const isSelectedByTree = ariaSelected === true || ariaSelected === 'true';
 
-                  return (
-                    <Row
-                      key={it.getId()}
-                      item={it}
-                      indent={indent}
-                      onRename={actions.handleRename}
-                      onDropMove={actions.handleDropMove}
-                      isTopLevel={false}
-                      isTreeFocused={isTreeFocused}
-                      onTreeFocusFromRow={handleTreeFocusFromRow}
-                      isActiveFromTab={isActiveFromTab}
-                      tabId={tabId}
-                      isSelectedByTree={isSelectedByTree}
-                    />
-                  );
-                })
-              }
+                return (
+                  <Row
+                    key={it.getId()}
+                    item={it}
+                    indent={indent}
+                    onRename={actions.handleRename}
+                    onDropMove={actions.handleDropMove}
+                    isTopLevel={false}
+                    isTreeFocused={isTreeFocused}
+                    onTreeFocusFromRow={handleTreeFocusFromRow}
+                    isActiveFromTab={isActiveFromTab}
+                    tabId={tabId}
+                    isSelectedByTree={isSelectedByTree}
+                  />
+                );
+              })}
             </div>
           </div>
         );

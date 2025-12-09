@@ -77,14 +77,16 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
     return { ...(mergedStyle || {}), paddingLeft: `${pad}px` };
   })();
 
-  // AIDEV-NOTE: Row click selects/focuses; for files with a valid mountId, sync tabbar and navigate to open the query tab.
+  // AIDEV-NOTE: Row click selects/focuses; for files with a valid mountId, sync tabbar and
+  // navigate to the unsaved queries route. Query trees are rendered outside OpSpaceRouteProvider,
+  // so they own the transition into `/queries/new`.
   const handleRowClick = (e: React.MouseEvent) => {
     try {
       itemProps?.onClick?.(e);
     } catch {}
     if (isFolder) return;
 
-    const { mountId, nodeId } = item?.getItemData?.() as TreeNode;
+    const { nodeId } = item?.getItemData?.() as TreeNode;
 
     // AIDEV-NOTE: When this row already reflects the focused tab, avoid redundant tab
     // activation + navigation, but still ensure the associated TabBar tab is visible

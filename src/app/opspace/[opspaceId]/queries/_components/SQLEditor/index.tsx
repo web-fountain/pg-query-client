@@ -249,21 +249,32 @@ function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEdit
     try { onChange?.(next); } catch {}
   }, [onChange]);
 
-  // AIDEV-NOTE: Debounced write to Redux (300ms). Cancel on route change/unmount; flush last value.
+  // AIDEV-NOTE: Debounced write to Redux (200ms). Track the last sent text
+  // and whether a debounced write is currently pending per dataQueryId so we
+  // can avoid redundant dispatches on tab/tree selection and still flush
+  // unsent edits on unmount.
+  const lastSentByIdRef = useRef<Record<string, string>>({});
+  const pendingByIdRef  = useRef<Record<string, boolean>>({});
+
   const debouncedWrite = useDebouncedCallback((id: UUIDv7, text: string) => {
     dispatch(updateDataQueryText({ dataQueryId: id, queryText: text }));
+    lastSentByIdRef.current[id] = text;
+    pendingByIdRef.current[id] = false;
   }, 200);
-
-  // AIDEV-NOTE: Skip redundant dispatch: track last sent per id
-  const lastSentByIdRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     return () => {
       const latest = latestTextRef.current || '';
-      if (lastSentByIdRef.current[dataQueryId] !== latest) {
-        try { debouncedWrite.flush(dataQueryId as UUIDv7, latest); } catch {}
-        lastSentByIdRef.current[dataQueryId] = latest;
+      const key = dataQueryId as UUIDv7;
+
+      // AIDEV-NOTE: Only flush if there is a pending debounced write for this
+      // id. This prevents spurious updateDataQueryText actions when the user is
+      // only changing selection (tabs or tree) and there is no unsent edit.
+      if (pendingByIdRef.current[key]) {
+        try { debouncedWrite.flush(key, latest); } catch {}
+        pendingByIdRef.current[key] = false;
       }
+
       try { debouncedWrite.cancel(); } catch {}
     };
   }, [debouncedWrite, dataQueryId]);
@@ -273,8 +284,13 @@ function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEdit
     editorViewRef.current = view;
     // Initialize latest text ref; CodeMirror will receive `value` via controlled prop.
     latestTextRef.current = value || '';
-    // AIDEV-NOTE: Initialize dispatch cache to avoid first unmount flush of identical value
-    try { lastSentByIdRef.current[dataQueryId] = value || ''; } catch {}
+    // AIDEV-NOTE: Initialize dispatch caches so we avoid a first unmount flush
+    // when nothing has changed for this dataQueryId.
+    try {
+      const key = dataQueryId as UUIDv7;
+      lastSentByIdRef.current[key] = value || '';
+      pendingByIdRef.current[key] = false;
+    } catch {}
   }, [value, dataQueryId]);
 
   // AIDEV-NOTE: Reconfigure linter extension without rebuilding the pipeline.
@@ -327,9 +343,13 @@ function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEdit
           onChange={(next) => {
             handleChange(next);
             if (!suppressDispatch) {
-              if (lastSentByIdRef.current[dataQueryId] !== next) {
-                try { debouncedWrite(dataQueryId as UUIDv7, next); } catch {}
-                lastSentByIdRef.current[dataQueryId] = next;
+              const key = dataQueryId as UUIDv7;
+              if (lastSentByIdRef.current[key] !== next) {
+                // AIDEV-NOTE: Mark a pending debounced write so unmount can
+                // decide whether a flush is required to capture the latest
+                // unsent edits.
+                pendingByIdRef.current[key] = true;
+                try { debouncedWrite(key, next); } catch {}
               }
             }
           }}

@@ -3,6 +3,7 @@
 import type { UnsavedQueryTreeRecord, UnsavedTreeNode } from '@Redux/records/unsavedQueryTree/types';
 
 import { useEffect, useMemo, useRef, useState }         from 'react';
+import { usePathname }                                  from 'next/navigation';
 import { useTree }                                      from '@headless-tree/react';
 import {
   syncDataLoaderFeature, selectionFeature,
@@ -43,6 +44,10 @@ function UnsavedQueriesTreeInner(
 ) {
   const tabIds          = useReduxSelector(selectTabIds);
   const focusedTabIndex = useReduxSelector(selectFocusedTabIndex);
+  const pathname        = usePathname();
+  // AIDEV-NOTE: Only treat unsaved rows as "active from tabbar" when the QueryWorkspace route is mounted.
+  // On the opspace landing page (/opspace/{id}) we always want a click to navigate.
+  const isOnQueriesRoute = (pathname || '').split('/').filter(Boolean).includes('queries');
 
   // AIDEV-NOTE: Derive unsaved group metadata from the current tree snapshot.
   const allGroupNodeIds = Object.values(unsavedQueryTree.nodes || {})
@@ -343,7 +348,11 @@ function UnsavedQueriesTreeInner(
                   onDropMove={actions.handleDropMove}
                   isTreeFocused={isTreeFocused}
                   isTopLevel={false}
-                  isActiveFromTab={activeUnsavedNodeId !== null && item.getId() === activeUnsavedNodeId}
+                  isActiveFromTab={
+                    isOnQueriesRoute &&
+                    activeUnsavedNodeId !== null &&
+                    item.getId() === activeUnsavedNodeId
+                  }
                 />
               ))}
             </div>
