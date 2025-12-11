@@ -66,8 +66,11 @@ function QueryWorkspace() {
   const topPanelRef              = useRef<HTMLDivElement  | null>(null);
   const bottomPanelRef           = useRef<HTMLDivElement  | null>(null);
   const isLoadingContent         = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
-  const hasCreatedInitialUnsaved = useRef(false);
+  const hasRequestedInitialUnsaved = useRef(false);
   const lastActiveDataQueryIdRef = useRef<string | null>(null);
+  const hasVisitedNewRef         = useRef(false);
+  const newIntentKeyRef          = useRef<string | null>(null);
+  const [hasExplicitNewIntent, setHasExplicitNewIntent] = useState(false);
 
   const tabIds                   = useReduxSelector(selectTabIds);
   const activeTabId              = useReduxSelector(selectActiveTabId);
@@ -98,33 +101,83 @@ function QueryWorkspace() {
   // AIDEV-NOTE: If on /queries/new and *no* unsaved tab exists yet for this
   // opspace (no tabs + no unsaved file nodes), create a single new unsaved
   // query. State-based guards run FIRST so they are evaluated fresh on each
-  // navigation. The ref guard runs LAST to prevent rapid double-dispatch
-  // within the same effect cycle (e.g., React StrictMode, dependency churn).
+  // navigation. The ref guard prevents duplicate dispatches while the "empty"
+  // condition is true (e.g., React StrictMode, concurrent re-renders), and is
+  // reset whenever we leave that empty state so later visits can auto-create.
+  //
+  // AIDEV-NOTE: We treat two cases as "allowed" sources for the initial
+  // auto-create:
+  //   1) The first-ever visit to /queries/new in this session where there are
+  //      no tabs and no unsaved files (deep link or initial navigation).
+  //   2) An explicit "Create New Query" intent from the opspace root page,
+  //      recorded in sessionStorage keyed by opspaceId.
+  //
+  // Closing the last unsaved tab while already on /queries/new moves the
+  // workspace into an "empty" state but does NOT set an explicit intent, and
+  // happens after we've already marked this as a visited /queries/new
+  // session, so it will not trigger another auto-create.
+
+  if (!newIntentKeyRef.current) {
+    newIntentKeyRef.current = `pg-query-client/opspace/${opspaceId}/new-intent`;
+  }
+  const newIntentKey = newIntentKeyRef.current;
+
   useEffect(() => {
-    if (routeMode !== 'new') return;
+    if (typeof window === 'undefined') return;
+    const key = newIntentKey;
+    if (!key) return;
 
-    // If any tab is already present (saved or unsaved), skip auto-create.
-    if (tabIds.length > 0) return;
+    try {
+      const raw = window.sessionStorage.getItem(key);
+      if (raw === '1') {
+        setHasExplicitNewIntent(true);
+        window.sessionStorage.removeItem(key);
+      }
+    } catch {}
+  }, [newIntentKey]);
 
-    // If there's an active data query from tabs, do not create a new one.
-    if (activeDataQueryIdFromTabs) return;
+  const isFirstNewVisit = routeMode === 'new' && !hasVisitedNewRef.current;
+  if (isFirstNewVisit) {
+    hasVisitedNewRef.current = true;
+  }
 
-    // If any unsaved file node already exists in the unsaved tree, skip.
-    const nodes = unsavedQueryTree.nodes || {};
-    const hasUnsavedFile = Object.values(nodes).some(
-      // AIDEV-NOTE: Unsaved tree nodes are a union of group/file; we only care about files here.
-      (node) => node && (node as any).kind === 'file'
-    );
-    if (hasUnsavedFile) return;
+  const nodes = unsavedQueryTree.nodes || {};
+  const hasUnsavedFile = Object.values(nodes).some(
+    // AIDEV-NOTE: Unsaved tree nodes are a union of group/file; we only care about files here.
+    (node) => node && (node as any).kind === 'file'
+  );
 
-    // AIDEV-NOTE: Ref guard runs LAST - prevents double-dispatch within same
-    // render cycle while allowing fresh state-based evaluation on each visit.
-    if (hasCreatedInitialUnsaved.current) return;
+  const shouldCreateInitialUnsaved =
+    routeMode === 'new' &&
+    tabIds.length === 0 &&
+    !activeDataQueryIdFromTabs &&
+    !hasUnsavedFile &&
+    (isFirstNewVisit || hasExplicitNewIntent);
+
+  useEffect(() => {
+    if (!shouldCreateInitialUnsaved) {
+      // AIDEV-NOTE: Clear the latch whenever we are not in an "empty /queries/new"
+      // state so that a future empty visit can trigger auto-create again.
+      hasRequestedInitialUnsaved.current = false;
+      return;
+    }
+
+    if (hasRequestedInitialUnsaved.current) {
+      return;
+    }
+
+    hasRequestedInitialUnsaved.current = true;
+
+    // AIDEV-NOTE: Consume any explicit "new intent" so it does not apply to
+    // later empty states (for example, after closing the last unsaved tab in
+    // the same /queries/new session).
+    if (hasExplicitNewIntent) {
+      setHasExplicitNewIntent(false);
+    }
 
     const dataQueryId = generateUUIDv7();
     dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
-    hasCreatedInitialUnsaved.current = true;
-  }, [routeMode, tabIds, activeDataQueryIdFromTabs, unsavedQueryTree.nodes, dispatch, nextUntitledName]);
+  }, [shouldCreateInitialUnsaved, dispatch, nextUntitledName]);
 
   // Hydrate ratio from localStorage after mount
   useEffect(() => {
