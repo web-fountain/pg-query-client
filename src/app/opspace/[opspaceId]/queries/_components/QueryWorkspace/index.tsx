@@ -10,27 +10,16 @@ import {
 }                                   from 'react';
 import dynamic                      from 'next/dynamic';
 
-import {
-  useReduxDispatch,
-  useReduxSelector
-}                                   from '@Redux/storeHooks';
+import { useReduxSelector }         from '@Redux/storeHooks';
 import {
   selectDataQueryIdForTabId,
   selectTabIds,
   selectActiveTabId
 }                                   from '@Redux/records/tabbar';
-import {
-  selectDataQueryRecord
-}                                   from '@Redux/records/dataQuery';
-import {
-  selectUnsavedQueryTree,
-  selectNextUntitledName
-}                                   from '@Redux/records/unsavedQueryTree';
-import { createNewUnsavedDataQueryThunk } from '@Redux/records/dataQuery/thunks';
-import { generateUUIDv7 }                from '@Utils/generateId';
+import { selectDataQueryRecord }    from '@Redux/records/dataQuery';
 
 import { useOpSpaceRoute }          from '../../_providers/OpSpaceRouteProvider';
-
+import OpSpaceIntro                 from '../../../_components/OpSpaceIntro';
 import TabBar                       from './TabBar';
 import Toolbar                      from './Toolbar';
 import SplitPane                    from './SplitPane';
@@ -57,29 +46,23 @@ function QueryWorkspace() {
   const {
     opspaceId,
     routeMode,
-    dataQueryId: routeDataQueryId
+    dataQueryId: routeDataQueryId,
+    navigateToNew
   }                             = useOpSpaceRoute();
-  const dispatch                = useReduxDispatch();
 
   const editorRef                = useRef<SQLEditorHandle | null>(null);
   const containerRef             = useRef<HTMLDivElement  | null>(null);
   const topPanelRef              = useRef<HTMLDivElement  | null>(null);
   const bottomPanelRef           = useRef<HTMLDivElement  | null>(null);
   const isLoadingContent         = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
-  const hasRequestedInitialUnsaved = useRef(false);
   const lastActiveDataQueryIdRef = useRef<string | null>(null);
-  const hasVisitedNewRef         = useRef(false);
-  const newIntentKeyRef          = useRef<string | null>(null);
-  const [hasExplicitNewIntent, setHasExplicitNewIntent] = useState(false);
 
-  const tabIds                   = useReduxSelector(selectTabIds);
-  const activeTabId              = useReduxSelector(selectActiveTabId);
+  const tabIds                    = useReduxSelector(selectTabIds);
+  const activeTabId               = useReduxSelector(selectActiveTabId);
   const activeDataQueryIdFromTabs = useReduxSelector(
     selectDataQueryIdForTabId,
     (activeTabId || null) as UUIDv7 | null
   );
-  const unsavedQueryTree         = useReduxSelector(selectUnsavedQueryTree);
-  const nextUntitledName         = useReduxSelector(selectNextUntitledName);
 
   // AIDEV-NOTE: Prefer the dataQueryId derived from the active tab once tab
   // state has hydrated from SSR. Fallback to the route segment
@@ -97,87 +80,6 @@ function QueryWorkspace() {
   // saved/unsaved queries) do not dispatch updateDataQueryText actions.
   const isHydratingText         = lastActiveDataQueryIdRef.current !== activeDataQueryId;
   lastActiveDataQueryIdRef.current = activeDataQueryId;
-
-  // AIDEV-NOTE: If on /queries/new and *no* unsaved tab exists yet for this
-  // opspace (no tabs + no unsaved file nodes), create a single new unsaved
-  // query. State-based guards run FIRST so they are evaluated fresh on each
-  // navigation. The ref guard prevents duplicate dispatches while the "empty"
-  // condition is true (e.g., React StrictMode, concurrent re-renders), and is
-  // reset whenever we leave that empty state so later visits can auto-create.
-  //
-  // AIDEV-NOTE: We treat two cases as "allowed" sources for the initial
-  // auto-create:
-  //   1) The first-ever visit to /queries/new in this session where there are
-  //      no tabs and no unsaved files (deep link or initial navigation).
-  //   2) An explicit "Create New Query" intent from the opspace root page,
-  //      recorded in sessionStorage keyed by opspaceId.
-  //
-  // Closing the last unsaved tab while already on /queries/new moves the
-  // workspace into an "empty" state but does NOT set an explicit intent, and
-  // happens after we've already marked this as a visited /queries/new
-  // session, so it will not trigger another auto-create.
-
-  if (!newIntentKeyRef.current) {
-    newIntentKeyRef.current = `pg-query-client/opspace/${opspaceId}/new-intent`;
-  }
-  const newIntentKey = newIntentKeyRef.current;
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const key = newIntentKey;
-    if (!key) return;
-
-    try {
-      const raw = window.sessionStorage.getItem(key);
-      if (raw === '1') {
-        setHasExplicitNewIntent(true);
-        window.sessionStorage.removeItem(key);
-      }
-    } catch {}
-  }, [newIntentKey]);
-
-  const isFirstNewVisit = routeMode === 'new' && !hasVisitedNewRef.current;
-  if (isFirstNewVisit) {
-    hasVisitedNewRef.current = true;
-  }
-
-  const nodes = unsavedQueryTree.nodes || {};
-  const hasUnsavedFile = Object.values(nodes).some(
-    // AIDEV-NOTE: Unsaved tree nodes are a union of group/file; we only care about files here.
-    (node) => node && (node as any).kind === 'file'
-  );
-
-  const shouldCreateInitialUnsaved =
-    routeMode === 'new' &&
-    tabIds.length === 0 &&
-    !activeDataQueryIdFromTabs &&
-    !hasUnsavedFile &&
-    (isFirstNewVisit || hasExplicitNewIntent);
-
-  useEffect(() => {
-    if (!shouldCreateInitialUnsaved) {
-      // AIDEV-NOTE: Clear the latch whenever we are not in an "empty /queries/new"
-      // state so that a future empty visit can trigger auto-create again.
-      hasRequestedInitialUnsaved.current = false;
-      return;
-    }
-
-    if (hasRequestedInitialUnsaved.current) {
-      return;
-    }
-
-    hasRequestedInitialUnsaved.current = true;
-
-    // AIDEV-NOTE: Consume any explicit "new intent" so it does not apply to
-    // later empty states (for example, after closing the last unsaved tab in
-    // the same /queries/new session).
-    if (hasExplicitNewIntent) {
-      setHasExplicitNewIntent(false);
-    }
-
-    const dataQueryId = generateUUIDv7();
-    dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
-  }, [shouldCreateInitialUnsaved, dispatch, nextUntitledName]);
 
   // Hydrate ratio from localStorage after mount
   useEffect(() => {
@@ -251,6 +153,8 @@ function QueryWorkspace() {
 
   const activeIndex = Math.max(0, tabIds.findIndex((t) => t === (activeTabId || '')));
   const activeTab   = tabIds[activeIndex] || tabIds[0];
+  const hasAnyTabs  = tabIds.length > 0;
+  const isNewRoute  = routeMode === 'new';
 
   const editorOnChange = useEvent((text: string) => {
     if (isLoadingContent.current) return;
@@ -267,55 +171,74 @@ function QueryWorkspace() {
 
       {/* Active tabpanel wrapping toolbar and content */}
       <div
-        id={activeTab ? `panel-${activeTab}` : 'panel-empty'}
+        id={hasAnyTabs ? `panel-${activeTab}` : 'panel-empty'}
         role="tabpanel"
-        aria-labelledby={activeTab ? `tab-${activeTab}` : undefined}
+        aria-labelledby={hasAnyTabs ? `tab-${activeTab}` : undefined}
         className={styles['tabpanel']}
-        style={{ display: activeTab ? 'contents' : 'none' }}
       >
-        {/* Toolbar within the active tab panel */}
-        <Toolbar
-          key={activeDataQueryId}
-          dataQueryId={activeDataQueryId as UUIDv7}
-          onRun={runFromToolbar}
-          getCurrentEditorText={getCurrentEditorText}
-        />
+        {hasAnyTabs ? (
+          <>
+            {/* Toolbar within the active tab panel */}
+            <Toolbar
+              key={activeDataQueryId}
+              dataQueryId={activeDataQueryId as UUIDv7}
+              onRun={runFromToolbar}
+              getCurrentEditorText={getCurrentEditorText}
+            />
 
-        <SplitPane
-          top={(
-            <Suspense fallback={<div className={styles['tabpanel']}>Loading editor…</div>}>
-              <SQLEditor
-                editorRef={editorRef}
-                onChange={editorOnChange}
-                value={(activeDataQueryRecord?.current?.queryText || '') as string}
-                suppressDispatch={isHydratingText}
-              />
-            </Suspense>
-          )}
-          bottom={(
-            <Suspense fallback={<div className={styles['tabpanel']}>Loading results…</div>}>
-              <QueryResults />
-            </Suspense>
-          )}
-          topStyle={topStyle}
-          bottomStyle={bottomStyle}
-          topRef={topPanelRef}
-          bottomRef={bottomPanelRef}
-          containerRef={containerRef as React.RefObject<HTMLElement | null>}
-          getRatio={() => topRatio}
-          onChangeImmediate={(r) => {
-            const topPct = Math.round(r * 100);
-            const bottomPct = Math.round((1 - r) * 100);
-            const topEl = topPanelRef.current;
-            const botEl = bottomPanelRef.current;
-            if (topEl) topEl.style.height = `${topPct}%`;
-            if (botEl) botEl.style.height = `${bottomPct}%`;
-          }}
-          onCommit={(r) => {
-            setTopRatio(r);
-            try { window.localStorage.setItem(STORAGE_KEY_SPLIT, JSON.stringify({ ratio: r })); } catch {}
-          }}
-        />
+            <SplitPane
+              top={(
+                <Suspense fallback={<div className={styles['tabpanel']}>Loading editor…</div>}>
+                  <SQLEditor
+                    editorRef={editorRef}
+                    onChange={editorOnChange}
+                    value={(activeDataQueryRecord?.current?.queryText || '') as string}
+                    suppressDispatch={isHydratingText}
+                  />
+                </Suspense>
+              )}
+              bottom={(
+                <Suspense fallback={<div className={styles['tabpanel']}>Loading results…</div>}>
+                  <QueryResults />
+                </Suspense>
+              )}
+              topStyle={topStyle}
+              bottomStyle={bottomStyle}
+              topRef={topPanelRef}
+              bottomRef={bottomPanelRef}
+              containerRef={containerRef as React.RefObject<HTMLElement | null>}
+              getRatio={() => topRatio}
+              onChangeImmediate={(r) => {
+                const topPct = Math.round(r * 100);
+                const bottomPct = Math.round((1 - r) * 100);
+                const topEl = topPanelRef.current;
+                const botEl = bottomPanelRef.current;
+                if (topEl) topEl.style.height = `${topPct}%`;
+                if (botEl) botEl.style.height = `${bottomPct}%`;
+              }}
+              onCommit={(r) => {
+                setTopRatio(r);
+                try { window.localStorage.setItem(STORAGE_KEY_SPLIT, JSON.stringify({ ratio: r })); } catch {}
+              }}
+            />
+          </>
+        ) : (
+          // AIDEV-NOTE: Empty-state for /queries/new (and any route with no open tabs).
+          // We no longer auto-create an unsaved query here; instead, the user explicitly
+          // opts in via this button or the TabBar "+" affordance. When on /queries/new,
+          // reuse the same OpSpaceIntro component used by the opspace root Page so the
+          // hero experience (logo + CTA) feels identical whether you land on the root
+          // or directly on /queries/new.
+          isNewRoute ? (
+            <OpSpaceIntro />
+          ) : (
+            <div className={styles['history-placeholder']}>
+              <div className={styles['history-text']}>
+                <p>No tabs open in this workspace.</p>
+              </div>
+            </div>
+          )
+        )}
       </div>
     </div>
   );
