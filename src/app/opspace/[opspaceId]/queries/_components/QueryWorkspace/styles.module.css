@@ -30,21 +30,3 @@
   color: var(--text-secondary);
   font-size: var(--space-4);
 }
-
-.empty-primary-button {
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-size: var(--font-size-md);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.empty-primary-button[aria-disabled='true'],
-.empty-primary-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}

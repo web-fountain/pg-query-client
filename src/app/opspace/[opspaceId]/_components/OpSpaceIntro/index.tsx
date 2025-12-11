@@ -1,7 +1,7 @@
 'use client';
 
 import CreateNewQueryButton from './CreateNewQueryButton';
-import styles               from '../../styles.module.css';
+import styles               from '../../../styles.module.css';
 
 
 function OpSpaceIntro() {

@@ -63,6 +63,12 @@ function TabBar() {
   // - a real tab change (mouse down on a different tab), vs
   // - redundant clicks on the already-active tab.
   const pendingPointerActivateRef = useRef<UUIDv7 | null>(null);
+  // AIDEV-NOTE: Guard against double fire for close/add actions while a thunk is
+  // still in flight. Unlike isPendingTabTransition (which is tied to React's
+  // internal transition lifecycle), these refs scope protection to the specific
+  // tab/id being acted on so the rest of the strip stays interactive.
+  const closingTabIdRef           = useRef<UUIDv7 | null>(null);
+  const isAddingRef               = useRef(false);
 
   const tabs = useMemo<Tab[]>(() => {
     return tabIds.map((t) => {
@@ -140,19 +146,30 @@ function TabBar() {
     }
   });
 
-  const handleAddTab = useEffectEvent(() => {
-    if (isPendingTabTransition) return;
+  const handleAddTab = useEffectEvent(async () => {
+    if (isAddingRef.current) return;
+
+    isAddingRef.current = true;
 
     const dataQueryId = generateUUIDv7();
-    dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
 
-    startTabTransition(() => {
-      navigateToNew();
-    });
+    try {
+      await dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
+
+      startTabTransition(() => {
+        navigateToNew();
+      });
+    } catch (error) {
+      console.error('handleAddTab: failed to create new unsaved tab', { dataQueryId, error });
+    } finally {
+      isAddingRef.current = false;
+    }
   });
 
   const handleTabClose = useEffectEvent(async (tabId: UUIDv7) => {
-    if (isPendingTabTransition) return;
+    if (closingTabIdRef.current === tabId) return;
+
+    closingTabIdRef.current = tabId;
 
     try {
       const result = await dispatch(closeTabThunk(tabId)).unwrap();
@@ -168,6 +185,10 @@ function TabBar() {
       });
     } catch (error) {
       console.error('handleTabClose: failed to close tab', { tabId, error });
+    } finally {
+      if (closingTabIdRef.current === tabId) {
+        closingTabIdRef.current = null;
+      }
     }
   });
 

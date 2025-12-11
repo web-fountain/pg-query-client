@@ -46,8 +46,7 @@ function QueryWorkspace() {
   const {
     opspaceId,
     routeMode,
-    dataQueryId: routeDataQueryId,
-    navigateToNew
+    dataQueryId: routeDataQueryId
   }                             = useOpSpaceRoute();
 
   const editorRef                = useRef<SQLEditorHandle | null>(null);

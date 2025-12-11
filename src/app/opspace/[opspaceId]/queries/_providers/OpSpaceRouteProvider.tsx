@@ -111,18 +111,39 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
     }
   });
 
-  // Initial alignment: on first load, align Redux active tab to URL or lastActiveUnsavedTabId
+  // AIDEV-NOTE: Initial alignment – on first load, align Redux active tab to URL
+  // or lastActiveUnsavedTabId. For saved routes, the URL's dataQueryId is the
+  // source of truth; if the currently active tab does not map to that id (e.g.,
+  // stale bootstrap state from cached tabs-open:list), we realign Redux so the
+  // correct tab is active.
+  //
+  // We intentionally wait until we have both:
+  //   1) dataQueryId parsed from the URL, and
+  //   2) a corresponding tabIdForRoute in tabIdByMountIdMap.
+  // Only then do we mark alignment complete. This avoids freezing alignment in
+  // an incomplete state during hydration/concurrent rendering.
   useEffect(() => {
     if (hasAlignedInitialRef.current) return;
 
     if (routeMode === 'saved') {
-      // If URL encodes a saved query and we don't have an active tab yet, align it
-      if (dataQueryId && !activeTabId) {
-        const tabId = tabIdByMountIdMap.get(dataQueryId);
-        if (tabId) {
-          void dispatch(setActiveTabThunk(tabId));
-        }
+      // Wait until we know the URL id.
+      if (!dataQueryId) return;
+
+      const tabIdForRoute = tabIdByMountIdMap.get(dataQueryId);
+
+      // Wait until we can see a tab for that id (entities may still be hydrating).
+      if (!tabIdForRoute) return;
+
+      const activeMountId = activeDataQueryIdFromTabs;
+
+      // If already aligned, mark complete and exit.
+      if (activeMountId === dataQueryId) {
+        hasAlignedInitialRef.current = true;
+        return;
       }
+
+      // Realign Redux to match the URL.
+      void dispatch(setActiveTabThunk(tabIdForRoute));
       hasAlignedInitialRef.current = true;
       return;
     }
@@ -134,7 +155,7 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
       }
       hasAlignedInitialRef.current = true;
     }
-  }, [routeMode, dataQueryId, activeTabId, lastActiveUnsavedTabId, dispatch]);
+  }, [routeMode, dataQueryId, activeDataQueryIdFromTabs, lastActiveUnsavedTabId, tabIdByMountIdMap, dispatch]);
 
   // Back/forward support
   useEffect(() => {

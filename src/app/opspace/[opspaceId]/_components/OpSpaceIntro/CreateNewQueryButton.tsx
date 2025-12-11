@@ -1,14 +1,14 @@
 'use client';
 
-import { useCallback, useTransition } from 'react';
-import { useParams, useRouter }       from 'next/navigation';
+import { useCallback, useTransition }         from 'react';
+import { useParams, useRouter }               from 'next/navigation';
 
 import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
-import { selectNextUntitledName }            from '@Redux/records/unsavedQueryTree';
-import { generateUUIDv7 }                    from '@Utils/generateId';
+import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
+import { generateUUIDv7 }                     from '@Utils/generateId';
 
-import styles                         from '../styles.module.css';
+import styles                                 from '../../../styles.module.css';
 
 
 function CreateNewQueryButton() {
