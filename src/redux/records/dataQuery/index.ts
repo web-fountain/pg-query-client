@@ -172,7 +172,6 @@ export const selectDataQueries      = createSelector.withTypes<RootState>()(
   (dataQueryRecords): DataQueryRecord => dataQueryRecords,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-
 export const selectDataQueryRecord  = createSelector.withTypes<RootState>()(
   [
     (state: RootState)                       => state.dataQueryRecords,
@@ -186,7 +185,6 @@ export const selectDataQueryRecord  = createSelector.withTypes<RootState>()(
   },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-
 export const selectDataQueryUnsaved = createSelector.withTypes<RootState>()(
   [
     (state: RootState)                      => state.dataQueryRecords,

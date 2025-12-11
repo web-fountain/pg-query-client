@@ -108,12 +108,12 @@ export async function closeTabAction(tabId: UUIDv7): Promise<{ success: boolean;
   // AIDEV-NOTE: Invalidate cached unsaved query tree on successful close
   try {
     updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
-  } catch {}
+  } catch {console.error('Error invalidating tree:children:buildInitialUnsavedQueryTree cache');}
 
   // AIDEV-NOTE: Invalidate cached list of open tabs on successful close
   try {
     updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
-  } catch {}
+  } catch {console.error('Error invalidating tabs-open:list cache');}
 
   return { success: true };
 }

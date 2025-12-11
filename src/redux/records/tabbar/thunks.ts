@@ -80,6 +80,19 @@ export const closeTabThunk = createAsyncThunk<CloseTabResult, UUIDv7, { state: R
       nextTabId && (postState.unsavedQueryTree.nodes[nextTabId] as UnsavedQueryTreeNode | undefined)
     );
 
+    const prevLast = postState.tabs.lastActiveUnsavedTabId;
+    const currentUnsavedIds = new Set(Object.keys(postState.unsavedQueryTree.nodes || {}));
+    let nextLastUnsaved: UUIDv7 | null = null;
+    for (const tId of postState.tabs.tabIds) {
+      if (currentUnsavedIds.has(String(tId))) {
+        nextLastUnsaved = tId as UUIDv7;
+        break;
+      }
+    }
+    if (prevLast !== nextLastUnsaved) {
+      dispatch(setLastActiveUnsavedTabId({ tabId: nextLastUnsaved }));
+    }
+
     closeTabAction(tabId).catch((error) => {
       console.error(`Error closing tab: ${tabId}`, error);
     });

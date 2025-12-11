@@ -26,6 +26,13 @@ export const moveNode     = createAction<{ nodeId: string; oldParentNodeId: stri
 export const resortChildren      = createAction<{ parentId: string }>('queryTree/resortChildren');
 export const insertChildSorted   = createAction<{ parentId: string; node: TreeNode }>('queryTree/insertChildSorted');
 
+// AIDEV-NOTE: Explicitly link a dataQueryId to a tree nodeId so renameNodeWithInvalidation
+// can locate the correct node even for client-created nodes (e.g., promotions).
+export const linkDataQueryIdToNodeIds = createAction<{
+  dataQueryId : UUIDv7;
+  nodeId      : UUIDv7;
+}>('queryTree/linkDataQueryIdToNodeIds');
+
 // AIDEV-NOTE: Rename with automatic resort detection and invalidation tracking.
 // This action updates the label, computes if resort is needed, and sets pendingInvalidations.
 export const renameNodeWithInvalidation = createAction<{
@@ -153,13 +160,24 @@ export default createReducer(initialState, (builder) => {
         const { parentId, node } = action.payload;
         state.nodes[node.nodeId] = { ...node, parentNodeId: parentId };
         const arr = state.childrenByParentId[parentId] || [];
+
         const resolve = (id: string) => {
           const n = state.nodes[id];
           return { nodeId: id, kind: (n?.kind || 'file') as 'folder' | 'file', name: n?.label || '', sortKey: n?.sortKey };
         };
+
         const idx = findInsertIndexIds(arr, resolve(node.nodeId), resolve, compareBySortKey);
-        if (!arr.includes(node.nodeId)) arr.splice(idx, 0, node.nodeId);
+        if (!arr.includes(node.nodeId as UUIDv7)) arr.splice(idx, 0, node.nodeId as UUIDv7);
         state.childrenByParentId[parentId] = arr;
+      }
+    )
+    .addCase(linkDataQueryIdToNodeIds,
+      function (state: QueryTreeRecord, action: PayloadAction<{ dataQueryId: UUIDv7; nodeId: UUIDv7 }>) {
+        const { dataQueryId, nodeId } = action.payload;
+        const existing = state.nodeIdsByDataQueryId[dataQueryId] || [];
+        if (!existing.includes(nodeId)) {
+          state.nodeIdsByDataQueryId[dataQueryId] = [...existing, nodeId];
+        }
       }
     )
     // AIDEV-NOTE: Rename with automatic resort detection and invalidation tracking.
@@ -174,7 +192,7 @@ export default createReducer(initialState, (builder) => {
         const node = state.nodes[nodeId];
         if (!node) return;
 
-        const parentId = node.parentNodeId;
+        const parentId = node.parentNodeId as UUIDv7;
 
         // Update the label
         node.label = name;

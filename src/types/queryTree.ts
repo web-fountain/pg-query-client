@@ -30,7 +30,7 @@ type Nodes = {
 };
 
 type ChildrenByParentId = {
-  [parentNodeId: UUIDv7]: UUIDv7[];
+  [parentNodeId: string | UUIDv7]: UUIDv7[];
 };
 
 type NodeIdsByFolderId = {

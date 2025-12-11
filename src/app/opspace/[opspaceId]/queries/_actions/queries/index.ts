@@ -123,10 +123,10 @@ export async function createNewUnsavedDataQueryAction(payload: { dataQueryId: UU
   return { success: true, data: data.data };
 }
 
-type ResponsePayload05 = {
-  ok: false | true;
-};
-export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: string, queryText?: string }): Promise<{ success: boolean }> {
+type ResponsePayload05 =
+  | { ok: false }
+  | { ok: true; data: { dataQueryId: UUIDv7, nodeId?: UUIDv7 } };
+export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: string, queryText?: string }): Promise<{ success: boolean; data?: { dataQueryId: UUIDv7, nodeId?: UUIDv7 } }> {
   console.log('[ACTION] updateDataQuery');
 
   const ctx = await getHeadersContextOrNull();
@@ -136,7 +136,7 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
 
   const { dataQueryId, name, queryText } = payload;
 
-  const { ok } = await backendFetchJSON<ResponsePayload05>({
+  const { ok, data } = await backendFetchJSON<ResponsePayload05>({
     path    : `/queries/${dataQueryId}`,
     method  : 'PATCH',
     scope   : ['queries:write'],
@@ -145,7 +145,7 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
     context : ctx
   });
 
-  if (!ok) {
+  if (!ok || !data?.ok) {
     return { success: false };
   }
 
@@ -166,5 +166,5 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
     updateTag(`queries:list:${ctx.opspacePublicId}`);
   } catch {}
 
-  return { success: true };
+  return { success: true, data: data.data };
 }

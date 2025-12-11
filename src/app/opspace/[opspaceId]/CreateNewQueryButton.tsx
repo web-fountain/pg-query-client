@@ -5,8 +5,6 @@ import { useParams, useRouter }               from 'next/navigation';
 
 import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
-import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
-import { generateUUIDv7 }                     from '@Utils/generateId';
 import styles                                 from '../styles.module.css';
 
 
@@ -17,13 +15,11 @@ function CreateNewQueryButton() {
   const dispatch                      = useReduxDispatch();
   const router                        = useRouter();
 
-  // AIDEV-NOTE: Optimistic tab write + immediate navigation (in a transition); backend save happens via thunk. Guard double-clicks via isPending.
+  // AIDEV-NOTE: Optimistic unsaved query + tab creation before navigating to
+  // /queries/new. QueryWorkspace's bootstrap effect is guarded so it will not
+  // create a duplicate unsaved tab when tabs/unsaved nodes already exist.
   const handleCreateNewQuery = useCallback(() => {
     if (isPending) return;
-
-    const dataQueryId = generateUUIDv7();
-
-    dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
 
     startTransition(() => {
       router.replace(`/opspace/${opspaceId}/queries/new`);

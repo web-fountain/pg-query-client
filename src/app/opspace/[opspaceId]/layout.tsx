@@ -71,7 +71,7 @@ async function LayoutWithData({ children, params }: { children: ReactNode, param
           nodeIdsByDataQueryId  : {}
         },
         unsavedQueryTree: {
-          rootId              : 'unsaved-root',
+          rootId              : 'unsaved-queries',
           nodes               : {},
           childrenByParentId  : {}
         }

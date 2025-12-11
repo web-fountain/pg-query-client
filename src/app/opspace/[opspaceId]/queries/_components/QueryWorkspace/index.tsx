@@ -17,13 +17,15 @@ import {
 import {
   selectDataQueryIdForTabId,
   selectTabIds,
-  selectActiveTabId,
-  selectLastActiveUnsavedTabId
+  selectActiveTabId
 }                                   from '@Redux/records/tabbar';
 import {
   selectDataQueryRecord
 }                                   from '@Redux/records/dataQuery';
-import { selectNextUntitledName }   from '@Redux/records/unsavedQueryTree';
+import {
+  selectUnsavedQueryTree,
+  selectNextUntitledName
+}                                   from '@Redux/records/unsavedQueryTree';
 import { createNewUnsavedDataQueryThunk } from '@Redux/records/dataQuery/thunks';
 import { generateUUIDv7 }                from '@Utils/generateId';
 
@@ -69,8 +71,11 @@ function QueryWorkspace() {
 
   const tabIds                   = useReduxSelector(selectTabIds);
   const activeTabId              = useReduxSelector(selectActiveTabId);
-  const activeDataQueryIdFromTabs = useReduxSelector(selectDataQueryIdForTabId, (activeTabId || null) as UUIDv7 | null);
-  const lastActiveUnsavedTabId   = useReduxSelector(selectLastActiveUnsavedTabId);
+  const activeDataQueryIdFromTabs = useReduxSelector(
+    selectDataQueryIdForTabId,
+    (activeTabId || null) as UUIDv7 | null
+  );
+  const unsavedQueryTree         = useReduxSelector(selectUnsavedQueryTree);
   const nextUntitledName         = useReduxSelector(selectNextUntitledName);
 
   // AIDEV-NOTE: Prefer the dataQueryId derived from the active tab once tab
@@ -90,31 +95,36 @@ function QueryWorkspace() {
   const isHydratingText         = lastActiveDataQueryIdRef.current !== activeDataQueryId;
   lastActiveDataQueryIdRef.current = activeDataQueryId;
 
-  // AIDEV-NOTE: If on /queries/new and no unsaved tab exists yet, create one.
-  // With tabs preloaded on the server, this runs against the true tabs state
-  // on first render and avoids creating an extra unsaved tab on refresh when
-  // unsaved tabs already exist.
+  // AIDEV-NOTE: If on /queries/new and *no* unsaved tab exists yet for this
+  // opspace (no tabs + no unsaved file nodes), create a single new unsaved
+  // query. State-based guards run FIRST so they are evaluated fresh on each
+  // navigation. The ref guard runs LAST to prevent rapid double-dispatch
+  // within the same effect cycle (e.g., React StrictMode, dependency churn).
   useEffect(() => {
-    if (hasCreatedInitialUnsaved.current) return;
     if (routeMode !== 'new') return;
 
-    // If there's an active data query from tabs, do not create a new one.
-    if (activeDataQueryIdFromTabs) {
-      hasCreatedInitialUnsaved.current = true;
-      return;
-    }
+    // If any tab is already present (saved or unsaved), skip auto-create.
+    if (tabIds.length > 0) return;
 
-    // If there's a known last active unsaved tab that OpSpaceRouteProvider will
-    // align to, avoid creating another unsaved query and let alignment happen.
-    if (lastActiveUnsavedTabId) {
-      hasCreatedInitialUnsaved.current = true;
-      return;
-    }
+    // If there's an active data query from tabs, do not create a new one.
+    if (activeDataQueryIdFromTabs) return;
+
+    // If any unsaved file node already exists in the unsaved tree, skip.
+    const nodes = unsavedQueryTree.nodes || {};
+    const hasUnsavedFile = Object.values(nodes).some(
+      // AIDEV-NOTE: Unsaved tree nodes are a union of group/file; we only care about files here.
+      (node) => node && (node as any).kind === 'file'
+    );
+    if (hasUnsavedFile) return;
+
+    // AIDEV-NOTE: Ref guard runs LAST - prevents double-dispatch within same
+    // render cycle while allowing fresh state-based evaluation on each visit.
+    if (hasCreatedInitialUnsaved.current) return;
 
     const dataQueryId = generateUUIDv7();
     dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
     hasCreatedInitialUnsaved.current = true;
-  }, [routeMode, activeDataQueryIdFromTabs, lastActiveUnsavedTabId, dispatch, nextUntitledName]);
+  }, [routeMode, tabIds, activeDataQueryIdFromTabs, unsavedQueryTree.nodes, dispatch, nextUntitledName]);
 
   // Hydrate ratio from localStorage after mount
   useEffect(() => {

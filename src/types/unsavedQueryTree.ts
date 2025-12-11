@@ -23,7 +23,7 @@ type UnsavedQueryTreeNode = {
 type UnsavedTreeNode = UnsavedQueryTreeGroupNode | UnsavedQueryTreeNode;
 
 type UnsavedQueryTree = {
-  rootId              : 'unsaved-root';
+  rootId              : 'unsaved-queries';
   nodes               : Record<string, UnsavedTreeNode>;
   childrenByParentId  : Record<string, UUIDv7[]>;
 };

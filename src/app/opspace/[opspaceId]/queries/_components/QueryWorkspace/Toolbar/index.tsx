@@ -18,6 +18,7 @@ import { saveDataQueryThunk }   from '@Redux/records/dataQuery/thunks';
 import { useDebouncedCallback } from '@Hooks/useDebounce';
 import Icon                     from '@Components/Icons';
 import { useSqlRunner }         from '../../../../_providers/SQLRunnerProvider';
+import { useOpSpaceRoute }      from '../../../_providers/OpSpaceRouteProvider';
 
 import styles                   from './styles.module.css';
 
@@ -30,6 +31,7 @@ type Props = {
 
 function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const { isRunning }           = useSqlRunner();
+  const { navigateToSaved }     = useOpSpaceRoute();
   const record                  = useReduxSelector(selectDataQueryRecord, dataQueryId);
   const dispatch                = useReduxDispatch();
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -91,12 +93,21 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
       dispatch(updateDataQueryText({ dataQueryId, queryText: latestText }));
     }
 
+    // need to check if user is attempting to save a query name that is already taken
+    // within the same query tree
+
     try {
-      await dispatch(saveDataQueryThunk({ dataQueryId }));
+      const result = await dispatch(saveDataQueryThunk({ dataQueryId })).unwrap();
+
+      // AIDEV-NOTE: Only transition from /queries/new → /queries/:id when a true
+      // promotion has completed successfully. Regular saves remain on the saved route.
+      if (result && result.success && result.isPromotion) {
+        navigateToSaved(dataQueryId);
+      }
     } finally {
       setIsSaving(false);
     }
-  }, [dataQueryId, debouncedCommit, dispatch, getCurrentEditorText]);
+  }, [dataQueryId, debouncedCommit, dispatch, getCurrentEditorText, navigateToSaved]);
 
   useEffect(() => {
     const name = record?.current?.name ?? record?.persisted?.name ?? '';

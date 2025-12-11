@@ -3,7 +3,8 @@ import type { RootState }     from '@Redux/store';
 import type { UUIDv7 }        from '@Types/primitives';
 import type {
   UnsavedQueryTreeNode,
-  UnsavedQueryTreeRecord
+  UnsavedQueryTreeRecord,
+  UnsavedTreeNode
 }                             from './types';
 
 import {
@@ -86,7 +87,7 @@ export const selectNextUntitledName = createSelector.withTypes<RootState>()(
 
 // Reducer
 const initialState: UnsavedQueryTreeRecord = {
-  rootId: 'unsaved-root',
+  rootId: 'unsaved-queries',
   nodes: {},
   childrenByParentId: {}
 };
@@ -100,16 +101,36 @@ export default createReducer(initialState, (builder) => {
     .addCase(addUnsavedTreeNodeFromFetch,
       function(state : UnsavedQueryTreeRecord, action: PayloadAction<{ tree: UnsavedQueryTreeNode }>) {
         const { tree } = action.payload;
-        const { nodeId, parentNodeId } = tree;
+        const { nodeId, parentNodeId, groupId } = tree;
+
+        const parentKey = String(parentNodeId);
+        const rootId = state.rootId;
+
+        // AIDEV-NOTE: When the first unsaved query is created client-side, the
+        // backend "group" node (e.g. id "1") may not yet be present in Redux.
+        // Synthesize a minimal group node and attach it under the root so the
+        // tree has a visible path root -> group -> file.
+        if (!state.nodes[parentKey]) {
+          const groupNode: UnsavedTreeNode = {
+            nodeId       : parentKey,
+            parentNodeId : rootId,
+            kind         : 'group',
+            groupId      : groupId,
+            position     : 0,
+            name         : 'Unsaved'
+          };
+          state.nodes[parentKey] = groupNode;
+
+          const rootChildren = state.childrenByParentId[rootId] || [];
+          if (!rootChildren.includes(parentKey as any)) {
+            state.childrenByParentId[rootId] = [...rootChildren, parentKey as any];
+          }
+        }
 
         state.nodes[nodeId] = tree;
 
-        const children = state.childrenByParentId[parentNodeId];
-        if (!children) {
-          state.childrenByParentId[parentNodeId] = [nodeId];
-        } else {
-          children.push(nodeId);
-        }
+        const children = state.childrenByParentId[parentKey] || [];
+        state.childrenByParentId[parentKey] = [...children, nodeId];
       }
     )
     .addCase(removeUnsavedTreeNodeByTabId,
