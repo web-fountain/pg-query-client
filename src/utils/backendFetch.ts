@@ -87,11 +87,11 @@ type BackendFetchOptions = {
 };
 
 type BackendFetchJSONResult<T> = {
-  ok: boolean;
-  status: number;
-  data?: T;
-  error?: unknown;
-  context?: HeadersContext;
+  ok        : boolean;
+  status    : number;
+  data?     : T;
+  error?    : unknown;
+  context?  : HeadersContext;
 };
 
 function buildScopeKey(scope: string[]): string {
@@ -123,11 +123,11 @@ function buildScopeKey(scope: string[]): string {
 // AIDEV-NOTE: Memoize OBO token per request to avoid repeated minting during bootstraps
 // (e.g. Promise.all([...]) calling backendFetchJSON multiple times).
 const getBackendJwtForRequest = cache(async (
-  tenantPublicId: string,
-  opspacePublicId: string,
-  operatorPublicId: string,
-  audience: string,
-  scopeKey: string
+  tenantPublicId    : string,
+  opspacePublicId   : string,
+  operatorPublicId  : string,
+  audience          : string,
+  scopeKey          : string
 ): Promise<string> => {
   const scope = scopeKey ? scopeKey.split(' ') : undefined;
   return getBackendAccessTokenOnBehalfOf({
@@ -277,7 +277,7 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
     });
     return { ok: true, status: res.status, data: responsePayload, context: ctx };
   } catch (error) {
-    const durationMs = Math.round(nowMs() - fetchStart);
+    const durationMs = Math.round(nowMonotonicMs() - fetchStart);
     if ((error as any)?.name === 'AbortError') {
       logBackendCall('error', {
         event         : 'backendFetch',
