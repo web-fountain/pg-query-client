@@ -1,44 +1,47 @@
-import type { PayloadAction }                 from '@reduxjs/toolkit';
-import type { RootState }                     from '@Redux/store';
-import type { UUIDv7 }                        from '@Types/primitives';
-import type { Tab, TabbarRecord }             from './types';
+import type { PayloadAction }     from '@reduxjs/toolkit';
+import type { RootState }         from '@Redux/store';
+import type { UUIDv7 }            from '@Types/primitives';
+import type { Tab, TabbarRecord } from './types';
 
 import {
-  createAction, createReducer, createSelector
-}                                             from '@reduxjs/toolkit';
+  createAction,
+  createReducer,
+  createSelector
+}                                 from '@reduxjs/toolkit';
 
 
 // Actions
-export const setInitialTabs  = createAction<TabbarRecord>                 ('tabs/setInitialTabs');
-export const addTabFromFetch = createAction<{ tab: Tab }>                 ('tabs/addTabFromFetch');
-export const closeTab        = createAction<{ tabId: UUIDv7 }>            ('tabs/closeTab');
-export const setActiveTab    = createAction<{ tabId: UUIDv7 }>            ('tabs/setActiveTab');
-export const focusTabIndex   = createAction<{ index: number }>            ('tabs/focusTabIndex');
-export const reorderTabs     = createAction<{ tabIds: UUIDv7[] }>('tabs/reorderTabs');
-export const setLastActiveUnsavedTabId = createAction<{ tabId: UUIDv7 | null }>('tabs/setLastActiveUnsavedTabId');
+export const setInitialTabs            = createAction<TabbarRecord>             ('tabs/setInitialTabs');
+export const addTabFromFetch           = createAction<{ tab: Tab }>             ('tabs/addTabFromFetch');
+export const closeTab                  = createAction<{ tabId: UUIDv7 }>        ('tabs/closeTab');
+export const setActiveTab              = createAction<{ tabId: UUIDv7 }>        ('tabs/setActiveTab');
+export const focusTabIndex             = createAction<{ index: number }>        ('tabs/focusTabIndex');
+export const reorderTabs               = createAction<{ tabIds: UUIDv7[] }>     ('tabs/reorderTabs');
+export const setLastActiveUnsavedTabId = createAction<{ tabId: UUIDv7 | null }> ('tabs/setLastActiveUnsavedTabId');
+
 
 // Selectors
-export const selectTabEntities      = createSelector.withTypes<RootState>()(
-  [(state) => state.tabs.entities],
-  (entities) => entities,
-  { devModeChecks: { identityFunctionCheck: 'never' } }
-);
-export const selectTabIds           = createSelector.withTypes<RootState>()(
+export const selectTabIds                 = createSelector.withTypes<RootState>()(
   [(state) => state.tabs.tabIds],
   (tabIds) => tabIds,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-export const selectActiveTabId      = createSelector.withTypes<RootState>()(
+export const selectTabEntities            = createSelector.withTypes<RootState>()(
+  [(state) => state.tabs.entities],
+  (entities) => entities,
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+export const selectActiveTabId            = createSelector.withTypes<RootState>()(
   [state => state.tabs.activeTabId],
   (activeTabId) => activeTabId,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-export const selectFocusedTabIndex  = createSelector.withTypes<RootState>()(
+export const selectFocusedTabIndex        = createSelector.withTypes<RootState>()(
   [state => state.tabs.focusedTabIndex],
   (focusedTabIndex) => focusedTabIndex,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-export const selectDataQueryIdForTabId = createSelector.withTypes<RootState>()(
+export const selectDataQueryIdForTabId    = createSelector.withTypes<RootState>()(
   [
     (state: RootState) => state.tabs.entities,
     (_state: RootState, tabId: UUIDv7 | null) => tabId
@@ -50,7 +53,7 @@ export const selectDataQueryIdForTabId = createSelector.withTypes<RootState>()(
   },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-export const selectTabIdByMountIdMap = createSelector.withTypes<RootState>()(
+export const selectTabIdByMountIdMap      = createSelector.withTypes<RootState>()(
   [(state) => state.tabs.entities],
   (entities) => {
     const map = new Map<UUIDv7, UUIDv7>();
@@ -67,15 +70,15 @@ export const selectLastActiveUnsavedTabId = createSelector.withTypes<RootState>(
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
-const initialState: TabbarRecord = {
-  tabIds          : [],
-  activeTabId     : null,
-  focusedTabIndex : null,
-  entities        : {},
-  lastActiveUnsavedTabId : null
-};
 
 // Reducer
+const initialState: TabbarRecord = {
+  tabIds                  : [],
+  activeTabId             : null,
+  focusedTabIndex         : null,
+  entities                : {},
+  lastActiveUnsavedTabId  : null
+};
 const reducer = createReducer(initialState, (builder) => {
   builder
     .addCase(setInitialTabs,
@@ -113,8 +116,8 @@ const reducer = createReducer(initialState, (builder) => {
         if (closingActive) {
           // AIDEV-NOTE: When closing the active tab, focus the next tab to the right.
           // If the closed tab was the last, focus the previous one instead.
-          const nextIndex = Math.min(tabIndex, state.tabIds.length - 1);
-          state.activeTabId = state.tabIds[nextIndex];
+          const nextIndex       = Math.min(tabIndex, state.tabIds.length - 1);
+          state.activeTabId     = state.tabIds[nextIndex];
           state.focusedTabIndex = nextIndex;
         } else if (state.focusedTabIndex !== null) {
           // AIDEV-NOTE: Keep focus stable; shift left if a tab before the focus index was removed.

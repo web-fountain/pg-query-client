@@ -24,75 +24,39 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@Auth/*": [
-        "./src/auth/*"
-      ],
-      "@Auth": [
-        "./src/auth"
-      ],
-      "@Components/*": [
-        "./src/components/*"
-      ],
-      "@Components": [
-        "./src/components"
-      ],
-      "@Constants/*": [
-        "./src/constants/*"
-      ],
-      "@Constants": [
-        "./src/constants"
-      ],
-      "@Lib/*": [
-        "./src/lib/*"
-      ],
-      "@Lib": [
-        "./src/lib"
-      ],
-      "@Hooks/*": [
-        "./src/hooks/*"
-      ],
-      "@Hooks": [
-        "./src/hooks"
-      ],
-      "@OpSpaceProviders/*": [
-        "./src/app/opspace/[opspaceId]/_providers/*"
-      ],
-      "@OpSpaceProviders": [
-        "./src/app/opspace/[opspaceId]/_providers"
-      ],
-      "@Pages/*": [
-        "./src/pages/*"
-      ],
-      "@Pages": [
-        "./src/pages"
-      ],
-      "@Redux/*": [
-        "./src/redux/*"
-      ],
-      "@Redux": [
-        "./src/redux"
-      ],
-      "@Styles/*": [
-        "./src/assets/styles/*"
-      ],
-      "@Styles": [
-        "./src/assets/styles"
-      ],
-      "@Types/*": [
-        "./src/types/*"
-      ],
-      "@Types": [
-        "./src/types"
-      ],
-      "@Utils/*": [
-        "./src/utils/*"
-      ],
-      "@Utils": [
-        "./src/utils"
-      ]
+      "@/*":                      ["./src/*"],
+      "@Actions/*":               ["./src/actions/*"],
+      "@Actions":                 ["./src/actions"],
+      "@Auth/*":                  ["./src/auth/*"],
+      "@Auth":                    ["./src/auth"],
+      "@Components/*":            ["./src/components/*"],
+      "@Components":              ["./src/components"],
+      "@Constants/*":             ["./src/constants/*"],
+      "@Constants":               ["./src/constants"],
+      "@Errors/*":                ["./src/errors/*"],
+      "@Errors":                  ["./src/errors"],
+      "@Lib/*":                   ["./src/lib/*"],
+      "@Lib":                     ["./src/lib"],
+      "@Hooks/*":                 ["./src/hooks/*"],
+      "@Hooks":                   ["./src/hooks"],
+      "@Observability/*":          ["./src/observability/*"],
+      "@Observability":            ["./src/observability"],
+      "@OpSpace/*":               ["./src/app/opspace/[opspaceId]/*"],
+      "@OpSpace":                 ["./src/app/opspace/[opspaceId]"],
+      "@OpSpaceProviders/*":      ["./src/app/opspace/[opspaceId]/_providers/*"],
+      "@OpSpaceProviders":        ["./src/app/opspace/[opspaceId]/_providers"],
+      "@OpSpaceQueriesActions/*": ["./src/app/opspace/[opspaceId]/queries/_actions/*"],
+      "@OpSpaceQueriesActions":   ["./src/app/opspace/[opspaceId]/queries/_actions"],
+      "@Pages/*":                 ["./src/pages/*"],
+      "@Pages":                   ["./src/pages"],
+      "@Redux/*":                 ["./src/redux/*"],
+      "@Redux":                   ["./src/redux"],
+      "@Styles/*":                ["./src/assets/styles/*"],
+      "@Styles":                  ["./src/assets/styles"],
+      "@Types/*":                 ["./src/types/*"],
+      "@Types":                   ["./src/types"],
+      "@Utils/*":                 ["./src/utils/*"],
+      "@Utils":                   ["./src/utils"]
     }
   },
   "include": [

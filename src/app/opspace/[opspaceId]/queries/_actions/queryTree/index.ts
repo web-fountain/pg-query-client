@@ -3,21 +3,35 @@
 import type { QueryTree, TreeNode } from '@Types/queryTree';
 import type { UnsavedQueryTree }    from '@Types/unsavedQueryTree';
 import type { HeadersContext }      from '@Utils/backendFetch';
+import type { ActionResult }        from '../types';
+import type {
+  BuildInitialQueryTreeApiResponse,
+  BuildInitialUnsavedQueryTreeApiResponse,
+  QueryTreeNodeChildren
+}                                   from './types';
 
 import { cacheLife, cacheTag }      from 'next/cache';
+import { withAction }               from '@Observability/server/action';
 import {
-  backendFetchJSON,
-  getHeadersContextOrNull
-}                                   from '@Utils/backendFetch';
+  actionErrorFromBackendFetch,
+  backendFailedActionError,
+  fail, ok
+}                                   from '@Errors/server/actionResult.server';
+import { backendFetchJSON }         from '@Utils/backendFetch';
+import {
+  queryTreeChildrenTag,
+  queryTreeInitialTag,
+  unsavedQueryTreeInitialTag
+}                                   from '../tags';
 
 
-type ResponsePayload01 =
-  | { ok: false; }
-  | { ok: true; data: QueryTree; };
-
-// AIDEV-NOTE: Cached initial query tree per HeadersContext using "use cache".
+// Cached initial query tree per HeadersContext using "use cache".
 // Cache is scoped by tenant/opspace/operator via HeadersContext and invalidated by updateTag('tree:children:...').
-async function buildInitialQueryTreeCached(ctx: HeadersContext): Promise<QueryTree | null> {
+type BuildInitialQueryTreeCachedResult =
+  | { ok: true; data: QueryTree }
+  | { ok: false; status: number; reason: 'fetch-failed' | 'backend-ok-false' };
+
+async function buildInitialQueryTreeCached(ctx: HeadersContext): Promise<BuildInitialQueryTreeCachedResult> {
   'use cache';
 
   cacheLife({
@@ -26,46 +40,61 @@ async function buildInitialQueryTreeCached(ctx: HeadersContext): Promise<QueryTr
     expire    : 300 // 5 minutes
   });
 
-  cacheTag(`tree:children:${ctx.opspacePublicId}:buildInitialQueryTree`);
+  cacheTag(queryTreeInitialTag(ctx.opspacePublicId));
 
-  const { ok, data } = await backendFetchJSON<ResponsePayload01>({
+  const res = await backendFetchJSON<BuildInitialQueryTreeApiResponse>({
     path    : '/queries/tree',
     method  : 'GET',
     scope   : ['queries-tree:read'],
-    logLabel: 'buildInitialQueryTree',
+    logLabel: 'buildInitialQueryTreeAction',
     context : ctx
   });
 
-  if (!ok || !data?.ok) {
-    return null;
+  if (!res.ok) {
+    return { ok: false, status: res.status, reason: 'fetch-failed' };
   }
 
-  return data.data;
+  if (!res.data?.ok) {
+    return { ok: false, status: res.status, reason: 'backend-ok-false' };
+  }
+
+  return { ok: true, data: res.data.data };
 }
 
-export async function buildInitialQueryTree(): Promise<{ success: boolean; data?: QueryTree }> {
-  console.log('[ACTION] buildInitialQueryTree');
+export async function buildInitialQueryTreeAction(): Promise<ActionResult<QueryTree>> {
+  return withAction(
+    { action: 'queryTree.buildInitial', op: 'read' },
+    async ({ ctx, meta }) => {
+      const tree = await buildInitialQueryTreeCached(ctx);
+      if (!tree.ok) {
+        if (tree.reason === 'backend-ok-false') {
+          return fail(meta, backendFailedActionError(meta, {
+            message: 'Failed to load query tree.',
+            request: { path: '/queries/tree', method: 'GET', scope: ['queries-tree:read'], logLabel: 'buildInitialQueryTreeAction' }
+          }));
+        }
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+        const isParseFailure = tree.status >= 200 && tree.status < 300;
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : tree.status,
+          fallbackMessage : 'Failed to load query tree.',
+          request         : { path: '/queries/tree', method: 'GET', scope: ['queries-tree:read'], logLabel: 'buildInitialQueryTreeAction' },
+          isParseFailure  : isParseFailure
+        }));
+      }
 
-  const tree = await buildInitialQueryTreeCached(ctx);
-  if (!tree) {
-    return { success: false };
-  }
-
-  return { success: true, data: tree };
+      return ok(meta, tree.data);
+    }
+  );
 }
-
-type ResponsePayload02 =
-  | { ok: false; }
-  | { ok: true; data: UnsavedQueryTree; };
 
 // AIDEV-NOTE: Cached initial unsaved query tree per HeadersContext using "use cache".
 // Cache is scoped by tenant/opspace/operator via HeadersContext and invalidated by updateTag('tree:children:...').
-async function buildInitialUnsavedQueryTreeCached(ctx: HeadersContext): Promise<UnsavedQueryTree | null> {
+type BuildInitialUnsavedQueryTreeCachedResult =
+  | { ok: true; data: UnsavedQueryTree }
+  | { ok: false; status: number; reason: 'fetch-failed' | 'backend-ok-false' };
+
+async function buildInitialUnsavedQueryTreeCached(ctx: HeadersContext): Promise<BuildInitialUnsavedQueryTreeCachedResult> {
   'use cache';
 
   cacheLife({
@@ -74,51 +103,63 @@ async function buildInitialUnsavedQueryTreeCached(ctx: HeadersContext): Promise<
     expire    : 300 // 5 minutes
   });
 
-  cacheTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
+  cacheTag(unsavedQueryTreeInitialTag(ctx.opspacePublicId));
 
-  const { ok, data } = await backendFetchJSON<ResponsePayload02>({
+  const res = await backendFetchJSON<BuildInitialUnsavedQueryTreeApiResponse>({
     path    : '/queries/tree/unsaved',
     method  : 'GET',
     scope   : ['queries-tree-unsaved:read'],
-    logLabel: 'buildInitialUnsavedQueryTree',
+    logLabel: 'buildInitialUnsavedQueryTreeAction',
     context : ctx
   });
 
-  console.log('[RESPONSE] buildInitialUnsavedQueryTree', data);
-
-  if (!ok || !data?.ok) {
-    return null;
+  if (!res.ok) {
+    return { ok: false, status: res.status, reason: 'fetch-failed' };
   }
 
-  return data.data;
+  if (!res.data?.ok) {
+    return { ok: false, status: res.status, reason: 'backend-ok-false' };
+  }
+
+  return { ok: true, data: res.data.data };
 }
 
-export async function buildInitialUnsavedQueryTree(): Promise<{ success: boolean; data?: UnsavedQueryTree }> {
-  console.log('[ACTION] buildInitialUnsavedQueryTree');
+export async function buildInitialUnsavedQueryTreeAction(): Promise<ActionResult<UnsavedQueryTree>> {
+  return withAction(
+    { action: 'queryTree.buildInitialUnsaved', op: 'read' },
+    async ({ ctx, meta }) => {
+      const tree = await buildInitialUnsavedQueryTreeCached(ctx);
+      if (!tree.ok) {
+        if (tree.reason === 'backend-ok-false') {
+          return fail(meta, backendFailedActionError(meta, {
+            message: 'Failed to load unsaved query tree.',
+            request: { path: '/queries/tree/unsaved', method: 'GET', scope: ['queries-tree-unsaved:read'], logLabel: 'buildInitialUnsavedQueryTreeAction' }
+          }));
+        }
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+        const isParseFailure = tree.status >= 200 && tree.status < 300;
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : tree.status,
+          fallbackMessage : 'Failed to load unsaved query tree.',
+          request         : { path: '/queries/tree/unsaved', method: 'GET', scope: ['queries-tree-unsaved:read'], logLabel: 'buildInitialUnsavedQueryTreeAction' },
+          isParseFailure  : isParseFailure
+        }));
+      }
 
-  const tree = await buildInitialUnsavedQueryTreeCached(ctx);
-  if (!tree) {
-    return { success: false };
-  }
-
-  return { success: true, data: tree };
+      return ok(meta, tree.data);
+    }
+  );
 }
-
-export type QueryTreeNodeChildren = {
-  node    : TreeNode;
-  children: TreeNode[];
-};
 
 const root = { id: 'queries', kind: 'folder', name: 'QUERIES' };
 
 // AIDEV-NOTE: Cache full tree payload; callers slice it to a node's children.
 // Tag is invalidated by updateTag(`tree:children:${opspacePublicId}:queries`) on writes.
-async function getQueryTreeCached(ctx: HeadersContext): Promise<QueryTree | null> {
+type GetQueryTreeCachedResult =
+  | { ok: true; data: QueryTree }
+  | { ok: false; status: number };
+
+async function getQueryTreeCached(ctx: HeadersContext): Promise<GetQueryTreeCachedResult> {
   'use cache';
 
   cacheLife({
@@ -126,9 +167,9 @@ async function getQueryTreeCached(ctx: HeadersContext): Promise<QueryTree | null
     revalidate: 60, // 1 minute
     expire    : 300 // 5 minutes
   });
-  cacheTag(`tree:children:${ctx.opspacePublicId}:queries`);
+  cacheTag(queryTreeChildrenTag(ctx.opspacePublicId));
 
-  const { ok, data } = await backendFetchJSON<QueryTree>({
+  const res = await backendFetchJSON<QueryTree>({
     path    : '/queries/tree/children',
     method  : 'GET',
     scope   : ['queries-tree:read'],
@@ -136,29 +177,37 @@ async function getQueryTreeCached(ctx: HeadersContext): Promise<QueryTree | null
     context : ctx
   });
 
-  if (!ok || !data) {
-    return null;
+  if (!res.ok || !res.data) {
+    return { ok: false, status: res.status };
   }
 
-  return data;
+  return { ok: true, data: res.data };
 }
 
-export async function getQueryTreeNodeChildren(nodeId?: string): Promise<QueryTreeNodeChildren> {
-  console.log('[ACTION] getQueryTreeNodeChildren');
+export async function getQueryTreeNodeChildrenAction(nodeId?: string): Promise<ActionResult<QueryTreeNodeChildren>> {
+  return withAction(
+    {
+      action : 'queryTree.children',
+      op     : 'read',
+      input  : { nodeId: nodeId ?? 'queries' }
+    },
+    async ({ ctx, meta }) => {
+      const tree = await getQueryTreeCached(ctx);
+      if (!tree.ok) {
+        const isParseFailure = tree.status >= 200 && tree.status < 300;
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : tree.status,
+          fallbackMessage : 'Failed to load query tree children.',
+          request         : { path: '/queries/tree/children', method: 'GET', scope: ['queries-tree:read'], logLabel: 'getQueryTree' },
+          isParseFailure  : isParseFailure
+        }));
+      }
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { node: root as unknown as TreeNode, children: [] } as QueryTreeNodeChildren;
-  }
-
-  const tree = await getQueryTreeCached(ctx);
-  if (!tree) {
-    return { node: root as unknown as TreeNode, children: [] } as QueryTreeNodeChildren;
-  }
-
-  const nid = nodeId ?? 'queries';
-  return {
-    node    : (tree.nodes[nid as any] ?? root) as unknown as TreeNode,
-    children: (tree.childrenByParentId[nid as any] ?? []).map((id: string) => tree.nodes[id as any] as unknown as TreeNode)
-  } as QueryTreeNodeChildren;
+      const nid = nodeId ?? 'queries';
+      return ok(meta, {
+        node      : (tree.data.nodes[nid as any] ?? root) as unknown as TreeNode,
+        children  : (tree.data.childrenByParentId[nid as any] ?? []).map((id: string) => tree.data.nodes[id as any] as unknown as TreeNode)
+      } as QueryTreeNodeChildren);
+    }
+  );
 }

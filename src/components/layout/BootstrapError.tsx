@@ -6,7 +6,7 @@ import styles from './BootstrapError.module.css';
 // AIDEV-NOTE: Client component for workspace bootstrap failure.
 // Uses window.location.reload() because this is shown when server data
 // fetch fails - no Redux state available to retry via dispatch.
-function BootstrapError() {
+function BootstrapError({ requestId }: { requestId?: string }) {
   return (
     <div className={styles['container']}>
       <div className={styles['card']}>
@@ -16,6 +16,11 @@ function BootstrapError() {
           Something went wrong while loading your workspace data.
           Please try again.
         </p>
+        {requestId ? (
+          <p className={styles['request-id']}>
+            Error ID: <code className={styles['request-id-code']}>{requestId}</code>
+          </p>
+        ) : null}
         <button
           type="button"
           className={styles['button']}

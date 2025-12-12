@@ -26,8 +26,12 @@ import {
 import { fsSortKeyEn }                  from '@Utils/collation';
 import {
   createNewUnsavedDataQueryAction,
-  updateDataQuery
-}                                       from '@/app/opspace/[opspaceId]/queries/_actions/queries';
+  updateDataQueryAction
+}                                       from '@OpSpaceQueriesActions/queries/index';
+import {
+  errorEntryFromActionError,
+  updateError
+}                                       from '@Redux/records/errors';
 
 
 export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string }, { state: RootState }>(
@@ -40,18 +44,26 @@ export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQuery
       console.log('[createNewQueryThunk] createNewQuery', payload);
       const res = await createNewUnsavedDataQueryAction(payload);
 
-      if (res?.success && res.data) {
+      if (res.success) {
         const { dataQueryId, name, ext, tab, tree } = res.data;
         dispatch(createNewUnsavedDataQueryFromFetch({ dataQueryId, name, ext }));
         dispatch(addTabFromFetch({ tab }));
         dispatch(addUnsavedTreeNodeFromFetch({ tree }));
         dispatch(setLastActiveUnsavedTabId({ tabId: tab.tabId }));
       } else {
-        console.error(`Create failed for dataQueryId: ${dataQueryId}`);
+        dispatch(updateError(errorEntryFromActionError({
+          actionType  : 'dataQuery/createNewUnsavedDataQueryThunk',
+          error       : res.error
+        })));
         return;
       }
     } catch (error) {
       console.error(`Server Error creating dataQueryId: ${dataQueryId}`, error);
+      dispatch(updateError({
+        actionType  : 'dataQuery/createNewUnsavedDataQueryThunk',
+        message     : 'Failed to create a new query.',
+        meta        : { error }
+      }));
       return;
     }
   }
@@ -97,9 +109,12 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
 
     try {
       console.log('[saveDataQueryThunk] updateDataQuery', payload);
-      const res = await updateDataQuery(payload);
-      if (!res?.success) {
-        console.error(`Save failed for dataQueryId: ${dataQueryId}`);
+      const res = await updateDataQueryAction(payload);
+      if (!res.success) {
+        dispatch(updateError(errorEntryFromActionError({
+          actionType  : 'dataQuery/saveDataQueryThunk',
+          error       : res.error
+        })));
         // Rollback optimistic rename
         if (hasSavedNode && payload.name && prevName) {
           dispatch(renameNodeWithInvalidation({ dataQueryId, name: prevName }));
@@ -113,6 +128,11 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
       }
     } catch (error) {
       console.error(`Server Error saving dataQueryId: ${dataQueryId}`, error);
+      dispatch(updateError({
+        actionType  : 'dataQuery/saveDataQueryThunk',
+        message     : 'Failed to save query.',
+        meta        : { error }
+      }));
       // AIDEV-TODO: Consider rollback of optimistic update on failure
       return { success: false };
     }

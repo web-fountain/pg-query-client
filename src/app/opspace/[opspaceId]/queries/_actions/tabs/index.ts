@@ -1,21 +1,35 @@
 'use server';
 
-import type { UUIDv7 }          from '@Types/primitives';
-import type { Tab, Tabbar }     from '@Types/tabs';
-import type { HeadersContext }  from '@Utils/backendFetch';
+import type { UUIDv7 }                    from '@Types/primitives';
+import type { Tab, Tabbar }               from '@Types/tabs';
+import type { HeadersContext }            from '@Utils/backendFetch';
+import type { ActionResult }              from '../types';
+import type {
+  ListOpenTabsApiResponse,
+  OpenTabApiResponse,
+  ReorderTabs,
+  ReorderTabsApiResponse
+}                                         from './types';
 
-import { cacheLife, cacheTag, updateTag }  from 'next/cache';
+import { cacheLife, cacheTag, updateTag } from 'next/cache';
+import { withAction }                     from '@Observability/server/action';
 import {
-  backendFetchJSON,
-  getHeadersContextOrNull
-}                               from '@Utils/backendFetch';
+  actionErrorFromBackendFetch,
+  backendFailedActionError,
+  fail, ok
+}                                         from '@Errors/server/actionResult.server';
+import { backendFetchJSON }               from '@Utils/backendFetch';
+import {
+  tabsOpenListTag,
+  unsavedQueryTreeInitialTag
+}                                         from '../tags';
 
 
-type ResponsePayload05 = {
-  ok: true;
-  data: Tabbar;
-};
-async function listOpenTabsCached(ctx: HeadersContext): Promise<Tabbar | null> {
+type ListOpenTabsCachedResult =
+  | { ok: true; data: Tabbar }
+  | { ok: false; status: number; reason: 'fetch-failed' | 'backend-ok-false' };
+
+async function listOpenTabsCached(ctx: HeadersContext): Promise<ListOpenTabsCachedResult> {
   'use cache';
 
   cacheLife({
@@ -23,164 +37,212 @@ async function listOpenTabsCached(ctx: HeadersContext): Promise<Tabbar | null> {
     revalidate: 60,     // 1 minute
     expire    : 300     // 5 minutes
   });
-  cacheTag(`tabs-open:list:${ctx.opspacePublicId}`);
+  cacheTag(tabsOpenListTag(ctx.opspacePublicId));
 
-  console.log('[ACTION] listOpenTabs');
-
-  const { ok, data } = await backendFetchJSON<ResponsePayload05>({
+  const res = await backendFetchJSON<ListOpenTabsApiResponse>({
     path: '/tabs/open',
     method: 'GET',
     scope: ['tabs-open:read'],
-    logLabel: 'listOpenTabs',
+    logLabel: 'listOpenTabsAction',
     context: ctx
   });
 
-  if (!ok || !data?.ok) {
-    return null;
+  if (!res.ok) {
+    return { ok: false, status: res.status, reason: 'fetch-failed' };
   }
 
-  return data.data;
+  if (!res.data?.ok) {
+    return { ok: false, status: res.status, reason: 'backend-ok-false' };
+  }
+
+  return { ok: true, data: res.data.data };
 }
 
-export async function listOpenTabs() : Promise<{ success: boolean; data?: Tabbar }> {
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+export async function listOpenTabsAction(): Promise<ActionResult<Tabbar>> {
+  return withAction(
+    { action: 'tabs.listOpen', op: 'read' },
+    async ({ ctx, meta }) => {
+      const data = await listOpenTabsCached(ctx);
+      if (!data.ok) {
+        if (data.reason === 'backend-ok-false') {
+          return fail(meta, backendFailedActionError(meta, {
+            message: 'Failed to list open tabs.',
+            request: { path: '/tabs/open', method: 'GET', scope: ['tabs-open:read'], logLabel: 'listOpenTabsAction' }
+          }));
+        }
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status: data.status,
+          fallbackMessage: 'Failed to list open tabs.',
+          request: { path: '/tabs/open', method: 'GET', scope: ['tabs-open:read'], logLabel: 'listOpenTabsAction' }
+        }));
+      }
 
-  const data = await listOpenTabsCached(ctx);
-  if (!data) {
-    return { success: false };
-  }
-
-  return { success: true, data };
+      return ok(meta, data.data);
+    }
+  );
 }
 
-export async function setActiveTabAction(tabId: UUIDv7): Promise<{ success: boolean; }> {
-  console.log('[ACTION] setActiveTab', tabId);
+export async function setActiveTabAction(tabId: UUIDv7): Promise<ActionResult<void>> {
+  return withAction(
+    {
+      action : 'tabs.setActive',
+      op     : 'write',
+      input  : { tabId }
+    },
+    async ({ ctx, meta }) => {
+      const res = await backendFetchJSON({
+        path: `/tabs/${tabId}/focus`,
+        method: 'POST',
+        contentType: null,
+        scope: ['tabs-focus:write'],
+        logLabel: 'setActiveTab',
+        context: ctx
+      });
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status: res.status,
+          error: res.error,
+          fallbackMessage: 'Failed to set active tab.',
+          request: { path: `/tabs/${tabId}/focus`, method: 'POST', scope: ['tabs-focus:write'], logLabel: 'setActiveTab' }
+        }));
+      }
 
-  const { ok } = await backendFetchJSON({
-    path: `/tabs/${tabId}/focus`,
-    method: 'POST',
-    contentType: null,
-    scope: ['tabs-focus:write'],
-    logLabel: 'setActiveTab',
-    context: ctx
-  });
+      // AIDEV-NOTE: We intentionally do NOT invalidate the tabs-open:list cache here.
+      // Focus changes only activeTabId/focusedTabIndex, which the client already
+      // tracks in Redux. Cache busting is reserved for structural changes (open/close/reorder).
 
-  if (!ok) {
-    return { success: false };
-  }
-
-  // AIDEV-NOTE: We intentionally do NOT invalidate the tabs-open:list cache here.
-  // Focus changes only activeTabId/focusedTabIndex, which the client already
-  // tracks in Redux. Cache busting is reserved for structural changes (open/close/reorder).
-
-  return { success: true };
+      return ok(meta, undefined);
+    }
+  );
 }
 
-export async function closeTabAction(tabId: UUIDv7): Promise<{ success: boolean; }> {
-  console.log('[ACTION] closeTab', tabId);
+export async function closeTabAction(tabId: UUIDv7): Promise<ActionResult<void>> {
+  return withAction(
+    {
+      action : 'tabs.close',
+      op     : 'write',
+      input  : { tabId }
+    },
+    async ({ ctx, meta }) => {
+      const res = await backendFetchJSON({
+        path        : `/tabs/${tabId}/close`,
+        method      : 'POST',
+        contentType : null,
+        scope       : ['tabs-close:write'],
+        logLabel    : 'closeTab',
+        context     : ctx
+      });
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status: res.status,
+          error: res.error,
+          fallbackMessage: 'Failed to close tab.',
+          request: { path: `/tabs/${tabId}/close`, method: 'POST', scope: ['tabs-close:write'], logLabel: 'closeTab' }
+        }));
+      }
 
-  const { ok } = await backendFetchJSON({
-    path: `/tabs/${tabId}/close`,
-    method: 'POST',
-    contentType: null,
-    scope: ['tabs-close:write'],
-    logLabel: 'closeTab',
-    context: ctx
-  });
+      // AIDEV-NOTE: Invalidate cached unsaved query tree on successful close
+      try {
+        updateTag(unsavedQueryTreeInitialTag(ctx.opspacePublicId));
+      } catch {}
 
-  if (!ok) {
-    return { success: false };
-  }
+      // AIDEV-NOTE: Invalidate cached list of open tabs on successful close
+      try {
+        updateTag(tabsOpenListTag(ctx.opspacePublicId));
+      } catch {}
 
-  // AIDEV-NOTE: Invalidate cached unsaved query tree on successful close
-  try {
-    updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
-  } catch {console.error('Error invalidating tree:children:buildInitialUnsavedQueryTree cache');}
-
-  // AIDEV-NOTE: Invalidate cached list of open tabs on successful close
-  try {
-    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
-  } catch {console.error('Error invalidating tabs-open:list cache');}
-
-  return { success: true };
+      return ok(meta, undefined);
+    }
+  );
 }
 
-type OpenTabResponse =
-  | { ok: false }
-  | { ok: true; data: Tab };
-export async function openTabAction(mountId: UUIDv7): Promise<{ success: boolean; data?: Tab }> {
-  console.log('[ACTION] openSavedQueryTab', mountId);
+export async function openTabAction(mountId: UUIDv7): Promise<ActionResult<Tab>> {
+  return withAction(
+    {
+      action : 'tabs.open',
+      op     : 'write',
+      input  : { mountId }
+    },
+    async ({ ctx, meta }) => {
+      // It is assumed that the mountId is the dataQueryId
+      // Will need to update this later to accept other mount types
+      const res = await backendFetchJSON<OpenTabApiResponse>({
+        path: `/tabs/open`,
+        method: 'POST',
+        scope: ['tabs-open:write'],
+        logLabel: 'openTab',
+        context: ctx,
+        body: { dataQueryId: mountId }
+      });
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status: res.status,
+          error: res.error,
+          fallbackMessage: 'Failed to open tab.',
+          request: { path: '/tabs/open', method: 'POST', scope: ['tabs-open:write'], logLabel: 'openTab' }
+        }));
+      }
 
-  // It is assumed that the mountId is the dataQueryId
-  // Will need to update this later to accept other mount types
-  const { ok, data } = await backendFetchJSON<OpenTabResponse>({
-    path: `/tabs/open`,
-    method: 'POST',
-    scope: ['tabs-open:write'],
-    logLabel: 'openTab',
-    context: ctx,
-    body: { dataQueryId: mountId }
-  });
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to open tab.',
+          request: { path: '/tabs/open', method: 'POST', scope: ['tabs-open:write'], logLabel: 'openTab' }
+        }));
+      }
 
-  if (!ok || !data?.ok) {
-    return { success: false };
-  }
+      // Invalidate cached list of open tabs
+      try {
+        updateTag(tabsOpenListTag(ctx.opspacePublicId));
+      } catch {}
 
-  // Invalidate cached list of open tabs
-  try {
-    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
-  } catch {}
-
-  return { success: true, data: data.data };
+      return ok(meta, res.data.data);
+    }
+  );
 }
 
-type ReorderTabsResponse =
-  | { ok: false }
-  | { ok: true; data: { from: number; to: number; } };
-export async function reorderTabAction(tabId: UUIDv7, newPosition: number, tabGroup?: number): Promise<{ success: boolean; data?: { from: number; to: number; } }> {
-  console.log('[ACTION] reorderTab', tabId, newPosition, tabGroup);
+export async function reorderTabAction(tabId: UUIDv7, newPosition: number, tabGroup?: number): Promise<ActionResult<ReorderTabs>> {
+  return withAction(
+    {
+      action : 'tabs.reorder',
+      op     : 'write',
+      input  : { tabId, newPosition, tabGroup }
+    },
+    async ({ ctx, meta }) => {
+      const res = await backendFetchJSON<ReorderTabsApiResponse>({
+        path: `/tabs/${tabId}/reorder`,
+        method: 'POST',
+        scope: ['tabs-reorder:write'],
+        logLabel: 'reorderTab',
+        context: ctx,
+        body: { tabId, newPosition }
+      });
 
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status: res.status,
+          error: res.error,
+          fallbackMessage: 'Failed to reorder tabs.',
+          request: { path: `/tabs/${tabId}/reorder`, method: 'POST', scope: ['tabs-reorder:write'], logLabel: 'reorderTab' }
+        }));
+      }
 
-  const { ok, data } = await backendFetchJSON<ReorderTabsResponse>({
-    path: `/tabs/${tabId}/reorder`,
-    method: 'POST',
-    scope: ['tabs-reorder:write'],
-    logLabel: 'reorderTab',
-    context: ctx,
-    body: { tabId, newPosition }
-  });
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to reorder tabs.',
+          request: { path: `/tabs/${tabId}/reorder`, method: 'POST', scope: ['tabs-reorder:write'], logLabel: 'reorderTab' }
+        }));
+      }
 
-  if (!ok || !data?.ok) {
-    return { success: false };
-  }
+      // AIDEV-NOTE: Reordering changes the logical "open tabs" resource (positions),
+      // so invalidate the cached list just like open/close/focus do.
+      try {
+        updateTag(tabsOpenListTag(ctx.opspacePublicId));
+      } catch {}
 
-  // AIDEV-NOTE: Reordering changes the logical "open tabs" resource (positions),
-  // so invalidate the cached list just like open/close/focus do.
-  try {
-    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
-  } catch {}
-
-  return { success: true, data: data.data };
+      return ok(meta, res.data.data);
+    }
+  );
 }

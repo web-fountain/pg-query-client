@@ -1,26 +1,45 @@
 'use server';
 
 import type { DataQuery }                 from '@Types/dataQuery';
-import type { Extension, UUIDv7 }         from '@Types/primitives';
-import type { UnsavedQueryTreeNode }      from '@Types/unsavedQueryTree';
 import type { HeadersContext }            from '@Utils/backendFetch';
+import type { ActionResult }              from '../types';
+import type {
+  CreateUnsavedDataQueryApiResponse,
+  CreateUnsavedDataQueryResult,
+  CreateNewUnsavedDataQueryPayload,
+  ListDataQueriesApiResponse,
+  UpdateDataQueryApiResponse,
+  UpdateDataQueryPayload,
+  UpdateDataQueryResult
+}                                         from './types';
 
 import { updateTag, cacheLife, cacheTag } from 'next/cache';
-
+import { withAction }                     from '@Observability/server';
+import {
+  actionErrorFromBackendFetch,
+  backendFailedActionError,
+  fail,
+  ok
+}                                         from '@Errors/server/actionResult.server';
 import {
   backendFetchJSON,
-  getHeadersContextOrNull
 }                                         from '@Utils/backendFetch';
-import { UpdateDataQuery } from '@/redux/records/dataQuery/types';
+import {
+  queriesListTag,
+  queryTreeChildrenTag,
+  queryTreeInitialTag,
+  tabsOpenListTag,
+  unsavedQueryTreeInitialTag
+}                                         from '../tags';
 
 
-type ResponsePayload04 = {
-  ok: true;
-  data: DataQuery[];
-};
-// AIDEV-NOTE: Cached list of queries per HeadersContext using "use cache".
+// Cached list of queries per HeadersContext using "use cache".
 // Cache is scoped by tenant/opspace/operator via HeadersContext and invalidated by updateTag('queries:list:...').
-async function listDataQueriesCached(ctx: HeadersContext): Promise<DataQuery[] | null> {
+type ListDataQueriesCachedResult =
+  | { ok: true; data: DataQuery[] }
+  | { ok: false; status: number; reason: 'fetch-failed' | 'backend-ok-false' };
+
+async function listDataQueriesCached(ctx: HeadersContext): Promise<ListDataQueriesCachedResult> {
   'use cache';
 
   cacheLife({
@@ -28,148 +47,172 @@ async function listDataQueriesCached(ctx: HeadersContext): Promise<DataQuery[] |
     revalidate: 60, // 1 minute
     expire    : 300 // 5 minutes
   });
-  cacheTag(`queries:list:${ctx.opspacePublicId}`);
+  cacheTag(queriesListTag(ctx.opspacePublicId));
 
-  console.log('[ACTION] listDataQueries');
-
-  const { ok, data } = await backendFetchJSON<ResponsePayload04>({
+  const res = await backendFetchJSON<ListDataQueriesApiResponse>({
     path    : '/queries',
     method  : 'GET',
     scope   : ['queries:read'],
-    logLabel: 'listDataQueries',
+    logLabel: 'listDataQueriesAction',
     context : ctx
   });
 
-  if (!ok || !data?.ok) {
-    return null;
+  if (!res.ok) {
+    return { ok: false, status: res.status, reason: 'fetch-failed' };
   }
 
-  return data.data;
+  if (!res.data?.ok) {
+    return { ok: false, status: res.status, reason: 'backend-ok-false' };
+  }
+
+  return { ok: true, data: res.data.data };
 }
 
-export async function listDataQueries() : Promise<{ success: boolean; data?: DataQuery[] }> {
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
+export async function listDataQueriesAction(): Promise<ActionResult<DataQuery[]>> {
+  return withAction(
+    { action: 'queries.list', op: 'read' },
+    async ({ ctx, meta }) => {
+      const data = await listDataQueriesCached(ctx);
+      if (!data.ok) {
+        if (data.reason === 'backend-ok-false') {
+          return fail(meta, backendFailedActionError(meta, {
+            message: 'Failed to list queries.',
+            request: { path: '/queries', method: 'GET', scope: ['queries:read'], logLabel: 'listDataQueriesAction' }
+          }));
+        }
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status: data.status,
+          fallbackMessage: 'Failed to list queries.',
+          request: { path: '/queries', method: 'GET', scope: ['queries:read'], logLabel: 'listDataQueriesAction' }
+        }));
+      }
 
-  const data = await listDataQueriesCached(ctx);
-  if (!data) {
-    return { success: false };
-  }
-
-  return { success: true, data };
+      return ok(meta, data.data);
+    }
+  );
 }
 
-type FetchData = {
-  dataQueryId : UUIDv7;
-  name        : string;
-  ext         : Extension;
-  tab: {
-    groupId   : number;
-    tabId     : UUIDv7;
-    mountId   : UUIDv7;
-    position  : number;
-  },
-  tree: UnsavedQueryTreeNode
-};
-type ResponsePayload03 =
-  | { ok: false }
-  | { ok: true; data: FetchData };
-export async function createNewUnsavedDataQueryAction(payload: { dataQueryId: UUIDv7, name?: string }): Promise<{ success: boolean; data?: FetchData }> {
-  console.log('[ACTION] createNewUnsavedDataQuery');
-
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
-
+export async function createNewUnsavedDataQueryAction(payload: CreateNewUnsavedDataQueryPayload): Promise<ActionResult<CreateUnsavedDataQueryResult>> {
   const { dataQueryId, name } = payload;
-  const body = name
-    ? { dataQueryId, name }
-    : { dataQueryId };
+  return withAction(
+    {
+      action : 'queries.createUnsaved',
+      op     : 'write',
+      input  : {
+        dataQueryId,
+        nameLen: typeof name === 'string' ? name.length : undefined
+      }
+    },
+    async ({ ctx, meta }) => {
+      const body = name
+        ? { dataQueryId, name }
+        : { dataQueryId };
 
-  console.log('[ACTION] createNewUnsavedDataQuery body', body);
+      const res = await backendFetchJSON<CreateUnsavedDataQueryApiResponse>({
+        path    : `/queries/unsaved`,
+        method  : 'POST',
+        scope   : ['queries-unsaved:write'],
+        logLabel: 'createNewUnsavedDataQuery',
+        context : ctx,
+        body
+      });
 
-  const { ok, data } = await backendFetchJSON<ResponsePayload03>({
-    path    : `/queries/unsaved`,
-    method  : 'POST',
-    scope   : ['queries-unsaved:write'],
-    logLabel: 'createNewUnsavedDataQuery',
-    context : ctx,
-    body
-  });
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : res.status,
+          error           : res.error,
+          fallbackMessage : 'Failed to create a new unsaved query.',
+          request         : { path: '/queries/unsaved', method: 'POST', scope: ['queries-unsaved:write'], logLabel: 'createNewUnsavedDataQuery' }
+        }));
+      }
 
-  console.log('[ACTION] createNewUnsavedDataQuery response', { data });
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to create a new unsaved query.',
+          request: { path: '/queries/unsaved', method: 'POST', scope: ['queries-unsaved:write'], logLabel: 'createNewUnsavedDataQuery' }
+        }));
+      }
 
-  if (!ok || !data?.ok) {
-    return { success: false };
-  }
+      // AIDEV-NOTE: Invalidate cached QUERIES children on successful save
+      try {
+        updateTag(unsavedQueryTreeInitialTag(ctx.opspacePublicId));
+      } catch {}
 
-  // AIDEV-NOTE: Invalidate cached QUERIES children on successful save
-  try {
-    updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
-  } catch {}
+      // AIDEV-NOTE: Invalidate cached listDataQueries results for this opspace.
+      try {
+        updateTag(queriesListTag(ctx.opspacePublicId));
+      } catch {}
 
-  // AIDEV-NOTE: Invalidate cached listDataQueries results for this opspace.
-  try {
-    updateTag(`queries:list:${ctx.opspacePublicId}`);
-  } catch {}
+      try {
+        updateTag(tabsOpenListTag(ctx.opspacePublicId));
+      } catch {}
 
-  try {
-    updateTag(`tabs-open:list:${ctx.opspacePublicId}`);
-  } catch {}
-
-  return { success: true, data: data.data };
+      return ok(meta, res.data.data);
+    }
+  );
 }
 
-type ResponsePayload05 =
-  | { ok: false }
-  | { ok: true; data: { dataQueryId: UUIDv7, nodeId?: UUIDv7 } };
-export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: string, queryText?: string }): Promise<{ success: boolean; data?: { dataQueryId: UUIDv7, nodeId?: UUIDv7 } }> {
-  console.log('[ACTION] updateDataQuery');
-
-  const ctx = await getHeadersContextOrNull();
-  if (!ctx) {
-    return { success: false };
-  }
-
+export async function updateDataQueryAction(payload: UpdateDataQueryPayload): Promise<ActionResult<UpdateDataQueryResult>> {
   const { dataQueryId, name, queryText } = payload;
+  return withAction(
+    {
+      action : 'queries.update',
+      op     : 'write',
+      input  : {
+        dataQueryId,
+        nameLen: typeof name === 'string' ? name.length : undefined,
+        queryTextLen: typeof queryText === 'string' ? queryText.length : undefined
+      }
+    },
+    async ({ ctx, meta }) => {
+      const res = await backendFetchJSON<UpdateDataQueryApiResponse>({
+        path    : `/queries/${dataQueryId}`,
+        method  : 'PATCH',
+        scope   : ['queries:write'],
+        body    : { name, queryText },
+        logLabel: 'updateDataQueryAction',
+        context : ctx
+      });
 
-  const { ok, data } = await backendFetchJSON<ResponsePayload05>({
-    path    : `/queries/${dataQueryId}`,
-    method  : 'PATCH',
-    scope   : ['queries:write'],
-    body    : { name, queryText },
-    logLabel: 'updateDataQuery',
-    context : ctx
-  });
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : res.status,
+          error           : res.error,
+          fallbackMessage : 'Failed to save query.',
+          request         : { path: `/queries/${dataQueryId}`, method: 'PATCH', scope: ['queries:write'], logLabel: 'updateDataQueryAction' }
+        }));
+      }
 
-  if (!ok || !data?.ok) {
-    return { success: false };
-  }
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to save query.',
+          request: { path: `/queries/${dataQueryId}`, method: 'PATCH', scope: ['queries:write'], logLabel: 'updateDataQueryAction' }
+        }));
+      }
 
-  if (name !== undefined) {
-    // AIDEV-NOTE: Invalidate cached QUERIES children on successful save if name changed
-    try {
-      updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialQueryTree`);
-    } catch {}
+      if (name !== undefined) {
+        // AIDEV-NOTE: Invalidate cached QUERIES children on successful save if name changed
+        try {
+          updateTag(queryTreeInitialTag(ctx.opspacePublicId));
+        } catch {}
 
-    // AIDEV-NOTE: Invalidate cached "tree node children" reads (QueryWorkspace tree browser).
-    try {
-      updateTag(`tree:children:${ctx.opspacePublicId}:queries`);
-    } catch {}
+        // AIDEV-NOTE: Invalidate cached "tree node children" reads (QueryWorkspace tree browser).
+        try {
+          updateTag(queryTreeChildrenTag(ctx.opspacePublicId));
+        } catch {}
 
-    // AIDEV-NOTE: Invalidate cached unsaved query tree on successful save (only if name changed)
-    try {
-      updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
-    } catch {}
-  }
+        // AIDEV-NOTE: Invalidate cached unsaved query tree on successful save (only if name changed)
+        try {
+          updateTag(unsavedQueryTreeInitialTag(ctx.opspacePublicId));
+        } catch {}
+      }
 
-   // AIDEV-NOTE: Invalidate cached listDataQueries results for this opspace.
-  try {
-    updateTag(`queries:list:${ctx.opspacePublicId}`);
-  } catch {}
+      // AIDEV-NOTE: Invalidate cached listDataQueries results for this opspace.
+      try {
+        updateTag(queriesListTag(ctx.opspacePublicId));
+      } catch {}
 
-  return { success: true, data: data.data };
+      return ok(meta, res.data.data);
+    }
+  );
 }

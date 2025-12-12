@@ -39,6 +39,19 @@
   line-height: var(--line-height-relaxed);
 }
 
+.request-id {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.request-id-code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
 .button {
   padding: var(--space-2) var(--space-4);
   border: none;

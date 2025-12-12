@@ -1,6 +1,6 @@
 import type { PayloadAction }           from '@reduxjs/toolkit';
 import type { RootState }               from '@Redux/store';
-import type { ErrorsState, ErrorEntry } from './types';
+import type { ErrorEntry, ErrorsState } from './types';
 
 import {
   createAction,
@@ -10,11 +10,16 @@ import {
 import { generateBase64Url22 }          from '@Utils/generateId';
 
 
+export { errorEntryFromActionError }    from './adapters';
+export type { ErrorEntry, ErrorsState } from './types';
+
 // Action Creators
 export const updateError = createAction(
   'errors/report',
   (payload: Omit<ErrorEntry, 'id' | 'createdAt'>) => {
-    const id = generateBase64Url22();
+    // Prefer the ActionError id when present so UI/debugging can correlate
+    // Redux errors with server action logs. Fall back to a new id for generic errors.
+    const id = payload.actionError?.id || generateBase64Url22();
     const createdAt = Date.now();
     return { payload: { id, createdAt, ...payload }, meta: { _routedError: true } };
   }

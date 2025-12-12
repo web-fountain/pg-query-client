@@ -9,7 +9,7 @@ type MultitenantClaims = JWTPayload & {
   sub?: string;
 };
 
-// AIDEV-NOTE: Minimal logger utilities; avoid logging PII unless PGQ_LOG_LEVEL=debug.
+// AIDEV-NOTE: Minimal logger utilities; avoid logging PII unless PGQC_LOG_LEVEL=debug.
 const LOG_LEVEL = process.env.PGQC_LOG_LEVEL || 'info';
 const DEBUG_ENABLED = LOG_LEVEL === 'debug';
 function logDebug(...args: unknown[]): void { if (DEBUG_ENABLED) console.debug('[proxy]', ...args); }

@@ -4,10 +4,8 @@ import type { UUIDv7 }                  from '@Types/primitives';
 
 import { createAsyncThunk }             from '@reduxjs/toolkit';
 import {
-  addTabFromFetch,
-  closeTab,
-  reorderTabs,
-  setActiveTab
+  addTabFromFetch, closeTab,
+  reorderTabs, setActiveTab
 }                                       from '@Redux/records/tabbar';
 import { removeUnsavedTreeNodeByTabId } from '@Redux/records/unsavedQueryTree';
 import {
@@ -16,11 +14,13 @@ import {
 }                                       from '@Redux/records/tabbar/index';
 import { removeDataQueryRecord }        from '@Redux/records/dataQuery';
 import {
-  closeTabAction,
-  openTabAction,
-  reorderTabAction,
-  setActiveTabAction
-}                                       from '@/app/opspace/[opspaceId]/queries/_actions/tabs/index';
+  closeTabAction, openTabAction,
+  reorderTabAction, setActiveTabAction
+}                                       from '@OpSpaceQueriesActions/tabs/index';
+import {
+  errorEntryFromActionError,
+  updateError
+}                                       from '@Redux/records/errors';
 
 
 export const setActiveTabThunk = createAsyncThunk<boolean, UUIDv7, { state: RootState }>(
@@ -42,10 +42,18 @@ export const setActiveTabThunk = createAsyncThunk<boolean, UUIDv7, { state: Root
     try {
       const res = await setActiveTabAction(tabId);
       if (!res.success) {
-        console.error(`Failed to set active tab: ${tabId}`);
+        dispatch(updateError(errorEntryFromActionError({
+          actionType  : 'tabs/setActiveTabThunk',
+          error       : res.error
+        })));
       }
     } catch (error) {
       console.error(`Error setting active tab: ${tabId}`, error);
+      dispatch(updateError({
+        actionType  : 'tabs/setActiveTabThunk',
+        message     : 'Failed to set active tab.',
+        meta        : { error }
+      }));
     }
 
     return isUnsaved; // lets callers know if this is an unsaved tab
@@ -53,9 +61,9 @@ export const setActiveTabThunk = createAsyncThunk<boolean, UUIDv7, { state: Root
 );
 
 type CloseTabResult = {
-  nextDataQueryId: UUIDv7 | null;
-  nextTabIsUnsaved: boolean;
-  hasRemainingTabs: boolean;
+  nextDataQueryId   : UUIDv7 | null;
+  nextTabIsUnsaved  : boolean;
+  hasRemainingTabs  : boolean;
 };
 export const closeTabThunk = createAsyncThunk<CloseTabResult, UUIDv7, { state: RootState }>(
   'tabs/closeTabThunk',
@@ -93,9 +101,23 @@ export const closeTabThunk = createAsyncThunk<CloseTabResult, UUIDv7, { state: R
       dispatch(setLastActiveUnsavedTabId({ tabId: nextLastUnsaved }));
     }
 
-    closeTabAction(tabId).catch((error) => {
-      console.error(`Error closing tab: ${tabId}`, error);
-    });
+    closeTabAction(tabId)
+      .then((res) => {
+        if (!res.success) {
+          dispatch(updateError(errorEntryFromActionError({
+            actionType  : 'tabs/closeTabThunk',
+            error       : res.error
+          })));
+        }
+      })
+      .catch((error) => {
+        console.error(`Error closing tab: ${tabId}`, error);
+        dispatch(updateError({
+          actionType  : 'tabs/closeTabThunk',
+          message     : 'Failed to close tab.',
+          meta        : { error }
+        }));
+      });
 
     return {
       nextDataQueryId,
@@ -111,8 +133,11 @@ export const openTabThunk = createAsyncThunk<UUIDv7 | null, UUIDv7, { state: Roo
     try {
       const res = await openTabAction(mountId);
 
-      if (!res.success || !res.data) {
-        console.error(`Failed to open tab: ${mountId}`);
+      if (!res.success) {
+        dispatch(updateError(errorEntryFromActionError({
+          actionType  : 'tabs/openTabThunk',
+          error       : res.error
+        })));
         return null;
       }
 
@@ -121,6 +146,11 @@ export const openTabThunk = createAsyncThunk<UUIDv7 | null, UUIDv7, { state: Roo
       return res.data.tabId;
     } catch (error) {
       console.error(`Error opening tab: ${mountId}`, error);
+      dispatch(updateError({
+        actionType  : 'tabs/openTabThunk',
+        message     : 'Failed to open tab.',
+        meta        : { error }
+      }));
       return null;
     }
   }
@@ -139,11 +169,19 @@ export const reorderTabsThunk = createAsyncThunk<void, UUIDv7[], { state: RootSt
       const res = await reorderTabAction(tabId, newPosition);
 
       if (!res.success) {
-        console.error(`Failed to reorder tab: ${tabId}`);
+        dispatch(updateError(errorEntryFromActionError({
+          actionType  : 'tabs/reorderTabsThunk',
+          error       : res.error
+        })));
         return;
       }
     } catch (error) {
       console.error(`Error reordering tabs: ${tabIds}`, error);
+      dispatch(updateError({
+        actionType  : 'tabs/reorderTabsThunk',
+        message     : 'Failed to reorder tabs.',
+        meta        : { error }
+      }));
       return;
     }
   }
