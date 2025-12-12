@@ -5,7 +5,8 @@ import type { Tab }           from './index';
 
 import {
   Fragment, memo, useCallback,
-  useEffect, useLayoutEffect, useRef
+  useEffect, useLayoutEffect,
+  useRef
 }                             from 'react';
 import Icon                   from '@Components/Icons';
 
@@ -40,10 +41,9 @@ type TabButtonProps = {
   isDragging  : boolean;
 };
 
-// AIDEV-NOTE: Persist horizontal scroll position per opspace so that TabBar can
-// restore the user's scroll offset across QueryWorkspace remounts (route changes
-// between different dataQueryIds in the same opspace).
-const lastScrollLeftByOpSpace = new Map<string, number>();
+// AIDEV-NOTE: Persist horizontal scroll offset across remounts.
+// This presenter doesn't have opspaceId, so the key is best-effort (derived from activeTabId).
+const lastScrollLeftByKey = new Map<string, number>();
 
 const TabButton = memo(function TabButton({
   tab,
@@ -140,8 +140,7 @@ function TabBarPresenter({
   onCloseTab,
   onReorderTabs
 }: PresenterProps) {
-  // AIDEV-NOTE: Internal map of tabId -> button element for focus management
-  // and drag-and-drop coordinate calculations.
+  // AIDEV-NOTE: Map tabId → button element for roving focus + DnD geometry.
   const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
   const tablistRef = useRef<HTMLDivElement | null>(null);
 
@@ -158,8 +157,7 @@ function TabBarPresenter({
     onCommitOrderAction: onReorderTabs
   });
 
-  // AIDEV-NOTE: Keep DOM focus synced with Redux roving tabindex to avoid
-  // double-click behavior when moving selection via keyboard.
+  // AIDEV-NOTE: Keep DOM focus synced with Redux roving tabindex (keyboard nav) without refocusing on renames.
   useEffect(() => {
     const count = tabs.length;
     if (count === 0) return;
@@ -176,9 +174,7 @@ function TabBarPresenter({
     } catch {
       try { btn.focus(); } catch {}
     }
-    // AIDEV-NOTE: Intentionally depend only on focusedTabIndex and tabs.length to
-    // avoid stealing focus (e.g., from the Toolbar input) on every rename that
-    // changes tab labels but not tab structure.
+    // AIDEV-NOTE: Depend only on focusedTabIndex/tabs.length so we don't steal focus (e.g., Toolbar input) on renames.
   }, [focusedTabIndex, tabs.length]);
 
   const handleSetRef = useCallback((index: number, el: HTMLButtonElement | null) => {
@@ -187,34 +183,26 @@ function TabBarPresenter({
     refsMap.current.set(tab.tabId, el);
   }, [tabs]);
 
-  // AIDEV-NOTE: Scroll persistence key is derived from the current opspace id
-  // by the container and passed as part of activeTabId/tabs. We only track the
-  // scrollLeft here keyed by a string derived from the activeTabId prefix.
+  // AIDEV-NOTE: Scroll persistence key (best-effort stand-in for opspaceId).
   const scrollKeyRef = useRef<string>('');
   scrollKeyRef.current = activeTabId ? String(activeTabId).slice(0, 8) : scrollKeyRef.current;
 
-  // AIDEV-NOTE: Combined scroll restoration + scroll-into-view. useLayoutEffect
-  // ensures adjustments happen before paint, avoiding a flash at scrollLeft=0
-  // followed by a jump to the active tab.
+  // AIDEV-NOTE: Restore scrollLeft and ensure focused/active tab is visible. useLayoutEffect avoids paint-jump.
   useLayoutEffect(() => {
     const container = tablistRef.current;
     if (!container) return;
 
     const key = scrollKeyRef.current;
 
-    // 1) Restore prior scroll position for this opspace, if any.
-    const lastScrollLeft = lastScrollLeftByOpSpace.get(key);
+    const lastScrollLeft = lastScrollLeftByKey.get(key);
     if (typeof lastScrollLeft === 'number' && lastScrollLeft > 0) {
       container.scrollLeft = lastScrollLeft;
     }
 
-    // 2) If content does not overflow horizontally, skip further work.
     if (container.scrollWidth <= container.clientWidth + 1) return;
 
-    // 3) Determine which tab button we want to ensure is visible.
     if (tabs.length === 0) return;
 
-    // Prefer focused tab index when available; fall back to activeTabId.
     let targetButton: HTMLButtonElement | null = null;
 
     if (typeof focusedTabIndex === 'number') {
@@ -238,18 +226,12 @@ function TabBarPresenter({
     const intersectionWidth = Math.min(buttonRect.right, containerRect.right) - Math.max(buttonRect.left, containerRect.left);
     const tabWidth = buttonRect.width;
 
-    // AIDEV-NOTE: Derive visibility semantics from the intersection between the tab
-    // and the viewport:
-    // - intersection <= 0        => fully off-screen
-    // - intersection ~ tabWidth  => fully visible (within epsilon)
-    // - 0 < intersection < width => partially visible
+    // AIDEV-NOTE: Use intersection width to detect full visibility (epsilon accounts for subpixel rounding).
     const epsilon = 1;
     const isOffscreen = intersectionWidth <= 0;
     const isFullyVisible = !isOffscreen && intersectionWidth >= (tabWidth - epsilon);
 
-    // AIDEV-NOTE: Only scroll when the tab is completely off-screen or only
-    // partially visible. Tabs that are already fully visible are left as-is
-    // to avoid unnecessary horizontal jumps when activating them.
+    // AIDEV-NOTE: Don't scroll if already fully visible; avoids horizontal jump on activation.
     if (isFullyVisible) return;
 
     try {
@@ -259,20 +241,18 @@ function TabBarPresenter({
         inline: 'nearest'
       });
     } catch {
-      // AIDEV-NOTE: Fallback for older browsers without scrollIntoView options.
+      // AIDEV-NOTE: Fallback for browsers without scrollIntoView options.
       targetButton.scrollIntoView();
     }
 
-    // 4) Persist the new scroll offset so subsequent remounts start from the same
-    // visible region.
     try {
-      lastScrollLeftByOpSpace.set(key, container.scrollLeft);
+      lastScrollLeftByKey.set(key, container.scrollLeft);
     } catch {}
   }, [tabs.length, activeTabId, focusedTabIndex]);
 
   const handleTablistScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     try {
-      lastScrollLeftByOpSpace.set(scrollKeyRef.current, e.currentTarget.scrollLeft);
+      lastScrollLeftByKey.set(scrollKeyRef.current, e.currentTarget.scrollLeft);
     } catch {}
   }, []);
 

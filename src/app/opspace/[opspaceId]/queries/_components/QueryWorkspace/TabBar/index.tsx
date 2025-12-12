@@ -1,16 +1,14 @@
 'use client';
 
-import type { UUIDv7 } from '@Types/primitives';
+import type { UUIDv7 }                        from '@Types/primitives';
 
 import {
-  useMemo, useTransition, useEffectEvent, useRef
-}                       from 'react';
-import { useRouter }    from 'next/navigation';
+  useMemo, useTransition, useEffectEvent,
+  useRef
+}                                             from 'react';
+import { useRouter }                          from 'next/navigation';
 
-import {
-  useReduxDispatch,
-  useReduxSelector
-}                       from '@Redux/storeHooks';
+import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 import {
   focusTabIndex     as focusTabIndexAction,
   selectActiveTabId,
@@ -18,36 +16,29 @@ import {
   selectTabEntities,
   selectTabIds,
   setActiveTab
-}                       from '@Redux/records/tabbar';
-import {
-  closeTabThunk,
-  reorderTabsThunk
-}                       from '@Redux/records/tabbar/thunks';
-import {
-  selectDataQueries
-}                       from '@Redux/records/dataQuery';
-import { createNewUnsavedDataQueryThunk } from '@Redux/records/dataQuery/thunks';
-import { selectNextUntitledName }        from '@Redux/records/unsavedQueryTree';
-import { generateUUIDv7 }                from '@Utils/generateId';
+}                                             from '@Redux/records/tabbar';
+import { closeTabThunk, reorderTabsThunk }    from '@Redux/records/tabbar/thunks';
+import { selectDataQueries }                  from '@Redux/records/dataQuery';
+import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
+import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
+import { generateUUIDv7 }                     from '@Utils/generateId';
 
-import { useOpSpaceRoute } from '../../../_providers/OpSpaceRouteProvider';
+import { useOpSpaceRoute }                    from '../../../_providers/OpSpaceRouteProvider';
 
-import { useActivateTab } from '../hooks/useActivateTab';
-import TabBarPresenter    from './TabBarPresenter';
+import { useActivateTab }                     from '../hooks/useActivateTab';
+import TabBarPresenter                        from './TabBarPresenter';
 
 
 export type Tab = { dataQueryId: UUIDv7; tabId: UUIDv7; name: string };
 
-// AIDEV-NOTE: TabBar container – Redux/router-aware smart component that owns
-// all tab-strip behavior (activation, keyboard, add/close, DnD commit) and
-// delegates pure rendering to TabBarPresenter.
+// AIDEV-NOTE: Redux/router-aware TabBar container. Owns tab-strip behavior and delegates rendering to TabBarPresenter.
 function TabBar() {
   const { opspaceId, navigateToNew } = useOpSpaceRoute();
 
   const router   = useRouter();
   const dispatch = useReduxDispatch();
 
-  const [isPendingTabTransition, startTabTransition] = useTransition();
+  const [, startTabTransition] = useTransition();
 
   const tabIds            = useReduxSelector(selectTabIds) as UUIDv7[];
   const tabEntities       = useReduxSelector(selectTabEntities);
@@ -58,15 +49,10 @@ function TabBar() {
 
   const activateTab       = useActivateTab();
 
-  // AIDEV-NOTE: Track the last tabId that was activated via pointerdown so that
-  // click can distinguish between:
-  // - a real tab change (mouse down on a different tab), vs
-  // - redundant clicks on the already-active tab.
+  // AIDEV-NOTE: pointerdown optimistically sets active tab in Redux; click runs the thunk (backend + routing).
+  // Track which tabId was switched to via pointerdown so we can treat "click active tab" as a no-op unless it was just activated.
   const pendingPointerActivateRef = useRef<UUIDv7 | null>(null);
-  // AIDEV-NOTE: Guard against double fire for close/add actions while a thunk is
-  // still in flight. Unlike isPendingTabTransition (which is tied to React's
-  // internal transition lifecycle), these refs scope protection to the specific
-  // tab/id being acted on so the rest of the strip stays interactive.
+  // AIDEV-NOTE: Guard against double fire for add/close while their thunks are in flight.
   const closingTabIdRef           = useRef<UUIDv7 | null>(null);
   const isAddingRef               = useRef(false);
 
@@ -86,11 +72,7 @@ function TabBar() {
     const pendingId = pendingPointerActivateRef.current;
     pendingPointerActivateRef.current = null;
 
-    // AIDEV-NOTE: Early-return only when the tab is already active and this
-    // click was not preceded by a pointerdown that switched to this tab.
-    // This preserves the \"no-op click on active tab\" behavior while still
-    // allowing pointerdown→click sequences that changed the tab to call the
-    // thunk and update backend/route state.
+    // AIDEV-NOTE: No-op clicks on the active tab, unless pointerdown just switched to it (so we still run the thunk + routing).
     if (tabId === activeTabId && pendingId !== tabId) {
       return;
     }
@@ -102,13 +84,10 @@ function TabBar() {
     const { tabId } = tab;
 
     if (tabId === (activeTabId || null)) {
-      // Pointer down on the already-active tab – no pending activation.
       pendingPointerActivateRef.current = null;
       return;
     }
 
-    // Pointer down on a different tab – optimistically set it active in Redux
-    // and remember that this pointer sequence changed the active tab.
     pendingPointerActivateRef.current = tabId;
     dispatch(setActiveTab({ tabId }));
   });
@@ -132,8 +111,6 @@ function TabBar() {
     } else if (key === 'Enter' || key === ' ') {
       e.preventDefault();
 
-      // Use the focused index to find the corresponding Tab, then reuse
-      // the same path as mouse click (handleTabClick).
       const count = tabs.length;
       if (!count) return;
 
@@ -193,8 +170,7 @@ function TabBar() {
   });
 
   const handleReorderTabs = useEffectEvent((nextTabIds: UUIDv7[]) => {
-    // AIDEV-NOTE: TabBar DnD commits ordering here; Tabbar reducer remains single
-    // source of truth and server is kept in sync via reorderTabsThunk.
+    // AIDEV-NOTE: DnD emits the full order; commit it to Redux and sync the backend.
     dispatch(reorderTabsThunk(nextTabIds));
   });
 

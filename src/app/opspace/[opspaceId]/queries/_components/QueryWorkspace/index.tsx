@@ -23,7 +23,6 @@ import OpSpaceIntro                 from '../../../_components/OpSpaceIntro';
 import TabBar                       from './TabBar';
 import Toolbar                      from './Toolbar';
 import SplitPane                    from './SplitPane';
-import { useEvent }                 from './hooks/useEvent';
 import {
   STORAGE_KEY_SPLIT,
   STORAGE_KEY_LAST_VISITED
@@ -31,7 +30,7 @@ import {
 import styles                       from './styles.module.css';
 
 
-// AIDEV-NOTE: Dynamic import heavy client components; provide loading fallback
+// AIDEV-NOTE: SQLEditor/QueryResults are heavy + browser-only. Load client-side with an in-panel fallback.
 const SQLEditor = dynamic(() => import('../SQLEditor'), {
   ssr: false,
   loading: () => (<div className={styles['tabpanel']}>Loading editor…</div>)
@@ -41,7 +40,6 @@ const QueryResults = dynamic(() => import('../QueryResults'), {
   loading: () => (<div className={styles['tabpanel']}>Loading results…</div>)
 });
 
-// AIDEV-NOTE: SQLEditor is large; if initial TTI needs improvement, consider next/dynamic.
 function QueryWorkspace() {
   const {
     opspaceId,
@@ -53,7 +51,6 @@ function QueryWorkspace() {
   const containerRef             = useRef<HTMLDivElement  | null>(null);
   const topPanelRef              = useRef<HTMLDivElement  | null>(null);
   const bottomPanelRef           = useRef<HTMLDivElement  | null>(null);
-  const isLoadingContent         = useRef(false);      // track if we're loading content to prevent dispatch during programmatic hydration
   const lastActiveDataQueryIdRef = useRef<string | null>(null);
 
   const tabIds                    = useReduxSelector(selectTabIds);
@@ -63,24 +60,20 @@ function QueryWorkspace() {
     (activeTabId || null) as UUIDv7 | null
   );
 
-  // AIDEV-NOTE: Prefer the dataQueryId derived from the active tab once tab
-  // state has hydrated from SSR. Fallback to the route segment
-  // (routeDataQueryId) on initial load so deep links still work.
+  // AIDEV-NOTE: Prefer tab-derived dataQueryId; fallback to the route segment on first load (deep links).
   const activeDataQueryId       = (activeDataQueryIdFromTabs || routeDataQueryId || '') as string;
   const activeDataQueryRecord   = useReduxSelector(selectDataQueryRecord, activeDataQueryId);
 
-  const [topRatio, setTopRatio] = useState<number>(0.5);    // split ratio is local; we persist only on commit.
+  // AIDEV-NOTE: Split ratio is local state; persist it only on drag commit.
+  const [topRatio, setTopRatio] = useState<number>(0.5);
   const topStyle                = useMemo(() => ({ height: `${Math.round(topRatio * 100)}%` }), [topRatio]);
   const bottomStyle             = useMemo(() => ({ height: `${Math.round((1 - topRatio) * 100)}%` }), [topRatio]);
 
-  // AIDEV-NOTE: Treat the first render after an activeDataQueryId change as a
-  // hydration pass for SQLEditor. We suppress debounced writes during this
-  // render so that programmatic document loads (e.g., switching tabs between
-  // saved/unsaved queries) do not dispatch updateDataQueryText actions.
+  // AIDEV-NOTE: When switching queries, CodeMirror receives a new `value`. Suppress SQLEditor's debounced Redux write on that "programmatic" update.
   const isHydratingText         = lastActiveDataQueryIdRef.current !== activeDataQueryId;
   lastActiveDataQueryIdRef.current = activeDataQueryId;
 
-  // Hydrate ratio from localStorage after mount
+  // AIDEV-NOTE: Restore split ratio from localStorage after mount.
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY_SPLIT);
@@ -92,7 +85,7 @@ function QueryWorkspace() {
     } catch {}
   }, []);
 
-  // AIDEV-NOTE: Keyboard shortcuts for run. Use React 19.2 useEffectEvent to avoid effect re-runs
+  // AIDEV-NOTE: Mod/Ctrl+Enter runs the current query. useEffectEvent keeps the listener stable.
   const onHotkey = useEffectEvent((e: KeyboardEvent) => {
     const isMod = e.metaKey || e.ctrlKey;
     if (!isMod) return;
@@ -108,7 +101,7 @@ function QueryWorkspace() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // AIDEV-NOTE: Persist last visited location for root page resume behavior
+  // AIDEV-NOTE: Persist last visited opspace/query so the root page can offer a "resume" link (saved queries only).
   useEffect(() => {
     try {
       const payload =
@@ -123,8 +116,8 @@ function QueryWorkspace() {
           : {
               opspaceId,
               routeMode,                    // 'new'
-              // AIDEV-NOTE: For /queries/new we don't pin a specific dataQueryId here;
-              // restoration should use lastActiveUnsavedTabId + /queries/new.
+              // AIDEV-NOTE: For /queries/new we intentionally don't pin a specific dataQueryId;
+              // restoration within the OpSpace prefers lastActiveUnsavedTabId + /queries/new.
               dataQueryId: null,
               v: 2,
               updatedAt: Date.now()
@@ -137,15 +130,6 @@ function QueryWorkspace() {
     } catch {}
   }, [opspaceId, routeMode, activeDataQueryId]);
 
-  useEffect(() => {
-    // AIDEV-NOTE: Hydrate editor only on active tab changes.
-    if (!activeTabId) return;
-    // Redux is the source of truth for query text; SQLEditor receives value from Redux.
-    isLoadingContent.current = true;
-    // Allow restore within a short window after hydration
-    setTimeout(() => { isLoadingContent.current = false; }, 200);
-  }, [activeTabId]);
-
   const getCurrentEditorText = useCallback(() => {
     return editorRef.current?.getCurrentText() || '';
   }, []);
@@ -155,20 +139,14 @@ function QueryWorkspace() {
   const hasAnyTabs  = tabIds.length > 0;
   const isNewRoute  = routeMode === 'new';
 
-  const editorOnChange = useEvent((text: string) => {
-    if (isLoadingContent.current) return;
-  });
-
   const runFromToolbar = useCallback(() => {
     editorRef.current?.runCurrentQuery();
   }, []);
 
   return (
     <div className={styles['query-workspace']} ref={containerRef}>
-      {/* Tabs bar */}
       <TabBar />
 
-      {/* Active tabpanel wrapping toolbar and content */}
       <div
         id={hasAnyTabs ? `panel-${activeTab}` : 'panel-empty'}
         role="tabpanel"
@@ -177,7 +155,6 @@ function QueryWorkspace() {
       >
         {hasAnyTabs ? (
           <>
-            {/* Toolbar within the active tab panel */}
             <Toolbar
               key={activeDataQueryId}
               dataQueryId={activeDataQueryId as UUIDv7}
@@ -190,7 +167,6 @@ function QueryWorkspace() {
                 <Suspense fallback={<div className={styles['tabpanel']}>Loading editor…</div>}>
                   <SQLEditor
                     editorRef={editorRef}
-                    onChange={editorOnChange}
                     value={(activeDataQueryRecord?.current?.queryText || '') as string}
                     suppressDispatch={isHydratingText}
                   />
@@ -222,12 +198,7 @@ function QueryWorkspace() {
             />
           </>
         ) : (
-          // AIDEV-NOTE: Empty-state for /queries/new (and any route with no open tabs).
-          // We no longer auto-create an unsaved query here; instead, the user explicitly
-          // opts in via this button or the TabBar "+" affordance. When on /queries/new,
-          // reuse the same OpSpaceIntro component used by the opspace root Page so the
-          // hero experience (logo + CTA) feels identical whether you land on the root
-          // or directly on /queries/new.
+          // AIDEV-NOTE: Empty-state: on `/queries/new` show the OpSpaceIntro hero; otherwise show a minimal placeholder.
           isNewRoute ? (
             <OpSpaceIntro />
           ) : (

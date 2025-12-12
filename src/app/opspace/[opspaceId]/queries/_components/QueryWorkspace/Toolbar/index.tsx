@@ -1,26 +1,25 @@
 'use client';
 
-import type { ChangeEvent }     from 'react';
-import type { UUIDv7 }          from '@Types/primitives';
+import type { ChangeEvent }                   from 'react';
+import type { UUIDv7 }                        from '@Types/primitives';
 
 import {
-  memo, useCallback, useEffect,
-  useMemo, useRef, useState
-}                               from 'react';
+  memo, useCallback, useEffect, useMemo,
+  useRef, useState
+}                                             from 'react';
 
-import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
+import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 import {
-  selectDataQueryRecord,
-  updateDataQueryName,
+  selectDataQueryRecord, updateDataQueryName,
   updateDataQueryText
-}                               from '@Redux/records/dataQuery';
-import { saveDataQueryThunk }   from '@Redux/records/dataQuery/thunks';
-import { useDebouncedCallback } from '@Hooks/useDebounce';
-import Icon                     from '@Components/Icons';
-import { useSqlRunner }         from '../../../../_providers/SQLRunnerProvider';
-import { useOpSpaceRoute }      from '../../../_providers/OpSpaceRouteProvider';
+}                                             from '@Redux/records/dataQuery';
+import { saveDataQueryThunk }                 from '@Redux/records/dataQuery/thunks';
+import { useDebouncedCallback }               from '@Hooks/useDebounce';
+import Icon                                   from '@Components/Icons';
+import { useSqlRunner }                       from '../../../../_providers/SQLRunnerProvider';
+import { useOpSpaceRoute }                    from '../../../_providers/OpSpaceRouteProvider';
 
-import styles                   from './styles.module.css';
+import styles                                 from './styles.module.css';
 
 
 type Props = {
@@ -53,9 +52,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
-    // AIDEV-NOTE: Debounced write site for query name changes. When this runs
-    // we clear the pending flag because there is no longer an outstanding
-    // debounce for this id/value pair.
+    // AIDEV-NOTE: Debounced Redux commit for name edits; clear pending flag once it runs.
     hasPendingNameCommitRef.current = false;
     dispatch(updateDataQueryName({ dataQueryId: id, name: next }));
   }, [dispatch]);
@@ -64,8 +61,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const onNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setQueryName(name);
-    // AIDEV-NOTE: Mark that we have a pending debounced write for this name.
-    // This lets unmount/Save distinguish between \"no edits\" and \"unsent edits\".
+    // AIDEV-NOTE: Mark pending debounced write so Save/unmount can flush unsent name edits.
     hasPendingNameCommitRef.current = true;
     debouncedCommit(dataQueryId, name);
   }, [dataQueryId, debouncedCommit]);
@@ -76,16 +72,13 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
 
     setIsSaving(true);
 
-    // Flush any pending name changes immediately, but only if a debounce is
-    // actually outstanding. This avoids dispatching no-op name updates when
-    // the user simply switches tabs without editing the name.
+    // AIDEV-NOTE: Flush pending name changes before saving, but only if a debounce is outstanding.
     if (hasPendingNameCommitRef.current) {
       debouncedCommit.flush(dataQueryId, queryNameRef.current);
       hasPendingNameCommitRef.current = false;
     }
 
-    // AIDEV-NOTE: Only dispatch text update if editor text differs from Redux state.
-    // This bridges the gap between SQLEditor's debounced writes and an immediate Save click.
+    // AIDEV-NOTE: SQLEditor writes queryText debounced; Save forces Redux to the latest editor text before thunk runs.
     const latestText = getCurrentEditorText?.();
     const currentText = currentRecord.current?.queryText;
 
@@ -93,8 +86,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
       dispatch(updateDataQueryText({ dataQueryId, queryText: latestText }));
     }
 
-    // need to check if user is attempting to save a query name that is already taken
-    // within the same query tree
+    // AIDEV-TODO: Validate name uniqueness within the current query tree (or surface a backend duplicate-name error) before saving.
 
     try {
       const result = await dispatch(saveDataQueryThunk({ dataQueryId })).unwrap();

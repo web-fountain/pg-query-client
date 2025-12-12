@@ -155,6 +155,11 @@ export async function updateDataQuery(payload: { dataQueryId: UUIDv7, name?: str
       updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialQueryTree`);
     } catch {}
 
+    // AIDEV-NOTE: Invalidate cached "tree node children" reads (QueryWorkspace tree browser).
+    try {
+      updateTag(`tree:children:${ctx.opspacePublicId}:queries`);
+    } catch {}
+
     // AIDEV-NOTE: Invalidate cached unsaved query tree on successful save (only if name changed)
     try {
       updateTag(`tree:children:${ctx.opspacePublicId}:buildInitialUnsavedQueryTree`);
