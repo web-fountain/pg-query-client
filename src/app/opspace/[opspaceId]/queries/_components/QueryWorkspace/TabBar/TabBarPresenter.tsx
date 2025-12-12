@@ -18,27 +18,27 @@ type PresenterProps = {
   tabs            : Tab[];
   activeTabId     : string;
   focusedTabIndex : number;
-  onTabClick      : (tab: Tab) => void;
-  onPointerDown   : (tab: Tab) => void;
-  onKeyDown       : (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onAddTab        : () => void;
   onCloseTab      : (tabId: UUIDv7) => void | Promise<void>;
+  onKeyDown       : (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  onPointerDown   : (tab: Tab) => void;
   onReorderTabs   : (tabIds: UUIDv7[]) => void;
+  onTabClick      : (tab: Tab) => void;
 };
 
 type TabButtonProps = {
-  tab         : Tab;
   index       : number;
-  selected    : boolean;
+  isDragging  : boolean;
   isFocusable : boolean;
-  setRef      : (index: number, el: HTMLButtonElement | null) => void;
-  onTabClick  : (tab: Tab) => void;
+  selected    : boolean;
+  tab         : Tab;
+  beginDrag   : (tabId: UUIDv7, clientX: number) => void;
+  endDrag     : () => void;
   onCloseTab  : (tabId: UUIDv7) => void | Promise<void>;
   onPointerDownActivate?: (tab: Tab) => void;
-  beginDrag   : (tabId: UUIDv7, clientX: number) => void;
+  onTabClick  : (tab: Tab) => void;
+  setRef      : (index: number, el: HTMLButtonElement | null) => void;
   updateDrag  : (clientX: number) => void;
-  endDrag     : () => void;
-  isDragging  : boolean;
 };
 
 // AIDEV-NOTE: Persist horizontal scroll offset across remounts.
@@ -221,24 +221,24 @@ function TabBarPresenter({
     if (!targetButton) return;
 
     const containerRect = container.getBoundingClientRect();
-    const buttonRect = targetButton.getBoundingClientRect();
+    const buttonRect    = targetButton.getBoundingClientRect();
 
     const intersectionWidth = Math.min(buttonRect.right, containerRect.right) - Math.max(buttonRect.left, containerRect.left);
-    const tabWidth = buttonRect.width;
+    const tabWidth          = buttonRect.width;
 
     // AIDEV-NOTE: Use intersection width to detect full visibility (epsilon accounts for subpixel rounding).
-    const epsilon = 1;
-    const isOffscreen = intersectionWidth <= 0;
-    const isFullyVisible = !isOffscreen && intersectionWidth >= (tabWidth - epsilon);
+    const epsilon         = 1;
+    const isOffscreen     = intersectionWidth <= 0;
+    const isFullyVisible  = !isOffscreen && intersectionWidth >= (tabWidth - epsilon);
 
     // AIDEV-NOTE: Don't scroll if already fully visible; avoids horizontal jump on activation.
     if (isFullyVisible) return;
 
     try {
       targetButton.scrollIntoView({
-        behavior: 'auto',
-        block: 'nearest',
-        inline: 'nearest'
+        behavior  : 'auto',
+        block     : 'nearest',
+        inline    : 'nearest'
       });
     } catch {
       // AIDEV-NOTE: Fallback for browsers without scrollIntoView options.

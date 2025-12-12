@@ -1,4 +1,4 @@
-import type { UUIDv7 }    from '@Types/primitives';
+import type { UUIDv7 }                        from '@Types/primitives';
 import type { DataQuery, DataQueryEditField } from '@Types/dataQuery';
 
 

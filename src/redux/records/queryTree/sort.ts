@@ -1,13 +1,6 @@
 import { getFsNumericEnCollator, compareSortKeys } from '@Utils/collation';
+import type { ComparableNode }                     from './types';
 
-
-// AIDEV-NOTE: Minimal shape required for comparison; caller supplies resolved name
-export type ComparableNode = {
-  nodeId: string;
-  kind: 'folder' | 'file';
-  name: string;
-  sortKey?: string;
-};
 
 // AIDEV-NOTE: Compare by folder-first, then name via fs_numeric_en, then nodeId
 export function compareByName(a: ComparableNode, b: ComparableNode): number {

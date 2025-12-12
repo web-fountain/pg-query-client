@@ -26,39 +26,20 @@ import {
   validateDataQueryUpdate
 }  from './validation';
 
+type CreateNewUnsavedDataQuery  = { dataQueryId: UUIDv7; name: string; ext: Extension }
+type MarkDataQuerySaved         = { dataQueryId: UUIDv7; name?: string; queryText?: string }
 
-export type CreateNewDataQuery = {
-  dataQueryId: UUIDv7;
-  name: string;
-  ext: string;
-  tab: {
-    groupId: number;
-    tabId: UUIDv7;
-    position: number;
-  },
-  tree: {
-    root: string;
-    groupdId: number;
-    tabId: UUIDv7;
-    position: number;
-  }
-};
-
-export type CreateNewUnsavedDataQuery = {
-  dataQueryId : UUIDv7;
-  name        : string;
-  ext         : Extension;
-};
 
 // Action Creators
-export const seedDataQueryFromActiveTab = createAction<DataQuery>           ('dataQuery/seedDataQueryFromActiveTab');
-export const setDataQueryRecord         = createAction<DataQuery>           ('dataQuery/setDataQueryRecord');
-
-export const createDataQuery            = createAction<CreateDataQuery>     ('dataQuery/createDataQuery');
-export const createNewUnsavedDataQuery  = createAction<CreateNewUnsavedDataQuery>  ('dataQuery/createNewUnsavedDataQuery');
-export const createNewUnsavedDataQueryFromFetch = createAction<CreateNewUnsavedDataQuery>  ('dataQuery/createNewUnsavedDataQueryFromFetch');
-
-export const updateDataQuery            = createAction(
+export const seedDataQueryFromActiveTab         = createAction<DataQuery>                 ('dataQuery/seedDataQueryFromActiveTab');
+export const setDataQueryRecord                 = createAction<DataQuery>                 ('dataQuery/setDataQueryRecord');
+export const createDataQuery                    = createAction<CreateDataQuery>           ('dataQuery/createDataQuery');
+export const createNewUnsavedDataQuery          = createAction<CreateNewUnsavedDataQuery> ('dataQuery/createNewUnsavedDataQuery');
+export const createNewUnsavedDataQueryFromFetch = createAction<CreateNewUnsavedDataQuery> ('dataQuery/createNewUnsavedDataQueryFromFetch');
+export const updateDataQueryIsUnsaved           = createAction<{ dataQueryId: UUIDv7 }>   ('dataQuery/updateDataQueryIsUnsaved');
+export const markDataQuerySaved                 = createAction<MarkDataQuerySaved>        ('dataQuery/markDataQuerySaved');
+export const removeDataQueryRecord              = createAction<{ dataQueryId: UUIDv7 }>   ('dataQuery/removeDataQueryRecord');
+export const updateDataQuery                    = createAction(
   'dataQuery/updateDataQuery',
   (payload: UpdateDataQuery) => {
     const result = validateDataQueryUpdate(payload);
@@ -114,7 +95,7 @@ export const updateDataQuery            = createAction(
     return { payload, meta };
   }
 );
-export const updateDataQueryName        = createAction(
+export const updateDataQueryName                = createAction(
   'dataQuery/updateDataQueryName',
   (payload: UpdateDataQueryName) => {
     // AIDEV-NOTE: Validate name field; map errors to invalid.name for reducer consumption
@@ -138,7 +119,7 @@ export const updateDataQueryName        = createAction(
     return { payload, meta };
   }
 );
-export const updateDataQueryText        = createAction(
+export const updateDataQueryText                = createAction(
   'dataQuery/updateDataQueryText',
   (payload: UpdateDataQueryText) => {
     // AIDEV-NOTE: Validate queryText field; map errors to invalid.queryText for reducer consumption
@@ -162,9 +143,7 @@ export const updateDataQueryText        = createAction(
     return { payload, meta };
   }
 );
-export const updateDataQueryIsUnsaved   = createAction<{ dataQueryId: UUIDv7 }    >   ('dataQuery/updateDataQueryIsUnsaved');
-export const markDataQuerySaved         = createAction<{ dataQueryId: UUIDv7, name?: string, queryText?: string }>   ('dataQuery/markDataQuerySaved');
-export const removeDataQueryRecord      = createAction<{ dataQueryId: UUIDv7 }>('dataQuery/removeDataQueryRecord');
+
 
 // Selectors
 export const selectDataQueries      = createSelector.withTypes<RootState>()(
@@ -315,7 +294,7 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(markDataQuerySaved,
-      function(state: DataQueryRecord, action: PayloadAction<{ dataQueryId: UUIDv7, name?: string, queryText?: string }>) {
+      function(state: DataQueryRecord, action: PayloadAction<MarkDataQuerySaved>) {
         const { dataQueryId } = action.payload;
         const dataQuery = state[dataQueryId];
 

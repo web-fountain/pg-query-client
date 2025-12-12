@@ -23,51 +23,50 @@ import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thu
 import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
 import { generateUUIDv7 }                     from '@Utils/generateId';
 
-import { useOpSpaceRoute }                    from '../../../_providers/OpSpaceRouteProvider';
+import { useQueriesRoute }                    from '../../../_providers/QueriesRouteProvider';
 
 import { useActivateTab }                     from '../hooks/useActivateTab';
 import TabBarPresenter                        from './TabBarPresenter';
 
 
-export type Tab = { dataQueryId: UUIDv7; tabId: UUIDv7; name: string };
+export type Tab = { tabId: UUIDv7; name: string };
 
 // AIDEV-NOTE: Redux/router-aware TabBar container. Owns tab-strip behavior and delegates rendering to TabBarPresenter.
 function TabBar() {
-  const { opspaceId, navigateToNew } = useOpSpaceRoute();
+  const { opspaceId, navigateToNew }  = useQueriesRoute();
+  const router                        = useRouter();
+  const [, startTabTransition]        = useTransition();
+  const tabIds                        = useReduxSelector(selectTabIds) as UUIDv7[];
+  const tabEntities                   = useReduxSelector(selectTabEntities);
+  const activeTabId                   = useReduxSelector(selectActiveTabId) as UUIDv7 | null;
+  const focusedTabIndex               = useReduxSelector(selectFocusedTabIndex) as number | null;
+  const dataQueryRecords              = useReduxSelector(selectDataQueries);
+  const nextUntitledName              = useReduxSelector(selectNextUntitledName) as string;
+  const dispatch                      = useReduxDispatch();
 
-  const router   = useRouter();
-  const dispatch = useReduxDispatch();
-
-  const [, startTabTransition] = useTransition();
-
-  const tabIds            = useReduxSelector(selectTabIds) as UUIDv7[];
-  const tabEntities       = useReduxSelector(selectTabEntities);
-  const activeTabId       = useReduxSelector(selectActiveTabId);
-  const focusedTabIndex   = useReduxSelector(selectFocusedTabIndex);
-  const dataQueryRecords  = useReduxSelector(selectDataQueries);
-  const nextUntitledName  = useReduxSelector(selectNextUntitledName);
-
-  const activateTab       = useActivateTab();
-
-  // AIDEV-NOTE: pointerdown optimistically sets active tab in Redux; click runs the thunk (backend + routing).
+  const activateTab                   = useActivateTab();
+  // pointerdown optimistically sets active tab in Redux; click runs the thunk (backend + routing).
   // Track which tabId was switched to via pointerdown so we can treat "click active tab" as a no-op unless it was just activated.
-  const pendingPointerActivateRef = useRef<UUIDv7 | null>(null);
-  // AIDEV-NOTE: Guard against double fire for add/close while their thunks are in flight.
-  const closingTabIdRef           = useRef<UUIDv7 | null>(null);
-  const isAddingRef               = useRef(false);
+  const pendingPointerActivateRef     = useRef<UUIDv7 | null>(null);
+  // Guard against double fire for add/close while their thunks are in flight.
+  const closingTabIdRef               = useRef<UUIDv7 | null>(null);
+  const isAddingRef                   = useRef(false);
 
   const tabs = useMemo<Tab[]>(() => {
-    return tabIds.map((t) => {
-      const tab = tabEntities[t];
-      const dataQueryId = tab?.mountId;
-      const rec = dataQueryId ? dataQueryRecords?.[dataQueryId] : undefined;
-      const name = (rec?.current?.name as string) || (rec?.persisted?.name as string) || 'Untitled';
-      return { dataQueryId: (dataQueryId || t) as UUIDv7, tabId: t, name };
+    return tabIds.map((tabId) => {
+      const tab         = tabEntities[tabId];
+      const mountId     = tab?.mountId;
+      const rec         = mountId ? dataQueryRecords?.[mountId] : undefined;
+      const name        = (rec?.current?.name as string) || (rec?.persisted?.name as string) || 'Untitled';
+      return {
+        tabId,
+        name
+      };
     });
   }, [tabIds, tabEntities, dataQueryRecords]);
 
   const handleTabClick = useEffectEvent((tab: Tab) => {
-    const { dataQueryId, tabId } = tab;
+    const { tabId } = tab;
 
     const pendingId = pendingPointerActivateRef.current;
     pendingPointerActivateRef.current = null;
@@ -77,7 +76,7 @@ function TabBar() {
       return;
     }
 
-    activateTab({ tabId, dataQueryId });
+    activateTab(tabId);
   });
 
   const handleTabPointerDown = useEffectEvent((tab: Tab) => {

@@ -78,7 +78,7 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
   })();
 
   // AIDEV-NOTE: Row click selects/focuses; for files with a valid mountId, sync tabbar and
-  // navigate to the unsaved queries route. Query trees are rendered outside OpSpaceRouteProvider,
+  // navigate to the unsaved queries route. Query trees are rendered outside QueriesRouteProvider,
   // so they own the transition into `/queries/new`.
   const handleRowClick = (e: React.MouseEvent) => {
     try {

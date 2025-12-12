@@ -13,6 +13,7 @@ import {
   unexpectedActionError
 }                                        from '@Errors/server/actionResult.server';
 import { getHeadersContextOrNull }       from '@Utils/backendFetch';
+import { nowMonotonicMs }                from '@Utils/time';
 import {
   getCorrelationInfo,
   runWithCorrelationInfo
@@ -28,18 +29,10 @@ export type ActionWrapOptions = {
 
 const DEBUG_ENABLED = (process.env.PGQC_LOG_LEVEL || '').toLowerCase() === 'debug';
 
-// AIDEV-NOTE: Use a monotonic clock for durations (avoid wall-clock jumps).
-function nowMs(): number {
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
-}
-
 // AIDEV-NOTE: Outer-boundary action wrapper. This MUST be called outside any 'use cache'
 // functions so it runs for both cache hits and cache misses.
 export async function withAction<T>(opts: ActionWrapOptions, fn: (args: { ctx: HeadersContext; correlationId: string; meta: ActionMeta }) => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
-  const start = nowMs();
+  const start = nowMonotonicMs();
 
   const correlation = await getCorrelationInfo();
   return runWithCorrelationInfo(correlation, async () => {
@@ -48,7 +41,7 @@ export async function withAction<T>(opts: ActionWrapOptions, fn: (args: { ctx: H
 
     if (!ctx) {
       const result = fail<T>(meta, missingContextActionError(meta));
-      const durationMs = Math.round(nowMs() - start);
+      const durationMs = Math.round(nowMonotonicMs() - start);
 
       logJson('warn', {
         event         : 'action',
@@ -73,7 +66,7 @@ export async function withAction<T>(opts: ActionWrapOptions, fn: (args: { ctx: H
       result = fail(meta, unexpectedActionError(meta, error));
     }
 
-    const durationMs = Math.round(nowMs() - start);
+    const durationMs = Math.round(nowMonotonicMs() - start);
 
     if (result.success) {
       logJson('info', {

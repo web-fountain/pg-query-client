@@ -5,6 +5,7 @@ import { headers }                         from 'next/headers';
 
 import { getBackendAccessTokenOnBehalfOf } from '@Auth/obo';
 import { formatError }                     from '@Utils/error';
+import { nowMonotonicMs }                  from '@Utils/time';
 import {
   createCorrelationId,
   getCorrelationInfoFromContext
@@ -42,16 +43,6 @@ const BACKEND_FETCH_SLOW_MS = (() => {
 function truncateErrorMessage(message: string): string {
   if (message.length <= DEFAULT_ERROR_MESSAGE_MAX_LEN) return message;
   return message.slice(0, DEFAULT_ERROR_MESSAGE_MAX_LEN);
-}
-
-// Use a monotonic clock for durations (avoid wall-clock jumps).
-function nowMs(): number {
-  // `performance.now()` exists in Node (via perf_hooks) and in Edge-like runtimes.
-  // Fall back to Date.now() defensively.
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
 }
 
 // Request-scoped memoization to avoid repeated `headers()` reads during
@@ -215,10 +206,10 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
     }, timeoutMs);
   }
 
-  const fetchStart = nowMs();
+  const fetchStart = nowMonotonicMs();
   try {
     const res = await fetch(url, init);
-    const durationMs = Math.round(nowMs() - fetchStart);
+    const durationMs = Math.round(nowMonotonicMs() - fetchStart);
     if (!res.ok) {
       let errBody: unknown = null;
       try { errBody = await res.json(); } catch { try { errBody = await res.text(); } catch {} }

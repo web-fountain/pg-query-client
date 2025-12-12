@@ -5,8 +5,8 @@ export type DataQueryTab = {
   dataQueryId : UUIDv7;
   name        : string;
   queryText   : string;   // last saved queryText (not drafts)
-  createdAt   : number;   // epoch ms
-  updatedAt   : number;   // epoch ms
+  createdAt   : string;   // ISO 8601 (timestamptz)
+  updatedAt   : string;   // ISO 8601 (timestamptz)
 };
 
 export type OpSpaceTabsState = {

@@ -30,7 +30,10 @@ type Nodes = {
 };
 
 type ChildrenByParentId = {
-  [parentNodeId: string | UUIDv7]: UUIDv7[];
+  // AIDEV-NOTE: Children arrays contain nodeIds, which are used as string keys
+  // into `nodes`. Even though some nodeIds are branded UUIDv7 at the type level,
+  // object keys are always strings at runtime, so we model these as string[].
+  [parentNodeId: string | UUIDv7]: string[];
 };
 
 type NodeIdsByFolderId = {

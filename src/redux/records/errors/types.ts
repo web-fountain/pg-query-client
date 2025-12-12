@@ -11,7 +11,7 @@ export type ErrorEntry = {
   // When present, prefer using `actionError.id` as the support/debug identifier.
   actionError?  : ActionError;
   meta?         : unknown;
-  createdAt     : number;
+  createdAt     : string;   // ISO 8601 (timestamptz)
 };
 
 export type ErrorsState = {

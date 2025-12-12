@@ -17,7 +17,7 @@ import { saveDataQueryThunk }                 from '@Redux/records/dataQuery/thu
 import { useDebouncedCallback }               from '@Hooks/useDebounce';
 import Icon                                   from '@Components/Icons';
 import { useSqlRunner }                       from '../../../../_providers/SQLRunnerProvider';
-import { useOpSpaceRoute }                    from '../../../_providers/OpSpaceRouteProvider';
+import { useQueriesRoute }                    from '../../../_providers/QueriesRouteProvider';
 
 import styles                                 from './styles.module.css';
 
@@ -30,7 +30,7 @@ type Props = {
 
 function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const { isRunning }           = useSqlRunner();
-  const { navigateToSaved }     = useOpSpaceRoute();
+  const { navigateToSaved }     = useQueriesRoute();
   const record                  = useReduxSelector(selectDataQueryRecord, dataQueryId);
   const dispatch                = useReduxDispatch();
   const [isSaving, setIsSaving] = useState<boolean>(false);

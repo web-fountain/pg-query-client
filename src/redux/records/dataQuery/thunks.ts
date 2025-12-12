@@ -3,6 +3,7 @@ import type { UUIDv7 }                  from '@Types/primitives';
 import type { TreeNode }                from '@Redux/records/queryTree/types';
 
 import { createAsyncThunk }             from '@reduxjs/toolkit';
+import * as log                         from '@Observability/client/thunks';
 import {
   createNewUnsavedDataQuery,
   createNewUnsavedDataQueryFromFetch,
@@ -37,12 +38,24 @@ import {
 export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string }, { state: RootState }>(
   'dataQuery/createNewUnsavedDataQueryThunk',
   async ({ dataQueryId, name }, { dispatch }) => {
+    log.thunkStart({
+      thunk : 'dataQuery/createNewUnsavedDataQueryThunk',
+      input : {
+        dataQueryId,
+        nameLen: typeof name === 'string' ? name.length : undefined
+      }
+    });
+
     dispatch(createNewUnsavedDataQuery({ dataQueryId, name, ext: 'sql' }));
 
     const payload = { dataQueryId };
     try {
-      console.log('[createNewQueryThunk] createNewQuery', payload);
       const res = await createNewUnsavedDataQueryAction(payload);
+      log.thunkResult({
+        thunk  : 'dataQuery/createNewUnsavedDataQueryThunk',
+        result : res,
+        input  : { dataQueryId }
+      });
 
       if (res.success) {
         const { dataQueryId, name, ext, tab, tree } = res.data;
@@ -58,7 +71,12 @@ export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQuery
         return;
       }
     } catch (error) {
-      console.error(`Server Error creating dataQueryId: ${dataQueryId}`, error);
+      log.thunkException({
+        thunk   : 'dataQuery/createNewUnsavedDataQueryThunk',
+        message : 'createNewUnsavedDataQueryAction threw',
+        error   : error,
+        input   : { dataQueryId }
+      });
       dispatch(updateError({
         actionType  : 'dataQuery/createNewUnsavedDataQueryThunk',
         message     : 'Failed to create a new query.',
@@ -87,7 +105,10 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
 
     // AIDEV-NOTE: At this point, latest name/queryText edits should already be captured
     // in record.unsaved.update via write-time reducers (e.g., updateDataQueryName/Text).
-    const payload = record.unsaved.update;
+    const payload       = record.unsaved.update;
+
+    const nameLen       = typeof payload.name === 'string' ? payload.name.length : undefined;
+    const queryTextLen  = typeof payload.queryText === 'string' ? payload.queryText.length : undefined;
 
     const tabIdByMountId = selectTabIdByMountIdMap(state);
     const tabId = tabIdByMountId.get(dataQueryId)!;
@@ -98,6 +119,15 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
     const hasSavedNode = !!queryTree.nodeIdsByDataQueryId?.[dataQueryId]?.length;
     const prevName = hasSavedNode ? record.current.name : undefined;
 
+    log.thunkStart({
+      thunk : 'dataQuery/saveDataQueryThunk',
+      input : {
+        dataQueryId,
+        hasSavedNode,
+        nameLen,
+        queryTextLen
+      }
+    });
 
     // AIDEV-NOTE: Optimistic update for already-saved queries – update QueryTree labels immediately
     // so the directory reflects the new name while the backend call is in flight.
@@ -108,8 +138,17 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
     let treeNodeId: UUIDv7 | undefined;
 
     try {
-      console.log('[saveDataQueryThunk] updateDataQuery', payload);
       const res = await updateDataQueryAction(payload);
+      log.thunkResult({
+        thunk  : 'dataQuery/saveDataQueryThunk',
+        result : res,
+        input  : {
+          dataQueryId,
+          hasSavedNode,
+          nameLen,
+          queryTextLen
+        }
+      });
       if (!res.success) {
         dispatch(updateError(errorEntryFromActionError({
           actionType  : 'dataQuery/saveDataQueryThunk',
@@ -127,7 +166,17 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
         treeNodeId = res.data.nodeId as UUIDv7;
       }
     } catch (error) {
-      console.error(`Server Error saving dataQueryId: ${dataQueryId}`, error);
+      log.thunkException({
+        thunk   : 'dataQuery/saveDataQueryThunk',
+        message : 'updateDataQueryAction threw',
+        error   : error,
+        input   : {
+          dataQueryId,
+          hasSavedNode,
+          nameLen,
+          queryTextLen
+        }
+      });
       dispatch(updateError({
         actionType  : 'dataQuery/saveDataQueryThunk',
         message     : 'Failed to save query.',

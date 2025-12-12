@@ -18,7 +18,7 @@ import {
 }                                   from '@Redux/records/tabbar';
 import { selectDataQueryRecord }    from '@Redux/records/dataQuery';
 
-import { useOpSpaceRoute }          from '../../_providers/OpSpaceRouteProvider';
+import { useQueriesRoute }          from '../../_providers/QueriesRouteProvider';
 import OpSpaceIntro                 from '../../../_components/OpSpaceIntro';
 import TabBar                       from './TabBar';
 import Toolbar                      from './Toolbar';
@@ -45,7 +45,7 @@ function QueryWorkspace() {
     opspaceId,
     routeMode,
     dataQueryId: routeDataQueryId
-  }                             = useOpSpaceRoute();
+  }                             = useQueriesRoute();
 
   const editorRef                = useRef<SQLEditorHandle | null>(null);
   const containerRef             = useRef<HTMLDivElement  | null>(null);
@@ -111,7 +111,7 @@ function QueryWorkspace() {
               routeMode,                    // 'saved'
               dataQueryId: activeDataQueryId || null,
               v: 2,
-              updatedAt: Date.now()
+              updatedAt: new Date().toISOString()
             }
           : {
               opspaceId,
@@ -120,7 +120,7 @@ function QueryWorkspace() {
               // restoration within the OpSpace prefers lastActiveUnsavedTabId + /queries/new.
               dataQueryId: null,
               v: 2,
-              updatedAt: Date.now()
+              updatedAt: new Date().toISOString()
             };
 
       window.localStorage.setItem(

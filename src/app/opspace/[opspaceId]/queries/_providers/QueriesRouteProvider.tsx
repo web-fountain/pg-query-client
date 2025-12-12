@@ -22,7 +22,7 @@ import { selectUnsavedQueryTree }             from '@Redux/records/unsavedQueryT
 
 type RouteMode = 'saved' | 'new';
 
-type OpSpaceRouteContextValue = {
+type QueriesRouteContextValue = {
   opspaceId  : Base64Url22;
   routeMode  : RouteMode;
   dataQueryId: UUIDv7 | null;  // saved id or active unsaved mountId
@@ -40,9 +40,9 @@ type HistoryStateShape = {
   [key: string]: any;
 };
 
-const OpSpaceRouteCtx = createContext<OpSpaceRouteContextValue | null>(null);
+const QueriesRouteCtx = createContext<QueriesRouteContextValue | null>(null);
 
-function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22; children: ReactNode }) {
+function QueriesRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22; children: ReactNode }) {
   const pathname  = usePathname() || '';
   const router    = useRouter();
   const dispatch  = useReduxDispatch();
@@ -195,7 +195,7 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
   }, [opspaceId, routeMode, dataQueryId, pathname]);
 
   return (
-    <OpSpaceRouteCtx.Provider
+    <QueriesRouteCtx.Provider
       value={{
         opspaceId,
         routeMode,
@@ -205,15 +205,15 @@ function OpSpaceRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
       }}
     >
       {children}
-    </OpSpaceRouteCtx.Provider>
+    </QueriesRouteCtx.Provider>
   );
 }
 
-function useOpSpaceRoute(): OpSpaceRouteContextValue {
-  const ctx = useContext(OpSpaceRouteCtx);
-  if (!ctx) throw new Error('useOpSpaceRoute must be used within OpSpaceRouteProvider');
+function useQueriesRoute(): QueriesRouteContextValue {
+  const ctx = useContext(QueriesRouteCtx);
+  if (!ctx) throw new Error('useQueriesRoute must be used within QueriesRouteProvider');
   return ctx;
 }
 
 
-export { OpSpaceRouteProvider, useOpSpaceRoute };
+export { QueriesRouteProvider, useQueriesRoute };

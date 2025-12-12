@@ -5,7 +5,7 @@ import { notFound }             from 'next/navigation';
 import QueryToolPanel           from '@Components/layout/QueryToolPanel';
 import { isBase64Url22 }        from '@Utils/generateId';
 
-import { OpSpaceRouteProvider } from './_providers/OpSpaceRouteProvider';
+import { QueriesRouteProvider } from './_providers/QueriesRouteProvider';
 import { SQLValidatorProvider } from './_providers/SQLValidatorProvider';
 
 
@@ -18,13 +18,13 @@ async function Layout({ children, params }: { children: ReactNode; params: Promi
   if (!isBase64Url22(opspaceId)) return notFound();
 
   return (
-    <OpSpaceRouteProvider opspaceId={opspaceId as Base64Url22}>
+    <QueriesRouteProvider opspaceId={opspaceId as Base64Url22}>
       <SQLValidatorProvider>
         <QueryToolPanel>
           {children}
         </QueryToolPanel>
       </SQLValidatorProvider>
-    </OpSpaceRouteProvider>
+    </QueriesRouteProvider>
   );
 }
 

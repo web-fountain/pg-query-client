@@ -8,7 +8,7 @@ import { useReduxSelector }               from '@Redux/storeHooks';
 import { selectDataQueryRecord }          from '@Redux/records/dataQuery';
 
 import { useSqlRunner }                   from '../../../_providers/SQLRunnerProvider';
-import { useOpSpaceRoute }                from '../../_providers/OpSpaceRouteProvider';
+import { useQueriesRoute }                from '../../_providers/QueriesRouteProvider';
 import JSONEditor                         from '../JSONEditor';
 
 import styles                             from './styles.module.css';
@@ -16,7 +16,7 @@ import styles                             from './styles.module.css';
 
 function QueryResults() {
   const { lastResult, lastError } = useSqlRunner();
-  const { dataQueryId }           = useOpSpaceRoute();
+  const { dataQueryId }           = useQueriesRoute();
   const activeDataQueryRecord     = useReduxSelector(selectDataQueryRecord, dataQueryId);
   const [activeTab, setActiveTab] = useState<'data-output' | 'messages'>('data-output');
   const sqlText                   = (activeDataQueryRecord?.current?.queryText || '') as string;

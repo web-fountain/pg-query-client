@@ -2,7 +2,6 @@ import type { PayloadAction }                   from '@reduxjs/toolkit';
 import type { RootState }                       from '@Redux/store';
 import type { UUIDv7 }                          from '@Types/primitives';
 import type {
-  PendingInvalidations,
   QueryTreeRecord,
   TreeNode
 }                                               from './types';
@@ -16,40 +15,60 @@ import { fsSortKeyEn }                          from '@Utils/collation';
 import { compareBySortKey, findInsertIndexIds } from './sort';
 
 
+type SetChildren                = { parentId: string; rows: TreeNode[] };
+type AddChild                   = { parentId: string; node: TreeNode };
+type MoveNode                   = { nodeId: string; oldParentNodeId: string; newParentNodeId: string; index?: number };
+type ResortChildren             = { parentId: string };
+type InsertChildSorted          = { parentId: string; node: TreeNode };
+type LinkDataQueryIdToNodeIds   = { dataQueryId: UUIDv7; nodeId: UUIDv7 };
+type RenameNodeWithInvalidation = { dataQueryId: UUIDv7; name: string };
+type ClearInvalidations         = { items: string[]; parents: string[] };
+
 // Action Creators
-export const setInitialQueryTree = createAction<QueryTreeRecord> ('queryTree/setInitialQueryTree');
-export const setQueryTree = createAction<QueryTreeRecord> ('queryTree/setQueryTree');
-export const setChildren  = createAction<{ parentId: string; rows: TreeNode[] }>   ('queryTree/setChildren');
-export const upsertNode   = createAction<TreeNode>                                    ('queryTree/upsertNode');
-export const addChild     = createAction<{ parentId: string; node: TreeNode }>        ('queryTree/addChild');
-export const moveNode     = createAction<{ nodeId: string; oldParentNodeId: string; newParentNodeId: string; index?: number }>('queryTree/moveNode');
-export const resortChildren      = createAction<{ parentId: string }>('queryTree/resortChildren');
-export const insertChildSorted   = createAction<{ parentId: string; node: TreeNode }>('queryTree/insertChildSorted');
+export const setInitialQueryTree  = createAction<QueryTreeRecord>   ('queryTree/setInitialQueryTree');
+export const setQueryTree         = createAction<QueryTreeRecord>   ('queryTree/setQueryTree');
+export const setChildren          = createAction<SetChildren>       ('queryTree/setChildren');
+export const upsertNode           = createAction<TreeNode>          ('queryTree/upsertNode');
+export const addChild             = createAction<AddChild>          ('queryTree/addChild');
+export const moveNode             = createAction<MoveNode>          ('queryTree/moveNode');
+export const resortChildren       = createAction<ResortChildren>    ('queryTree/resortChildren');
+export const insertChildSorted    = createAction<InsertChildSorted> ('queryTree/insertChildSorted');
 
 // AIDEV-NOTE: Explicitly link a dataQueryId to a tree nodeId so renameNodeWithInvalidation
 // can locate the correct node even for client-created nodes (e.g., promotions).
-export const linkDataQueryIdToNodeIds = createAction<{
-  dataQueryId : UUIDv7;
-  nodeId      : UUIDv7;
-}>('queryTree/linkDataQueryIdToNodeIds');
+export const linkDataQueryIdToNodeIds   = createAction<LinkDataQueryIdToNodeIds>    ('queryTree/linkDataQueryIdToNodeIds');
 
 // AIDEV-NOTE: Rename with automatic resort detection and invalidation tracking.
 // This action updates the label, computes if resort is needed, and sets pendingInvalidations.
-export const renameNodeWithInvalidation = createAction<{
-  dataQueryId : UUIDv7;
-  name        : string;
-}>('queryTree/renameNodeWithInvalidation');
+export const renameNodeWithInvalidation = createAction<RenameNodeWithInvalidation>  ('queryTree/renameNodeWithInvalidation');
 
 // AIDEV-NOTE: Clear invalidations after processing (pass what was processed to avoid races).
-export const clearInvalidations = createAction<{
-  items   : string[];
-  parents : string[];
-}>('queryTree/clearInvalidations');
+export const clearInvalidations         = createAction<ClearInvalidations>          ('queryTree/clearInvalidations');
+
 
 // Selectors
+export const selectItem             = createSelector.withTypes<RootState>()(
+  [
+    (_state: RootState, nodeId: UUIDv7) => nodeId,
+    (state: RootState) => state.queryTree.nodes
+  ],
+  (nodeId, nodes) => nodes[nodeId]
+);
+export const selectQueryTree        = createSelector.withTypes<RootState>()(
+  [(state: RootState) => state.queryTree],
+  (queryTree): QueryTreeRecord => queryTree,
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+export const selectItemLabel        = createSelector.withTypes<RootState>()(
+  [
+    (_state: RootState, nodeId: UUIDv7) => nodeId,
+    (state: RootState) => state.queryTree.nodes
+  ],
+  (nodeId, nodes) => nodes[nodeId]?.label
+);
 export const selectChildrenWithData = createSelector.withTypes<RootState>()(
   [
-    (state: RootState, parentId: string) => parentId,
+    (_state: RootState, parentId: string) => parentId,
     (state: RootState) => state.queryTree ],
   (parentId, tree) => {
     const ids = tree.childrenByParentId[parentId] || [];
@@ -57,27 +76,6 @@ export const selectChildrenWithData = createSelector.withTypes<RootState>()(
   }
 );
 
-export const selectItem = createSelector.withTypes<RootState>()(
-  [
-    (_state: RootState, nodeId: UUIDv7) => nodeId,
-    (state: RootState) => state.queryTree.nodes
-  ],
-  (nodeId, nodes) => nodes[nodeId]
-);
-
-export const selectQueryTree = createSelector.withTypes<RootState>()(
-  [(state: RootState) => state.queryTree],
-  (queryTree): QueryTreeRecord => queryTree,
-  { devModeChecks: { identityFunctionCheck: 'never' } }
-);
-
-export const selectItemLabel = createSelector.withTypes<RootState>()(
-  [
-    (_state: RootState, nodeId: UUIDv7) => nodeId,
-    (state: RootState) => state.queryTree.nodes
-  ],
-  (nodeId, nodes) => nodes[nodeId]?.label
-);
 
 // Reducer
 const initialState: QueryTreeRecord = {
@@ -103,7 +101,7 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(setChildren,
-      function (state: QueryTreeRecord, action: PayloadAction<{ parentId: string; rows: TreeNode[] }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<SetChildren>) {
         const { parentId, rows } = action.payload;
         const ids: string[] = [];
 
@@ -123,7 +121,7 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(addChild,
-      function (state: QueryTreeRecord, action: PayloadAction<{ parentId: string; node: TreeNode }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<AddChild>) {
         const { parentId, node } = action.payload;
         state.nodes[node.nodeId] = { ...node, parentNodeId: parentId };
         const arr = state.childrenByParentId[parentId] || [];
@@ -132,7 +130,7 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(moveNode,
-      function (state: QueryTreeRecord, action: PayloadAction<{ nodeId: string; oldParentNodeId: string; newParentNodeId: string; index?: number }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<MoveNode>) {
         const { nodeId, oldParentNodeId, newParentNodeId, index } = action.payload;
         const oldArr = state.childrenByParentId[oldParentNodeId] || [];
         state.childrenByParentId[oldParentNodeId] = oldArr.filter((x: string) => x !== nodeId);
@@ -144,7 +142,7 @@ export default createReducer(initialState, (builder) => {
     )
     // AIDEV-NOTE: Re-sort a parent's children by sortKey/name to reflect rename operations
     .addCase(resortChildren,
-      function (state: QueryTreeRecord, action: PayloadAction<{ parentId: string }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<ResortChildren>) {
         const { parentId } = action.payload;
         const ids = (state.childrenByParentId[parentId] || []).slice();
         const resolve = (id: string) => {
@@ -156,7 +154,7 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(insertChildSorted,
-      function (state: QueryTreeRecord, action: PayloadAction<{ parentId: string; node: TreeNode }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<InsertChildSorted>) {
         const { parentId, node } = action.payload;
         state.nodes[node.nodeId] = { ...node, parentNodeId: parentId };
         const arr = state.childrenByParentId[parentId] || [];
@@ -172,7 +170,7 @@ export default createReducer(initialState, (builder) => {
       }
     )
     .addCase(linkDataQueryIdToNodeIds,
-      function (state: QueryTreeRecord, action: PayloadAction<{ dataQueryId: UUIDv7; nodeId: UUIDv7 }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<LinkDataQueryIdToNodeIds>) {
         const { dataQueryId, nodeId } = action.payload;
         const existing = state.nodeIdsByDataQueryId[dataQueryId] || [];
         if (!existing.includes(nodeId)) {
@@ -183,7 +181,7 @@ export default createReducer(initialState, (builder) => {
     // AIDEV-NOTE: Rename with automatic resort detection and invalidation tracking.
     // Computes if the rename causes a sort order change and sets pendingInvalidations.
     .addCase(renameNodeWithInvalidation,
-      function (state: QueryTreeRecord, action: PayloadAction<{ dataQueryId: UUIDv7; name: string }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<RenameNodeWithInvalidation>) {
         const { dataQueryId, name } = action.payload;
 
         const nodeId = state.nodeIdsByDataQueryId?.[dataQueryId]?.[0];
@@ -261,7 +259,7 @@ export default createReducer(initialState, (builder) => {
     )
     // AIDEV-NOTE: Clear only the invalidations that were actually processed (race-safe).
     .addCase(clearInvalidations,
-      function (state: QueryTreeRecord, action: PayloadAction<{ items: string[]; parents: string[] }>) {
+      function (state: QueryTreeRecord, action: PayloadAction<ClearInvalidations>) {
         const inv = state.pendingInvalidations;
         if (!inv) return;
 

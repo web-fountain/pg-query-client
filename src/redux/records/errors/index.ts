@@ -20,7 +20,7 @@ export const updateError = createAction(
     // Prefer the ActionError id when present so UI/debugging can correlate
     // Redux errors with server action logs. Fall back to a new id for generic errors.
     const id = payload.actionError?.id || generateBase64Url22();
-    const createdAt = Date.now();
+    const createdAt = new Date().toISOString();
     return { payload: { id, createdAt, ...payload }, meta: { _routedError: true } };
   }
 );
@@ -31,17 +31,16 @@ export const selectErrorsState = createSelector.withTypes<RootState>()(
   (errors): ErrorsState => errors,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
-
 export const selectLastError = createSelector.withTypes<RootState>()(
   [state => state.errors],
   (errors) => (errors.last ? errors.byId[errors.last] : undefined),
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
-// Reducer
-const initialState: ErrorsState = { byId: {}, last: null };
 
+// Reducer
 // AIDEV-NOTE: Errors are append-only in byId; last holds the most recent id for UX to subscribe.
+const initialState: ErrorsState = { byId: {}, last: null };
 export default createReducer(initialState, (builder) => {
   builder
     .addCase(updateError,

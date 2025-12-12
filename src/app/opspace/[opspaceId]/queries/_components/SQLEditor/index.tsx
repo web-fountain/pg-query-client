@@ -20,7 +20,7 @@ import { useDebouncedCallback }                   from '@Hooks/useDebounce';
 
 import { useSqlRunner }                           from '../../../_providers/SQLRunnerProvider';
 import { useSQLValidator }                        from '../../_providers/SQLValidatorProvider';
-import { useOpSpaceRoute }                        from '../../_providers/OpSpaceRouteProvider';
+import { useQueriesRoute }                        from '../../_providers/QueriesRouteProvider';
 import styles                                     from './styles.module.css';
 import type { UUIDv7 }                            from '@Types/primitives';
 
@@ -190,7 +190,7 @@ type SQLEditorProps = { onChange?: (value: string) => void; editorRef?: React.Re
 function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEditorProps) {
   const { runQuery }        = useSqlRunner();
   const { getLinter }       = useSQLValidator();
-  const { dataQueryId }     = useOpSpaceRoute();
+  const { dataQueryId }     = useQueriesRoute();
   const dispatch            = useReduxDispatch();
   const editorContainerRef  = useRef<HTMLDivElement | null>(null);
 
