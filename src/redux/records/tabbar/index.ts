@@ -14,6 +14,7 @@ import {
 export const setInitialTabs            = createAction<TabbarRecord>             ('tabs/setInitialTabs');
 export const addTabFromFetch           = createAction<{ tab: Tab }>             ('tabs/addTabFromFetch');
 export const closeTab                  = createAction<{ tabId: UUIDv7 }>        ('tabs/closeTab');
+export const closeAllTabs              = createAction                           ('tabs/closeAllTabs');
 export const setActiveTab              = createAction<{ tabId: UUIDv7 }>        ('tabs/setActiveTab');
 export const focusTabIndex             = createAction<{ index: number }>        ('tabs/focusTabIndex');
 export const reorderTabs               = createAction<{ tabIds: UUIDv7[] }>     ('tabs/reorderTabs');
@@ -127,6 +128,16 @@ const reducer = createReducer(initialState, (builder) => {
             state.focusedTabIndex = state.tabIds.length - 1;
           }
         }
+      }
+    )
+    .addCase(closeAllTabs,
+      function(state: TabbarRecord) {
+        // AIDEV-NOTE: Close all unsaved tabs at once; reset to empty state.
+        state.tabIds = [];
+        state.entities = {};
+        state.activeTabId = null;
+        state.focusedTabIndex = null;
+        state.lastActiveUnsavedTabId = null;
       }
     )
     .addCase(setActiveTab,

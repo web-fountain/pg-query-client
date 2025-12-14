@@ -1,6 +1,9 @@
 // AIDEV-NOTE: Encapsulates create/rename/move behaviors and parent refreshes.
 import { useCallback } from 'react';
-import { OnCreateFolder, OnCreateFile, OnRename, OnDropMove } from '../types';
+import { useReduxDispatch } from '@Redux/storeHooks';
+import { closeAllTabs } from '@Redux/records/tabbar';
+import { clearAllUnsavedTreeNodes } from '@Redux/records/unsavedQueryTree';
+import { OnCreateFolder, OnCreateFile, OnRename, OnDropMove, OnCloseAll } from '../types';
 import {
   createFolder as apiCreateFolder,
   createQueryFile as apiCreateQueryFile,
@@ -12,6 +15,7 @@ import {
 type LoadableTree = { loadChildrenIds: (id: string) => void } & { [key: string]: unknown };
 
 export function useItemActions(tree: LoadableTree, targetFolderId: string) {
+  const dispatch = useReduxDispatch();
   // AIDEV-NOTE: micro-batching for parent refreshes within same tick
   let refreshQueue = new Set<string>();
   const flushRefreshes = () => {
@@ -102,10 +106,17 @@ export function useItemActions(tree: LoadableTree, targetFolderId: string) {
     }
   }, [tree]);
 
+  const handleCloseAll: OnCloseAll = useCallback(() => {
+    // AIDEV-NOTE: Close all unsaved queries by dispatching Redux actions.
+    dispatch(closeAllTabs());
+    dispatch(clearAllUnsavedTreeNodes());
+  }, [dispatch]);
+
   return {
     handleCreateFolder,
     handleCreateFile,
     handleRename,
-    handleDropMove
+    handleDropMove,
+    handleCloseAll
   };
 }

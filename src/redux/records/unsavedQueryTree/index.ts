@@ -39,6 +39,7 @@ function parseUntitledSuffix(name: string, base: string): number | null {
 export const setInitialUnsavedQueryTree   = createAction<UnsavedQueryTreeRecord>          ('unsavedQueryTree/setInitialUnsavedQueryTree');
 export const addUnsavedTreeNodeFromFetch  = createAction<{ tree: UnsavedQueryTreeNode }>  ('unsavedQueryTree/addUnsavedTreeNodeFromFetch');
 export const removeUnsavedTreeNodeByTabId = createAction<{ tabId: UUIDv7 }>               ('unsavedQueryTree/removeUnsavedTreeNode');
+export const clearAllUnsavedTreeNodes     = createAction                                  ('unsavedQueryTree/clearAllNodes');
 
 
 // Selectors
@@ -144,6 +145,13 @@ export default createReducer(initialState, (builder) => {
 
         state.childrenByParentId[parentKey] = children.filter((id) => id !== node.nodeId);
         delete state.nodes[tabId];
+      }
+    )
+    .addCase(clearAllUnsavedTreeNodes,
+      function (state: UnsavedQueryTreeRecord) {
+        // AIDEV-NOTE: Clear all unsaved tree nodes; reset to empty state keeping rootId.
+        state.nodes = {};
+        state.childrenByParentId = {};
       }
     )
 });

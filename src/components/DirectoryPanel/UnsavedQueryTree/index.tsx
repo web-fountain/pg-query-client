@@ -1,28 +1,27 @@
 'use client';
 
-import type { UnsavedQueryTreeRecord, UnsavedTreeNode } from '@Redux/records/unsavedQueryTree/types';
+import type {
+  UnsavedQueryTreeRecord, UnsavedTreeNode
+}                                               from '@Redux/records/unsavedQueryTree/types';
 
-import { useEffect, useMemo, useRef, useState }         from 'react';
-import { usePathname }                                  from 'next/navigation';
-import { useTree }                                      from '@headless-tree/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname }                          from 'next/navigation';
+import { useTree }                              from '@headless-tree/react';
 import {
   syncDataLoaderFeature, selectionFeature,
   hotkeysCoreFeature, dragAndDropFeature
-}                                                       from '@headless-tree/core';
-import { useReduxSelector }                             from '@Redux/storeHooks';
-import { selectUnsavedQueryTree }                       from '@Redux/records/unsavedQueryTree';
-import {
-  selectTabIds,
-  selectFocusedTabIndex
-}                                                       from '@Redux/records/tabbar';
-import Icon                                             from '@Components/Icons';
+}                                               from '@headless-tree/core';
+import { useReduxSelector }                     from '@Redux/storeHooks';
+import { selectUnsavedQueryTree }               from '@Redux/records/unsavedQueryTree';
+import { selectTabIds, selectFocusedTabIndex }  from '@Redux/records/tabbar';
+import Icon                                     from '@Components/Icons';
 
-import { useTreeSectionState }                          from '../hooks/useTreeSectionState';
-import { useItemActions }                               from './hooks/useItemActions';
-import Row                                              from './components/Row';
-import Toolbar                                          from './components/Toolbar';
+import { useTreeSectionState }                  from '../hooks/useTreeSectionState';
+import { useItemActions }                       from './hooks/useItemActions';
+import Row                                      from './components/Row';
+import Toolbar                                  from './components/Toolbar';
 
-import styles                                           from './styles.module.css';
+import styles                                   from './styles.module.css';
 
 
 // AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes.
@@ -279,17 +278,9 @@ function UnsavedQueriesTreeInner(
           onKeyDown={(e) => { e.stopPropagation(); }}
         >
           <Toolbar
-            onCreateFolder={actions.handleCreateFolder}
             onCreateFile={actions.handleCreateFile}
-            disableNewFolder={(() => {
-              try {
-                const rootItemMeta = (rootItem as any)?.getItemMeta?.() ?? {};
-                const rootLevel = (rootItemMeta.level ?? 0) as number;
-                // AIDEV-NOTE: Block New Folder when a new child would be meta level >= 3 (aria-level >= 4)
-                return rootLevel + 1 >= 3;
-              } catch {}
-              return false;
-            })()}
+            onCloseAll={actions.handleCloseAll}
+            disableCloseAll={renderItems.length === 0}
           />
         </div>
       </div>

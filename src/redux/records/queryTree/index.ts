@@ -1,14 +1,10 @@
 import type { PayloadAction }                   from '@reduxjs/toolkit';
 import type { RootState }                       from '@Redux/store';
 import type { UUIDv7 }                          from '@Types/primitives';
-import type {
-  QueryTreeRecord,
-  TreeNode
-}                                               from './types';
+import type { QueryTreeRecord, TreeNode }       from './types';
 
 import {
-  createAction, createReducer,
-  createSelector
+  createAction, createReducer, createSelector
 }                                               from '@reduxjs/toolkit';
 
 import { fsSortKeyEn }                          from '@Utils/collation';

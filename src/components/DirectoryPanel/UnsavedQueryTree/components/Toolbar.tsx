@@ -1,30 +1,20 @@
 'use client';
 
-import type { OnCreateFolder, OnCreateFile } from '../types';
+import type { OnCreateFile, OnCloseAll } from '../types';
 import Icon   from '@Components/Icons';
 import styles from './Toolbar.module.css';
 
 
 type ToolbarProps = {
-  onCreateFolder: OnCreateFolder;
   onCreateFile: OnCreateFile;
-  disableNewFolder?: boolean;
+  onCloseAll: OnCloseAll;
+  disableCloseAll?: boolean;
 };
 
-function Toolbar({ onCreateFolder, onCreateFile, disableNewFolder }: ToolbarProps) {
+function Toolbar({ onCreateFile, onCloseAll, disableCloseAll }: ToolbarProps) {
   return (
     <header className={styles['toolbar']}>
       <div className={styles['tools']}>
-        <button
-          type="button"
-          className={styles['tool']}
-          aria-label="New Folder"
-          onClick={onCreateFolder}
-          title="New Folder"
-          disabled={!!disableNewFolder}
-        >
-          <Icon name="folder-plus" aria-hidden="true" />
-        </button>
         <button
           type="button"
           className={styles['tool']}
@@ -33,6 +23,16 @@ function Toolbar({ onCreateFolder, onCreateFile, disableNewFolder }: ToolbarProp
           title="New File"
         >
           <Icon name="file-plus" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className={styles['tool']}
+          aria-label="Close All"
+          onClick={onCloseAll}
+          title="Close All"
+          disabled={!!disableCloseAll}
+        >
+          <Icon name="close-all" aria-hidden="true" />
         </button>
       </div>
     </header>

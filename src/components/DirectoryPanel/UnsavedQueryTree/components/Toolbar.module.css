@@ -25,7 +25,7 @@
   align-items       : center;
   justify-content   : center;
   column-gap        : var(--space-1);
-  width             : 24px;
+  width             : 20px;
   height            : 20px;
   padding           : unset;
   border-radius     : unset;
