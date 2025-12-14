@@ -49,12 +49,15 @@
   padding-inline  : var(--px-4);
   color           : var(--text-primary);
   cursor          : pointer;
+  position        : relative; /* AIDEV-NOTE: positioning context for absolutely-placed header-tools */
 }
 .header-left {
-  display     : inline-flex;
-  align-items : center;
-  gap         : var(--space-2);
-  cursor      : pointer;
+  display        : inline-flex;
+  align-items    : center;
+  gap            : var(--space-2);
+  cursor         : pointer;
+  flex           : 1;
+  min-width      : 0; /* AIDEV-NOTE: allow label to shrink and ellide before overlapping tools */
 }
 .header-toggle {
   display         : inline-flex;
@@ -69,9 +72,14 @@
   cursor          : pointer;
 }
 .header-label {
-  font-size   : var(--text-xs);
-  font-weight : 600;
-  letter-spacing: 0.02em;
+  flex           : 1;
+  min-width      : 0; /* AIDEV-NOTE: allow shrinking for ellipsis */
+  font-size      : var(--text-xs);
+  font-weight    : 600;
+  letter-spacing : 0.02em;
+  overflow       : hidden;
+  text-overflow  : ellipsis;
+  white-space    : nowrap;
 }
 
 .scroller {
@@ -94,21 +102,31 @@
 /* AIDEV-NOTE: Collapsed state — show only the root row; do not force a 100% height scroller. */
 
 
-/* AIDEV-NOTE: Toolbar in header (right-aligned) */
+/* AIDEV-NOTE: Toolbar in header (right-aligned, absolutely positioned to not occupy space when hidden) */
 .header-tools {
-  display: inline-flex;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--duration-150) var(--ease-standard);
-  cursor: default; /* AIDEV-NOTE: toolbar itself shouldn't indicate header-level toggle */
-  z-index: 1; /* lift above header-left for interaction when visible */
+  position       : absolute;
+  right          : var(--px-4); /* AIDEV-NOTE: align with header padding-inline */
+  top            : 50%;
+  transform      : translateY(-50%);
+  display        : inline-flex;
+  align-items    : center;
+  opacity        : 0;
+  pointer-events : none;
+  transition     : opacity var(--duration-150) var(--ease-standard);
+  cursor         : default; /* AIDEV-NOTE: toolbar itself shouldn't indicate header-level toggle */
+  z-index        : 1; /* lift above header-left for interaction when visible */
 }
 
-/* AIDEV-NOTE: Reveal tools only when the expanded section is hovered (including header/title area) */
+/* AIDEV-NOTE: Reveal tools when the expanded section is hovered. */
 .tree[data-open="true"]:hover .header-tools {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* AIDEV-NOTE: When tools are visible, add margin to the label so it truncates with ellipsis.
+   This reserves space for the tools (≈60px) without affecting the parent container layout. */
+.tree[data-open="true"]:hover .header-label {
+  margin-right: 60px;
 }
 
 /* AIDEV-NOTE: Hover/focus fade-in for scrollbar visuals without changing thickness */
