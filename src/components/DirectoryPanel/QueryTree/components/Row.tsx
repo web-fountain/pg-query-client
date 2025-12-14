@@ -9,6 +9,7 @@ import { useRouter, useParams }                   from 'next/navigation';
 
 import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
 import { setActiveTabThunk, openTabThunk }        from '@Redux/records/tabbar/thunks';
+import { logClientJson }                          from '@Observability/client';
 import Icon                                       from '@Components/Icons';
 
 import styles                                     from './Row.module.css';
@@ -107,7 +108,14 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
     }
 
     // No existing tab — open a new one for this saved query
-    if (!mountId) {console.error('Failed to open tab: no mountId'); return;}
+    if (!mountId) {
+      logClientJson('error', () => ({
+        event   : 'queryTree',
+        phase   : 'open-tab-missing-mount-id',
+        nodeId  : nodeId
+      }));
+      return;
+    }
 
     try {
       const newTabId = await dispatch(openTabThunk(mountId)).unwrap();
@@ -119,7 +127,12 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
         } catch {}
       }
     } catch (error) {
-      console.error('Failed to open tab:', error);
+      logClientJson('error', () => ({
+        event         : 'queryTree',
+        phase         : 'open-tab-failed',
+        mountId       : mountId,
+        errorMessage  : error instanceof Error ? error.message : String(error)
+      }));
     }
   }, [itemProps, onTreeFocusFromRow, isFolder, isActiveFromTab, tabId, dispatch, mountId, opspaceId, router]);
 

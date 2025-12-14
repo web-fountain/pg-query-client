@@ -22,6 +22,7 @@ import { selectDataQueries }                  from '@Redux/records/dataQuery';
 import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
 import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
 import { generateUUIDv7 }                     from '@Utils/generateId';
+import { logClientJson }                      from '@Observability/client';
 
 import { useQueriesRoute }                    from '../../../_providers/QueriesRouteProvider';
 
@@ -136,7 +137,12 @@ function TabBar() {
         navigateToNew();
       });
     } catch (error) {
-      console.error('handleAddTab: failed to create new unsaved tab', { dataQueryId, error });
+      logClientJson('error', () => ({
+        event         : 'tabbar',
+        phase         : 'add-tab-failed',
+        dataQueryId   : dataQueryId,
+        errorMessage  : error instanceof Error ? error.message : String(error)
+      }));
     } finally {
       isAddingRef.current = false;
     }
@@ -160,7 +166,12 @@ function TabBar() {
         }
       });
     } catch (error) {
-      console.error('handleTabClose: failed to close tab', { tabId, error });
+      logClientJson('error', () => ({
+        event         : 'tabbar',
+        phase         : 'close-tab-failed',
+        tabId         : tabId,
+        errorMessage  : error instanceof Error ? error.message : String(error)
+      }));
     } finally {
       if (closingTabIdRef.current === tabId) {
         closingTabIdRef.current = null;

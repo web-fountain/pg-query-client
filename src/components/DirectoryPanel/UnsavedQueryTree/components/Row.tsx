@@ -8,6 +8,7 @@ import { memo }                                   from 'react';
 import { useRouter, useParams }                   from 'next/navigation';
 import { useReduxDispatch }                       from '@Redux/storeHooks';
 import { setActiveTabThunk, closeTabThunk }       from '@Redux/records/tabbar/thunks';
+import { logClientJson }                          from '@Observability/client';
 import Icon                                       from '@Components/Icons';
 import styles                                     from './Row.module.css';
 
@@ -132,7 +133,12 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
         }
       });
     } catch (error) {
-      console.error('handleCloseQuery: failed to close unsaved query tab', { tabId, error });
+      logClientJson('error', () => ({
+        event         : 'unsavedQueryTree',
+        phase         : 'close-tab-failed',
+        tabId         : tabId,
+        errorMessage  : error instanceof Error ? error.message : String(error)
+      }));
     }
   };
 
@@ -160,9 +166,6 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
         </span>
       ) : (
         <span className={styles['type-icon']}>
-          <span className={styles['type-icon-default']} aria-hidden="true">
-            <Icon name="file-lines" />
-          </span>
           <button
             type="button"
             className={styles['type-icon-button']}

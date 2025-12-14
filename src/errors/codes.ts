@@ -4,7 +4,7 @@
 // Design goals:
 // - Small cross-cutting set (use `meta.action` to answer "where" and `code` to answer "what class")
 // - Serializable across server actions and Redux
-// - Compatible with observability logs (see `src/observability/CONTEXT.md`)
+// - Compatible with observability logs (see `src/observability/server/CONTEXT.md`)
 
 type ValueOf<T> = T[keyof T];
 

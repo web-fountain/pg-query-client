@@ -1,5 +1,7 @@
 'use server';
 
+import type { BackendCallLogEvent }        from '@Observability/types';
+
 import { cache }                           from 'react';
 import { headers }                         from 'next/headers';
 
@@ -8,9 +10,11 @@ import { formatError }                     from '@Utils/error';
 import { nowMonotonicMs }                  from '@Utils/time';
 import {
   createCorrelationId,
-  getCorrelationInfoFromContext
+  getCorrelationInfoFromContext,
+  getLogContext,
+  getLogger
 }                                          from '@Observability/server';
-import { logBackendCall }                  from '@Observability/server/http';
+
 
 
 export type HeadersContext = {
@@ -64,7 +68,16 @@ export async function getHeadersContextOrNull(): Promise<HeadersContext | null> 
   const operatorPublicId  = ctx.operatorPublicId;
 
   if (!tenantPublicId || !opspacePublicId || !operatorPublicId) {
-    console.error('[backendFetch] Missing required headers: x-tenant-id, x-opspace-id, x-operator-id');
+    const logger = getLogger();
+    logger.warn({
+      event : 'headersContext',
+      ok    : false,
+      missing: {
+        tenantPublicId    : !tenantPublicId,
+        opspacePublicId   : !opspacePublicId,
+        operatorPublicId  : !operatorPublicId,
+      }
+    });
     return null;
   }
 
@@ -155,9 +168,11 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
   }
 
   const correlation = getCorrelationInfoFromContext() ?? { correlationId: createCorrelationId() };
+  const requestId   = getLogContext()?.bindings.requestId;
+  const logger      = getLogger();
 
-  const scopeKey = buildScopeKey(scope);
-  const backendJwt = await getBackendJwtForRequest(
+  const scopeKey    = buildScopeKey(scope);
+  const backendJwt  = await getBackendJwtForRequest(
     ctx.tenantPublicId,
     ctx.opspacePublicId,
     ctx.operatorPublicId,
@@ -213,7 +228,7 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
     if (!res.ok) {
       let errBody: unknown = null;
       try { errBody = await res.json(); } catch { try { errBody = await res.text(); } catch {} }
-      logBackendCall('error', {
+      const evt: BackendCallLogEvent = {
         event         : 'backendFetch',
         label         : logLabel,
         method        : method,
@@ -223,24 +238,35 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
         ctx           : ctx,
         correlationId : correlation.correlationId,
         vercelId      : correlation.vercelId,
+        requestId     : requestId,
         errorCode     : 'backend-non-2xx',
         errorMessage  : DEBUG_ENABLED ? truncateErrorMessage(formatError(errBody)) : undefined
-      });
+      };
+      logger.error(evt);
       return { ok: false, status: res.status, error: errBody, context: ctx };
     }
 
     if (res.status === 204) {
-      logBackendCall(durationMs >= BACKEND_FETCH_SLOW_MS ? 'warn' : 'debug', {
-        event         : 'backendFetch',
-        label         : logLabel,
-        method        : method,
-        url           : url,
-        status        : res.status,
-        durationMs    : durationMs,
-        ctx           : ctx,
-        correlationId : correlation.correlationId,
-        vercelId      : correlation.vercelId
-      });
+      const slow = durationMs >= BACKEND_FETCH_SLOW_MS;
+      if (slow || logger.isLevelEnabled('debug')) {
+        const evt: BackendCallLogEvent = {
+          event         : 'backendFetch',
+          label         : logLabel,
+          method        : method,
+          url           : url,
+          status        : res.status,
+          durationMs    : durationMs,
+          ctx           : ctx,
+          correlationId : correlation.correlationId,
+          vercelId      : correlation.vercelId,
+          requestId     : requestId
+        };
+        if (slow) {
+          logger.warn(evt);
+        } else {
+          logger.debug(evt);
+        }
+      }
       return { ok: true, status: res.status, data: {} as T, context: ctx };
     }
 
@@ -248,7 +274,7 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
     try {
       responsePayload = await res.json();
     } catch (jsonError) {
-      logBackendCall('error', {
+      const evt: BackendCallLogEvent = {
         event         : 'backendFetch',
         label         : logLabel,
         method        : method,
@@ -258,28 +284,39 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
         ctx           : ctx,
         correlationId : correlation.correlationId,
         vercelId      : correlation.vercelId,
+        requestId     : requestId,
         errorCode     : 'backend-parse',
         errorMessage  : DEBUG_ENABLED ? truncateErrorMessage(formatError(jsonError)) : undefined
-      });
+      };
+      logger.error(evt);
       return { ok: false, status: res.status, error: formatError(jsonError), context: ctx };
     }
 
-    logBackendCall(durationMs >= BACKEND_FETCH_SLOW_MS ? 'warn' : 'debug', {
-      event         : 'backendFetch',
-      label         : logLabel,
-      method        : method,
-      url           : url,
-      status        : res.status,
-      durationMs    : durationMs,
-      ctx           : ctx,
-      correlationId : correlation.correlationId,
-      vercelId      : correlation.vercelId
-    });
+    const slow = durationMs >= BACKEND_FETCH_SLOW_MS;
+    if (slow || logger.isLevelEnabled('debug')) {
+      const evt: BackendCallLogEvent = {
+        event         : 'backendFetch',
+        label         : logLabel,
+        method        : method,
+        url           : url,
+        status        : res.status,
+        durationMs    : durationMs,
+        ctx           : ctx,
+        correlationId : correlation.correlationId,
+        vercelId      : correlation.vercelId,
+        requestId     : requestId
+      };
+      if (slow) {
+        logger.warn(evt);
+      } else {
+        logger.debug(evt);
+      }
+    }
     return { ok: true, status: res.status, data: responsePayload, context: ctx };
   } catch (error) {
     const durationMs = Math.round(nowMonotonicMs() - fetchStart);
     if ((error as any)?.name === 'AbortError') {
-      logBackendCall('error', {
+      const evt: BackendCallLogEvent = {
         event         : 'backendFetch',
         label         : logLabel,
         method        : method,
@@ -289,12 +326,14 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
         ctx           : ctx,
         correlationId : correlation.correlationId,
         vercelId      : correlation.vercelId,
+        requestId     : requestId,
         errorCode     : 'backend-timeout',
         errorMessage  : `request timed out after ${timeoutMs}ms`
-      });
+      };
+      logger.error(evt);
       return { ok: false, status: 408, error: 'timeout', context: ctx };
     }
-    logBackendCall('error', {
+    const evt: BackendCallLogEvent = {
       event         : 'backendFetch',
       label         : logLabel,
       method        : method,
@@ -304,9 +343,11 @@ export async function backendFetchJSON<T>(opts: BackendFetchOptions): Promise<Ba
       ctx           : ctx,
       correlationId : correlation.correlationId,
       vercelId      : correlation.vercelId,
+      requestId     : requestId,
       errorCode     : 'backend-network',
       errorMessage  : DEBUG_ENABLED ? truncateErrorMessage(formatError(error)) : undefined
-    });
+    };
+    logger.error(evt);
     return { ok: false, status: 0, error, context: ctx };
   } finally {
     if (timeoutHandle) {

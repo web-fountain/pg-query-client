@@ -1,9 +1,11 @@
 import 'server-only';
 
-import type { LogLevel } from '../types';
+import type { Logger, LoggerOptions } from 'pino';
+import type { LogLevel }              from '../types';
+import pino                           from 'pino';
 
-// Vercel best practice is to log JSON to stdout/stderr for queryability.
-// This module will become the single entry point for server-side structured logs.
+// AIDEV-NOTE: Node.js server logger (Pino).
+// Do NOT import this module from Edge runtime code (middleware). Use `@Observability/edge/logger` there.
 
 const DEFAULT_LEVEL: LogLevel = 'info';
 
@@ -14,34 +16,88 @@ export function getLogLevel(): LogLevel {
   return DEFAULT_LEVEL;
 }
 
-export function isLevelEnabled(level: LogLevel, current: LogLevel): boolean {
-  const order: Record<LogLevel, number> = {
-    debug: 10,
-    info: 20,
-    warn: 30,
-    error: 40
-  };
-  return order[level] >= order[current];
+function isPrettyEnabled(): boolean {
+  // AIDEV-NOTE: `pino-pretty` is dev-only; never enable in production/serverless.
+  return process.env.NODE_ENV !== 'production' && (process.env.PGQC_LOG_PRETTY || '').toLowerCase() === 'true';
 }
 
-export function logJson(level: LogLevel, payload: Record<string, unknown>): void {
-  const current = getLogLevel();
-  if (!isLevelEnabled(level, current)) return;
+function createPinoLogger(): Logger {
+  const opts: LoggerOptions = {
+    level: getLogLevel(),
+    base: null,
+    formatters: {
+      level(label) {
+        return { level: label };
+      }
+    },
+    redact: {
+      // AIDEV-NOTE: Safety net. Call sites must still avoid logging sensitive payloads.
+      paths: [
+        'authorization',
+        'cookie',
+        'token',
+        'jwt',
+        'secret',
+        'password',
+        'queryText',
+        'querytext',
+        'headers.authorization',
+        'headers.cookie',
+        'headers.token',
+        'headers.jwt',
+        'headers.secret',
+        'headers.password',
+        'headers.queryText',
+        'headers.querytext',
+        'headers["set-cookie"]',
+        'requestHeaders.authorization',
+        'requestHeaders.cookie',
+        'requestHeaders.token',
+        'requestHeaders.jwt',
+        'requestHeaders.secret',
+        'requestHeaders.password',
+        'requestHeaders.queryText',
+        'requestHeaders.querytext',
+        'requestHeaders["set-cookie"]',
+        'input.queryText',
+        'input.querytext',
+        'audit.queryText',
+        'audit.querytext',
+        'body.queryText',
+        'body.querytext'
+      ],
+      censor: '[redacted]'
+    }
+  };
 
-  const line = JSON.stringify({
-    level,
-    ts: new Date().toISOString(),
-    ...payload
-  });
-
-  if (level === 'error') {
-    console.error(line);
-    return;
+  if (isPrettyEnabled()) {
+    // AIDEV-NOTE: `pino.transport(...)` uses a worker thread. This is safe as long as
+    // Pino deps are not bundled (see `next.config.ts` `serverExternalPackages`).
+    const transport = pino.transport({
+      target: 'pino-pretty',
+      options: {
+        colorize      : true,
+        translateTime : 'SYS:standard',
+        singleLine    : true,
+        ignore        : 'pid,hostname'
+      }
+    });
+    return pino(opts, transport);
   }
-  if (level === 'warn') {
-    console.warn(line);
-    return;
-  }
 
-  console.log(line);
+  return pino(opts);
+}
+
+type GlobalWithLogger = typeof globalThis & { __pgqcPinoLogger?: Logger };
+const globalWithLogger = globalThis as GlobalWithLogger;
+
+// AIDEV-NOTE: Next.js dev/HMR can evaluate modules multiple times.
+// Cache the base logger on globalThis to avoid duplicate transports/destinations.
+const baseLogger: Logger =
+  process.env.NODE_ENV === 'production'
+    ? createPinoLogger()
+    : (globalWithLogger.__pgqcPinoLogger ?? (globalWithLogger.__pgqcPinoLogger = createPinoLogger()));
+
+export function getBaseLogger(): Logger {
+  return baseLogger;
 }

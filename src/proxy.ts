@@ -5,7 +5,7 @@ import type { LogLevel }                  from '@Observability/types';
 import { NextResponse }                   from 'next/server';
 import { jwtVerify, createRemoteJWKSet }  from 'jose';
 
-import { logJson }                        from '@Observability/server/logger';
+import { logJson }                        from '@Observability/edge/logger';
 import { formatError }                    from '@Utils/error';
 
 

@@ -3,6 +3,7 @@
 import type { Base64Url22, UUIDv7 } from '@Types/primitives';
 import { useEffect, useState }      from 'react';
 import { STORAGE_KEY_LAST_VISITED } from '@Constants';
+import { logClientJson }            from '@Observability/client';
 import { preloadAllEditors }        from '@/app/opspace/[opspaceId]/_components/editorPreloaders';
 
 
@@ -42,8 +43,11 @@ function OpenOpSpaceLinkClient({}: OpenOpSpaceLinkClientProps) {
       } else {
         // AIDEV-NOTE: No OpSpace found. Log guidance and render nothing.
         // AIDEV-QUESTION: Should we surface a UI message here instead of logging only?
-        // eslint-disable-next-line no-console
-        console.error('[OpenOpSpaceLinkClient] No OpSpace session found in localStorage. To proceed, open an existing OpSpace via a shared link (format: /opspace/:opspaceId/queries/:dataQueryId) or create one from within the app, then revisit this page.');
+        logClientJson('warn', () => ({
+          event   : 'openOpSpaceLink',
+          phase   : 'missing-session',
+          message : 'No OpSpace session found in localStorage. Open an OpSpace via a shared link (/opspace/:opspaceId/queries/:dataQueryId) or create one in-app, then revisit.'
+        }));
       }
     } catch {}
   }, []);
