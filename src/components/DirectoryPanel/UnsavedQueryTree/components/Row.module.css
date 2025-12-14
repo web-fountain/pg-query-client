@@ -22,17 +22,16 @@
 .row-top-level.row-selected-focused:hover { background: var(--tree-item-selected-focused); }
 .row-top-level.row-selected-blurred:hover { background: var(--tree-item-selected-blurred); }
 
+/* AIDEV-NOTE: Fixed width ensures layout stability when the close button toggles visibility. */
 .type-icon {
   display         : inline-flex;
   align-items     : center;
   justify-content : center;
+  width           : 1em;
   color           : var(--icon-fill);
 }
 
-/* AIDEV-NOTE: File rows swap their default icon for a close button when hovered. */
-.type-icon-default {
-  display : inline-flex;
-}
+/* AIDEV-NOTE: File rows show a close button only on hover or when selected. */
 .type-icon-button {
   display         : none;
   align-items     : center;
@@ -47,11 +46,9 @@
   line-height     : 0;
 }
 
-.row:hover .type-icon-default {
-  display: none;
-}
-
-.row:hover .type-icon-button {
+.row:hover .type-icon-button,
+.row-selected-focused .type-icon-button,
+.row-selected-blurred .type-icon-button {
   display: inline-flex;
   color  : var(--icon-active);
 }
