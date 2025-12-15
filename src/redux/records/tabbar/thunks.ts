@@ -1,6 +1,6 @@
 import type { RootState }               from '@Redux/store';
 import type { UnsavedQueryTreeNode }    from '@Redux/records/unsavedQueryTree/types';
-import type { UUIDv7 }                  from '@Types/primitives'
+import type { UUIDv7 }                  from '@Types/primitives';
 
 import { createAsyncThunk }             from '@reduxjs/toolkit';
 import * as log                         from '@Observability/client/thunks';
@@ -165,8 +165,60 @@ export const closeTabThunk = createAsyncThunk<CloseTabResult, UUIDv7, { state: R
     return {
       nextDataQueryId,
       nextTabIsUnsaved,
-      hasRemainingTabs: postState.tabs.tabIds.length > 0,
+      hasRemainingTabs: postState.tabs.tabIds.length > 0
     };
+  }
+);
+
+export const closeAllUnsavedTabsThunk = createAsyncThunk<void, void, { state: RootState }>(
+  'tabs/closeAllUnsavedTabsThunk',
+  async (_arg, { dispatch, getState }) => {
+    const state = getState();
+    const { unsavedQueryTree, tabs } = state;
+
+    // AIDEV-NOTE: Collect all unsaved tabIds (file-kind nodes) in current tab order so that
+    // close semantics remain predictable and consistent with single-tab closes.
+    const unsavedIds = new Set<string>();
+    for (const key of Object.keys(unsavedQueryTree.nodes || {})) {
+      const node = unsavedQueryTree.nodes[key] as UnsavedQueryTreeNode | undefined;
+      if (node && node.kind === 'file') {
+        unsavedIds.add(String(node.nodeId));
+      }
+    }
+
+    if (!unsavedIds.size) {
+      return;
+    }
+
+    const orderedUnsavedTabIds: UUIDv7[] = [];
+    for (const tabId of tabs.tabIds) {
+      if (unsavedIds.has(String(tabId))) {
+        orderedUnsavedTabIds.push(tabId as UUIDv7);
+      }
+    }
+
+    log.thunkStart({
+      thunk : 'tabs/closeAllUnsavedTabsThunk',
+      input : {
+        unsavedCount : orderedUnsavedTabIds.length
+      }
+    });
+
+    for (const tabId of orderedUnsavedTabIds) {
+      try {
+        // AIDEV-NOTE: Delegate to closeTabThunk to ensure all side effects (Redux + server)
+        // remain centralized in a single pathway.
+        await dispatch(closeTabThunk(tabId)).unwrap();
+      } catch (error) {
+        log.thunkException({
+          thunk   : 'tabs/closeAllUnsavedTabsThunk',
+          message : 'closeTabThunk threw while closing all unsaved tabs',
+          error   : error,
+          input   : { tabId }
+        });
+        // AIDEV-NOTE: Continue closing remaining tabs even if one fails.
+      }
+    }
   }
 );
 

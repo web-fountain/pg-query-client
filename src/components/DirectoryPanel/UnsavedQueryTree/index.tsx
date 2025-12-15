@@ -4,20 +4,32 @@ import type {
   UnsavedQueryTreeRecord, UnsavedTreeNode
 }                                               from '@Redux/records/unsavedQueryTree/types';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname }                          from 'next/navigation';
+import {
+  useCallback, useEffect, useMemo, useRef,
+  useState, useTransition
+}                                               from 'react';
+import {
+  usePathname, useParams,
+  useRouter
+}                                               from 'next/navigation';
 import { useTree }                              from '@headless-tree/react';
 import {
   syncDataLoaderFeature, selectionFeature,
   hotkeysCoreFeature, dragAndDropFeature
 }                                               from '@headless-tree/core';
-import { useReduxSelector }                     from '@Redux/storeHooks';
-import { selectUnsavedQueryTree }               from '@Redux/records/unsavedQueryTree';
+import {
+  useReduxDispatch, useReduxSelector
+}                                               from '@Redux/storeHooks';
+import {
+  selectUnsavedQueryTree, selectNextUntitledName
+}                                               from '@Redux/records/unsavedQueryTree';
 import { selectTabIds, selectFocusedTabIndex }  from '@Redux/records/tabbar';
+import { createNewUnsavedDataQueryThunk }       from '@Redux/records/dataQuery/thunks';
+import { closeAllUnsavedTabsThunk }             from '@Redux/records/tabbar/thunks';
+import { generateUUIDv7 }                       from '@Utils/generateId';
 import Icon                                     from '@Components/Icons';
 
 import { useTreeSectionState }                  from '../hooks/useTreeSectionState';
-import { useItemActions }                       from './hooks/useItemActions';
 import Row                                      from './components/Row';
 import Toolbar                                  from './components/Toolbar';
 
@@ -41,12 +53,50 @@ function UnsavedQueriesTreeInner(
   { rootId, indent = 20, label = 'UNSAVED QUERIES', unsavedQueryTree, isOpen, setIsOpen }:
   { rootId: string; indent?: number; label: string; unsavedQueryTree: UnsavedQueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
-  const tabIds          = useReduxSelector(selectTabIds);
-  const focusedTabIndex = useReduxSelector(selectFocusedTabIndex);
-  const pathname        = usePathname();
+  const tabIds           = useReduxSelector(selectTabIds);
+  const focusedTabIndex  = useReduxSelector(selectFocusedTabIndex);
+  const nextUntitledName = useReduxSelector(selectNextUntitledName);
+  const pathname         = usePathname();
+  const dispatch         = useReduxDispatch();
+  const { opspaceId }    = useParams<{ opspaceId: string }>()!;
+  const router           = useRouter();
+  const [
+    isCreatePending,
+    startCreateTransition
+  ]                     = useTransition();
   // AIDEV-NOTE: Only treat unsaved rows as "active from tabbar" when the QueryWorkspace route is mounted.
   // On the opspace landing page (/opspace/{id}) we always want a click to navigate.
   const isOnQueriesRoute = (pathname || '').split('/').filter(Boolean).includes('queries');
+
+  const handleCreateFile = useCallback(() => {
+    if (isCreatePending) return;
+
+    // AIDEV-NOTE: Mirror CreateNewQueryButton semantics, but wrap in a transition so the UI
+    // can remain responsive and the toolbar button reflects a pending state.
+    startCreateTransition(() => {
+      const dataQueryId = generateUUIDv7();
+      dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
+      try {
+        router.replace(`/opspace/${opspaceId}/queries/new`);
+      } catch {}
+    });
+  }, [dispatch, nextUntitledName, opspaceId, router, isCreatePending, startCreateTransition]);
+
+  const handleCloseAll = useCallback(async () => {
+    // AIDEV-NOTE: Close all unsaved queries via bulk thunk that delegates to closeTabThunk.
+    try {
+      await dispatch(closeAllUnsavedTabsThunk());
+    } catch (e: any) {
+      if (typeof window !== 'undefined') {
+        window.alert(e?.message || 'Close all failed');
+      }
+    }
+  }, [dispatch]);
+
+  const handleDropMove = useCallback(async (_dragId: string, _dropTargetId: string, _isTargetFolder: boolean) => {
+    // AIDEV-TODO: Implement drag-and-drop reordering for UnsavedQueryTree backed by Redux.
+    return;
+  }, []);
 
   // AIDEV-NOTE: Derive unsaved group metadata from the current tree snapshot.
   const allGroupNodeIds = Object.values(unsavedQueryTree.nodes || {})
@@ -78,7 +128,6 @@ function UnsavedQueriesTreeInner(
   }, [tabIds, focusedTabIndex, unsavedQueryTree.nodes]);
 
   // AIDEV-NOTE: Memoized tree configuration to keep item props and handlers stable where possible.
-  // AIDEV-NOTE: The onDrop handler intentionally closes over `actions`; the binding is updated after tree creation.
   const treeConfig = useMemo(() => ({
     rootItemId: rootId,
     indent, // AIDEV-NOTE: Indentation applied by library on each row via item props style
@@ -127,14 +176,11 @@ function UnsavedQueriesTreeInner(
       const dropTargetId = target.item?.getId?.();
       if (!dragId || !dropTargetId) return;
       const isTargetFolder = !('childIndex' in target && typeof target.childIndex === 'number');
-      await actions.handleDropMove(dragId, dropTargetId, isTargetFolder);
+      await handleDropMove(dragId, dropTargetId, isTargetFolder);
     }
-  }), [rootId, indent, unsavedQueryTree, allGroupNodeIds]);
+  }), [rootId, indent, unsavedQueryTree, allGroupNodeIds, handleDropMove]);
 
   const tree = useTree<UnsavedTreeNode>(treeConfig);
-
-  // AIDEV-NOTE: Row actions scoped to this section root
-  const actions = useItemActions(tree as any, rootId);
 
   // AIDEV-NOTE: Ref for scroll host (used for scrollbar gutter detection).
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -278,9 +324,10 @@ function UnsavedQueriesTreeInner(
           onKeyDown={(e) => { e.stopPropagation(); }}
         >
           <Toolbar
-            onCreateFile={actions.handleCreateFile}
-            onCloseAll={actions.handleCloseAll}
+            onCreateFile={handleCreateFile}
+            onCloseAll={handleCloseAll}
             disableCloseAll={renderItems.length === 0}
+            isCreatePending={isCreatePending}
           />
         </div>
       </div>
@@ -335,8 +382,7 @@ function UnsavedQueriesTreeInner(
                   key={item.getId()}
                   item={item}
                   indent={indent}
-                  onRename={actions.handleRename}
-                  onDropMove={actions.handleDropMove}
+                  onDropMove={handleDropMove}
                   isTreeFocused={isTreeFocused}
                   isTopLevel={false}
                   isActiveFromTab={
