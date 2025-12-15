@@ -20,7 +20,10 @@ import {
 import { closeTabThunk, reorderTabsThunk }    from '@Redux/records/tabbar/thunks';
 import { selectDataQueries }                  from '@Redux/records/dataQuery';
 import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
-import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
+import {
+  selectNextUntitledName,
+  selectUnsavedQueryTree
+}                                             from '@Redux/records/unsavedQueryTree';
 import { generateUUIDv7 }                     from '@Utils/generateId';
 import { logClientJson }                      from '@Observability/client';
 
@@ -34,7 +37,7 @@ export type Tab = { tabId: UUIDv7; name: string };
 
 // AIDEV-NOTE: Redux/router-aware TabBar container. Owns tab-strip behavior and delegates rendering to TabBarPresenter.
 function TabBar() {
-  const { opspaceId, navigateToNew }  = useQueriesRoute();
+  const { opspaceId, routeMode, navigateToNew }  = useQueriesRoute();
   const router                        = useRouter();
   const [, startTabTransition]        = useTransition();
   const tabIds                        = useReduxSelector(selectTabIds) as UUIDv7[];
@@ -42,6 +45,7 @@ function TabBar() {
   const activeTabId                   = useReduxSelector(selectActiveTabId) as UUIDv7 | null;
   const focusedTabIndex               = useReduxSelector(selectFocusedTabIndex) as number | null;
   const dataQueryRecords              = useReduxSelector(selectDataQueries);
+  const unsavedQueryTree              = useReduxSelector(selectUnsavedQueryTree);
   const nextUntitledName              = useReduxSelector(selectNextUntitledName) as string;
   const dispatch                      = useReduxDispatch();
 
@@ -72,9 +76,23 @@ function TabBar() {
     const pendingId = pendingPointerActivateRef.current;
     pendingPointerActivateRef.current = null;
 
-    // AIDEV-NOTE: No-op clicks on the active tab, unless pointerdown just switched to it (so we still run the thunk + routing).
+    // AIDEV-NOTE: No-op clicks on the active tab, unless pointerdown just switched to it
+    // (so we still run the thunk + routing). However, if the route is out-of-sync with
+    // the tab type (e.g. unsaved tab active while on /queries/{id}), we must realign.
     if (tabId === activeTabId && pendingId !== tabId) {
-      return;
+      let isUnsavedTab = false;
+      try {
+        const node = (unsavedQueryTree.nodes as any)?.[String(tabId)];
+        isUnsavedTab = !!node && node.kind === 'file';
+      } catch {}
+
+      const shouldRealign =
+        (isUnsavedTab && routeMode !== 'new')
+        || (!isUnsavedTab && routeMode !== 'saved');
+
+      if (!shouldRealign) {
+        return;
+      }
     }
 
     activateTab(tabId);
@@ -89,7 +107,17 @@ function TabBar() {
     }
 
     pendingPointerActivateRef.current = tabId;
-    dispatch(setActiveTab({ tabId }));
+    try {
+      dispatch(setActiveTab({ tabId }));
+    } catch (error) {
+      logClientJson('error', () => ({
+        event         : 'tabbar',
+        phase         : 'pointerdown-set-active-tab-failed',
+        tabId         : tabId,
+        activeTabId   : activeTabId,
+        errorMessage  : error instanceof Error ? error.message : String(error)
+      }));
+    }
   });
 
   const handleTablistKeyDown = useEffectEvent((e: React.KeyboardEvent<HTMLDivElement>) => {

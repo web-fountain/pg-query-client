@@ -23,7 +23,7 @@ import {
 import {
   selectUnsavedQueryTree, selectNextUntitledName
 }                                               from '@Redux/records/unsavedQueryTree';
-import { selectTabIds, selectFocusedTabIndex }  from '@Redux/records/tabbar';
+import { selectActiveTabId, selectTabIds }      from '@Redux/records/tabbar';
 import { createNewUnsavedDataQueryThunk }       from '@Redux/records/dataQuery/thunks';
 import { closeAllUnsavedTabsThunk }             from '@Redux/records/tabbar/thunks';
 import { generateUUIDv7 }                       from '@Utils/generateId';
@@ -54,7 +54,7 @@ function UnsavedQueriesTreeInner(
   { rootId: string; indent?: number; label: string; unsavedQueryTree: UnsavedQueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
   const tabIds           = useReduxSelector(selectTabIds);
-  const focusedTabIndex  = useReduxSelector(selectFocusedTabIndex);
+  const activeTabId      = useReduxSelector(selectActiveTabId);
   const nextUntitledName = useReduxSelector(selectNextUntitledName);
   const pathname         = usePathname();
   const dispatch         = useReduxDispatch();
@@ -111,21 +111,17 @@ function UnsavedQueriesTreeInner(
   const hasMultipleGroups = groupCount > 1;
   const singleGroupId = groupCount === 1 ? rootGroupIds[0] : null;
 
-  // AIDEV-NOTE: Sync unsaved tree highlight with tabbar's roving focus index.
+  // AIDEV-NOTE: Sync unsaved tree highlight with the active tab (not the roving focus index).
+  // Users expect the highlighted node to remain highlighted until another tab is selected.
   const activeUnsavedNodeId = useMemo(() => {
-    if (!tabIds || tabIds.length === 0 || focusedTabIndex == null) return null;
-
-    const count = tabIds.length;
-    const clamped = (((focusedTabIndex || 0) % count) + count) % count;
-    const tabId = tabIds[clamped] as string;
-
-    const node = unsavedQueryTree.nodes[tabId];
+    if (!activeTabId) return null;
+    const node = unsavedQueryTree.nodes[String(activeTabId)];
     if (node && node.kind === 'file') {
       return node.nodeId;
     }
 
     return null;
-  }, [tabIds, focusedTabIndex, unsavedQueryTree.nodes]);
+  }, [activeTabId, unsavedQueryTree.nodes]);
 
   // AIDEV-NOTE: Memoized tree configuration to keep item props and handlers stable where possible.
   const treeConfig = useMemo(() => ({

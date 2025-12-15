@@ -145,8 +145,18 @@ const reducer = createReducer(initialState, (builder) => {
         const { tabId } = action.payload;
         const tab       = state.entities[tabId];
 
-        state.activeTabId     = tabId;
-        state.focusedTabIndex = tab.position;
+        state.activeTabId = tabId;
+        if (tab && typeof tab.position === 'number') {
+          state.focusedTabIndex = tab.position;
+          return;
+        }
+
+        // AIDEV-NOTE: Fallback for transient/incomplete state where tabIds contains the id
+        // but entities is missing the corresponding tab. Prefer stable behavior over throwing.
+        const idx = state.tabIds.indexOf(tabId);
+        if (idx >= 0) {
+          state.focusedTabIndex = idx;
+        }
       }
     )
     .addCase(focusTabIndex,

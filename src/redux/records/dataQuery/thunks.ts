@@ -33,6 +33,7 @@ import {
   errorEntryFromActionError,
   updateError
 }                                       from '@Redux/records/errors';
+import { requestSqlEditorAutofocus }    from '@Redux/records/uiFocus';
 
 
 export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string }, { state: RootState }>(
@@ -46,6 +47,9 @@ export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQuery
       }
     });
 
+    // AIDEV-NOTE: Creating a new unsaved query is an explicit "start typing" intent.
+    // We request an editor autofocus; QueryWorkspace will honor it only when appropriate.
+    dispatch(requestSqlEditorAutofocus());
     dispatch(createNewUnsavedDataQuery({ dataQueryId, name, ext: 'sql' }));
 
     const payload = { dataQueryId };

@@ -59,6 +59,13 @@ const TabButton = memo(function TabButton({
   endDrag,
   isDragging
 }: TabButtonProps) {
+  // AIDEV-NOTE: Tabs use pointer events for DnD. Some browsers will suppress `click`
+  // when a pointer gesture is interpreted as a drag. We therefore also activate the tab
+  // on pointer-up when the gesture did not move beyond a small threshold.
+  const pointerStartRef       = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextClickRef  = useRef(false);
+  const dragThresholdPx       = 10;
+
   const handleSetRef = useCallback((el: HTMLButtonElement | null) => {
     setRef(index, el);
   }, [setRef, index]);
@@ -67,6 +74,7 @@ const TabButton = memo(function TabButton({
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest('[data-tab-close="true"]')) return;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
     try { onPointerDownActivate?.(tab); } catch {}
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
     beginDrag(tab.tabId, e.clientX);
@@ -78,8 +86,24 @@ const TabButton = memo(function TabButton({
   }, [updateDrag]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const target = e.target as HTMLElement;
+    const isClose = !!target?.closest?.('[data-tab-close="true"]');
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+
+    const dx = start ? Math.abs(e.clientX - start.x) : 0;
+    // AIDEV-NOTE: Tab DnD is horizontal; tolerate vertical jitter so "clicks" don't get dropped.
+    const isClickGesture = !isClose && dx < dragThresholdPx;
+
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
     endDrag();
+
+    if (isClickGesture) {
+      // AIDEV-NOTE: Prevent double-activation when `click` also fires.
+      suppressNextClickRef.current = true;
+      try { window.setTimeout(() => { suppressNextClickRef.current = false; }, 0); } catch {}
+      onTabClick(tab);
+    }
   }, [endDrag]);
 
   const handlePointerCancel = useCallback(() => {
@@ -95,7 +119,10 @@ const TabButton = memo(function TabButton({
       tabIndex={isFocusable ? 0 : -1}
       className={`${styles['tab']} ${isDragging ? styles['tab-dragging'] : ''}`}
       ref={handleSetRef}
-      onClick={() => onTabClick(tab)}
+      onClick={() => {
+        if (suppressNextClickRef.current) return;
+        onTabClick(tab);
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -141,8 +168,40 @@ function TabBarPresenter({
   onReorderTabs
 }: PresenterProps) {
   // AIDEV-NOTE: Map tabId → button element for roving focus + DnD geometry.
-  const refsMap = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
+  const rootRef    = useRef<HTMLDivElement | null>(null);
+  const refsMap    = useRef<Map<UUIDv7, HTMLButtonElement | null>>(new Map());
   const tablistRef = useRef<HTMLDivElement | null>(null);
+
+  const handleTablistClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    // Ignore clicks that originated from a real tab button or the close affordance.
+    if (target.closest('[data-tab-close="true"]')) return;
+    if (target.closest('[role="tab"]')) return;
+
+    // AIDEV-NOTE: If the user clicks the gap between tabs, activate the nearest tab.
+    // This prevents "nothing happens" reports caused by separators/margins in the tab strip.
+    const x = e.clientX;
+    let best: Tab | null = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+
+    for (const tab of tabs) {
+      const el = refsMap.current.get(tab.tabId) || null;
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      const dist = Math.abs(x - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = tab;
+      }
+    }
+
+    if (best) {
+      try { onTabClick(best); } catch {}
+    }
+  }, [tabs, onTabClick]);
 
   const {
     draggingTabId,
@@ -159,6 +218,18 @@ function TabBarPresenter({
 
   // AIDEV-NOTE: Keep DOM focus synced with Redux roving tabindex (keyboard nav) without refocusing on renames.
   useEffect(() => {
+    // AIDEV-NOTE: Do not steal focus when the user is interacting elsewhere (e.g. directory tree).
+    // Only apply roving focus while focus is already within the TabBar.
+    try {
+      const root = rootRef.current;
+      const active = document.activeElement as Node | null;
+      if (root && active && !root.contains(active)) return;
+      if (root && !active) return;
+    } catch {
+      // If we can't inspect focus, prefer not stealing it.
+      return;
+    }
+
     const count = tabs.length;
     if (count === 0) return;
 
@@ -258,6 +329,7 @@ function TabBarPresenter({
 
   return (
     <div
+      ref={rootRef}
       className={styles['tabs-bar']}
       data-dragging={draggingTabId ? 'true' : 'false'}
     >
@@ -274,6 +346,7 @@ function TabBarPresenter({
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
         onScroll={handleTablistScroll}
+        onClick={handleTablistClick}
       >
         {tabs.map((tab, index) => {
           const selected = tab.tabId === activeTabId;

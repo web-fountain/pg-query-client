@@ -1,33 +1,35 @@
 'use client';
 
-import type { UUIDv7 }              from '@Types/primitives';
-import type { SQLEditorHandle }     from '../SQLEditor';
+import type { UUIDv7 }                        from '@Types/primitives';
+import type { SQLEditorHandle }               from '../SQLEditor';
 
 import {
   useCallback, useEffect, useEffectEvent,
-  useMemo, useRef, useState,
-  Suspense
-}                                   from 'react';
-import dynamic                      from 'next/dynamic';
+  useMemo, useRef, useState, Suspense
+}                                             from 'react';
+import dynamic                                from 'next/dynamic';
 
-import { useReduxSelector }         from '@Redux/storeHooks';
+import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
 import {
-  selectDataQueryIdForTabId,
-  selectTabIds,
+  selectDataQueryIdForTabId, selectTabIds,
   selectActiveTabId
-}                                   from '@Redux/records/tabbar';
-import { selectDataQueryRecord }    from '@Redux/records/dataQuery';
+}                                             from '@Redux/records/tabbar';
+import { selectDataQueryRecord }              from '@Redux/records/dataQuery';
+import {
+  ackSqlEditorAutofocus,
+  selectPendingSqlEditorAutofocusRequestId
+}                                             from '@Redux/records/uiFocus';
 
-import { useQueriesRoute }          from '../../_providers/QueriesRouteProvider';
-import OpSpaceIntro                 from '../../../_components/OpSpaceIntro';
-import TabBar                       from './TabBar';
-import Toolbar                      from './Toolbar';
-import SplitPane                    from './SplitPane';
+import { useQueriesRoute }                    from '../../_providers/QueriesRouteProvider';
+import OpSpaceIntro                           from '../../../_components/OpSpaceIntro';
+import TabBar                                 from './TabBar';
+import Toolbar                                from './Toolbar';
+import SplitPane                              from './SplitPane';
 import {
   STORAGE_KEY_SPLIT,
   STORAGE_KEY_LAST_VISITED
-}                                   from '@Constants';
-import styles                       from './styles.module.css';
+}                                             from '@Constants';
+import styles                                 from './styles.module.css';
 
 
 // AIDEV-NOTE: SQLEditor/QueryResults are heavy + browser-only. Load client-side with an in-panel fallback.
@@ -47,6 +49,7 @@ function QueryWorkspace() {
     dataQueryId: routeDataQueryId
   }                             = useQueriesRoute();
 
+  const dispatch                 = useReduxDispatch();
   const editorRef                = useRef<SQLEditorHandle | null>(null);
   const containerRef             = useRef<HTMLDivElement  | null>(null);
   const topPanelRef              = useRef<HTMLDivElement  | null>(null);
@@ -143,23 +146,64 @@ function QueryWorkspace() {
     editorRef.current?.runCurrentQuery();
   }, []);
 
-  // AIDEV-NOTE: When on /queries/new with at least one tab, prefer focusing the SQLEditor
-  // so the user can type immediately after creating a new unsaved query. We defer focus
-  // to the next animation frame to ensure it wins over TabBar roving-focus effects.
+  const pendingSqlEditorAutofocusRequestId = useReduxSelector(selectPendingSqlEditorAutofocusRequestId);
+
+  // AIDEV-NOTE: Only auto-focus the editor when a new unsaved query was just created
+  // (explicit "start typing" intent). Selecting a tree row should keep focus in the tree.
   useEffect(() => {
+    if (!pendingSqlEditorAutofocusRequestId) return;
     if (!hasAnyTabs || routeMode !== 'new') return;
-    try {
-      requestAnimationFrame(() => {
-        try {
-          editorRef.current?.focusEditor();
-        } catch {}
-      });
-    } catch {
+
+    let raf = 0;
+    let tries = 0;
+    let didAck = false;
+    const maxTries = 600; // ~10s at 60fps; covers first-load dynamic imports
+
+    const tryFocus = () => {
+      tries += 1;
+
+      const handle = editorRef.current;
+      if (handle) {
+        try { handle.focusEditor(); } catch {}
+        if (!didAck) {
+          didAck = true;
+          dispatch(ackSqlEditorAutofocus({ requestId: pendingSqlEditorAutofocusRequestId }));
+        }
+        return;
+      }
+
+      if (tries >= maxTries) {
+        // AIDEV-NOTE: Avoid letting a stale focus request linger; it could steal focus later
+        // (e.g. when selecting a row) if the editor never mounted for some reason.
+        if (!didAck) {
+          didAck = true;
+          dispatch(ackSqlEditorAutofocus({ requestId: pendingSqlEditorAutofocusRequestId }));
+        }
+        return;
+      }
+
       try {
-        editorRef.current?.focusEditor();
+        raf = requestAnimationFrame(tryFocus);
       } catch {}
+    };
+
+    // AIDEV-NOTE: Defer to the next frame so this focus wins over tab roving-focus effects.
+    try {
+      raf = requestAnimationFrame(tryFocus);
+    } catch {
+      tryFocus();
     }
-  }, [hasAnyTabs, routeMode, activeDataQueryId]);
+
+    return () => {
+      try { cancelAnimationFrame(raf); } catch {}
+      // AIDEV-NOTE: If we unmount mid-flight (route change), consume the request so it doesn't
+      // unexpectedly focus the editor later.
+      if (!didAck) {
+        didAck = true;
+        dispatch(ackSqlEditorAutofocus({ requestId: pendingSqlEditorAutofocusRequestId }));
+      }
+    };
+  }, [pendingSqlEditorAutofocusRequestId, hasAnyTabs, routeMode, dispatch]);
 
   return (
     <div className={styles['query-workspace']} ref={containerRef}>
