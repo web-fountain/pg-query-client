@@ -1,10 +1,10 @@
 'use client';
 
-import type { TreeNode }                          from '@Redux/records/queryTree/types';
-import type { UUIDv7 }                            from '@Types/primitives';
-import type { TreeItemApi, OnRename, OnDropMove } from '../types';
+import type { TreeNode }                                      from '@Redux/records/queryTree/types';
+import type { UUIDv7 }                                        from '@Types/primitives';
+import type { TreeItemApi, OnRename, OnDropMove }            from '../types';
 
-import { memo, useCallback, useMemo }             from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef }      from 'react';
 import { useRouter, useParams }                   from 'next/navigation';
 
 import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
@@ -27,9 +27,32 @@ type RowProps = {
   tabId?              : UUIDv7;
   isSelectedByTree?   : boolean;
   onTreeFocusFromRow? : () => void;
+  isEditing?          : boolean;
+  isEditingSubmitting?: boolean;
+  editingName?        : string;
+  onEditingNameChange?: (next: string) => void;
+  onEditingCommit?    : (finalName: string) => void;
+  onEditingCancel?    : () => void;
 };
 
-function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocused, isActiveFromTab=false, tabId, isSelectedByTree=false, onTreeFocusFromRow }: RowProps) {
+function Row({
+  item,
+  indent,
+  onRename,
+  onDropMove,
+  isTopLevel = false,
+  isTreeFocused,
+  isActiveFromTab = false,
+  tabId,
+  isSelectedByTree = false,
+  onTreeFocusFromRow,
+  isEditing,
+  isEditingSubmitting,
+  editingName,
+  onEditingNameChange,
+  onEditingCommit,
+  onEditingCancel
+}: RowProps) {
   const router    = useRouter();
   const params    = useParams<{ opspaceId: string; dataQueryId?: string }>();
   const opspaceId = params?.opspaceId as string | undefined;
@@ -142,6 +165,73 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
     onRename(nodeId);
   }, [onRename, nodeId]);
 
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const el = inputRef.current;
+    if (!el) return;
+
+    // AIDEV-NOTE: Focus after paint to avoid headless-tree roving focus stealing focus
+    // during the same commit. This makes the input reliably focusable after "New Folder".
+    let raf = 0;
+    raf = requestAnimationFrame(() => {
+      try {
+        el.focus();
+        el.select();
+      } catch {}
+    });
+
+    return () => {
+      try { cancelAnimationFrame(raf); } catch {}
+    };
+  }, [isEditing]);
+
+  let nameContent: React.ReactNode;
+
+  if (isEditing && onEditingNameChange && onEditingCommit && onEditingCancel) {
+    // AIDEV-NOTE: Inline folder creation UX:
+    // - Empty input + Escape or blur => cancel draft (no folder created).
+    // - Non-empty input + Enter or blur => commit name and proceed with creation.
+    nameContent = (
+      <input
+        ref={inputRef}
+        className={styles['name-input']}
+        value={editingName ?? ''}
+        autoFocus
+        disabled={!!isEditingSubmitting}
+        onChange={(e) => onEditingNameChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (isEditingSubmitting) return;
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const trimmed = (editingName ?? '').trim();
+            if (trimmed) onEditingCommit(trimmed);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            const trimmed = (editingName ?? '').trim();
+            if (!trimmed) {
+              onEditingCancel();
+            }
+          }
+        }}
+        onBlur={() => {
+          if (isEditingSubmitting) return;
+          const trimmed = (editingName ?? '').trim();
+          if (trimmed) {
+            onEditingCommit(trimmed);
+          } else {
+            onEditingCancel();
+          }
+        }}
+      />
+    );
+  } else {
+    nameContent = (
+      <span className={styles['name']}>{itemName}</span>
+    );
+  }
+
   return (
     <div
       {...(itemProps as any)}
@@ -184,8 +274,7 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel=false, isTreeFocus
           <Icon name="file-lines" />
         </span>
       )}
-
-      <span className={styles['name']}>{itemName}</span>
+      {nameContent}
     </div>
   );
 }

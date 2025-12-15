@@ -12,6 +12,18 @@ export type BuildInitialUnsavedQueryTreeApiResponse =
   | { ok: true; data: UnsavedQueryTree };
 
 export type QueryTreeNodeChildren = {
-  node: TreeNode;
-  children: TreeNode[];
+  node      : TreeNode;
+  children  : TreeNode[];
 };
+
+// AIDEV-NOTE: Backend API shape for creating a new query folder in the saved QueryTree.
+export type CreateQueryFolderPayload = {
+  parentFolderId? : string;
+  name            : string;
+};
+
+export type CreateQueryFolderResult = TreeNode;
+
+export type CreateQueryFolderApiResponse =
+  | { ok: false }
+  | { ok: true; data: CreateQueryFolderResult };

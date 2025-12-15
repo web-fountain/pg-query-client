@@ -16,6 +16,7 @@ type AddChild                   = { parentId: string; node: TreeNode };
 type MoveNode                   = { nodeId: string; oldParentNodeId: string; newParentNodeId: string; index?: number };
 type ResortChildren             = { parentId: string };
 type InsertChildSorted          = { parentId: string; node: TreeNode };
+type RemoveNode                 = { parentId: string; nodeId: string };
 type LinkDataQueryIdToNodeIds   = { dataQueryId: UUIDv7; nodeId: UUIDv7 };
 type RenameNodeWithInvalidation = { dataQueryId: UUIDv7; name: string };
 type ClearInvalidations         = { items: string[]; parents: string[] };
@@ -29,6 +30,7 @@ export const addChild             = createAction<AddChild>          ('queryTree/
 export const moveNode             = createAction<MoveNode>          ('queryTree/moveNode');
 export const resortChildren       = createAction<ResortChildren>    ('queryTree/resortChildren');
 export const insertChildSorted    = createAction<InsertChildSorted> ('queryTree/insertChildSorted');
+export const removeNode           = createAction<RemoveNode>        ('queryTree/removeNode');
 
 // AIDEV-NOTE: Explicitly link a dataQueryId to a tree nodeId so renameNodeWithInvalidation
 // can locate the correct node even for client-created nodes (e.g., promotions).
@@ -163,6 +165,20 @@ export default createReducer(initialState, (builder) => {
         const idx = findInsertIndexIds(arr, resolve(node.nodeId), resolve, compareBySortKey);
         if (!arr.includes(node.nodeId as UUIDv7)) arr.splice(idx, 0, node.nodeId as UUIDv7);
         state.childrenByParentId[parentId] = arr;
+      }
+    )
+    // AIDEV-NOTE: Remove a node from its parent's children and delete it from the nodes map.
+    // This is currently used for provisional (draft) nodes created on the client during
+    // optimistic folder creation. Full delete semantics for persisted folders/files will
+    // be layered on later.
+    .addCase(removeNode,
+      function (state: QueryTreeRecord, action: PayloadAction<RemoveNode>) {
+        const { parentId, nodeId } = action.payload;
+        const arr = state.childrenByParentId[parentId] || [];
+        state.childrenByParentId[parentId] = arr.filter((id: string) => id !== nodeId);
+        if (state.nodes[nodeId]) {
+          delete state.nodes[nodeId];
+        }
       }
     )
     .addCase(linkDataQueryIdToNodeIds,

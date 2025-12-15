@@ -1,28 +1,31 @@
 'use server';
 
-import type { QueryTree, TreeNode } from '@Types/queryTree';
-import type { UnsavedQueryTree }    from '@Types/unsavedQueryTree';
-import type { HeadersContext }      from '@Utils/backendFetch';
-import type { ActionResult }        from '../types';
+import type { QueryTree, TreeNode }       from '@Types/queryTree';
+import type { UnsavedQueryTree }          from '@Types/unsavedQueryTree';
+import type { HeadersContext }            from '@Utils/backendFetch';
+import type { ActionResult }              from '../types';
 import type {
   BuildInitialQueryTreeApiResponse,
   BuildInitialUnsavedQueryTreeApiResponse,
-  QueryTreeNodeChildren
-}                                   from './types';
+  QueryTreeNodeChildren,
+  CreateQueryFolderApiResponse,
+  CreateQueryFolderPayload,
+  CreateQueryFolderResult
+}                                          from './types';
 
-import { cacheLife, cacheTag }      from 'next/cache';
-import { withAction }               from '@Observability/server/action';
+import { cacheLife, cacheTag, updateTag } from 'next/cache';
+import { withAction }                     from '@Observability/server/action';
 import {
   actionErrorFromBackendFetch,
   backendFailedActionError,
   fail, ok
-}                                   from '@Errors/server/actionResult.server';
-import { backendFetchJSON }         from '@Utils/backendFetch';
+}                                         from '@Errors/server/actionResult.server';
+import { backendFetchJSON }               from '@Utils/backendFetch';
 import {
   queryTreeChildrenTag,
   queryTreeInitialTag,
   unsavedQueryTreeInitialTag
-}                                   from '../tags';
+}                                         from '../tags';
 
 
 // Cached initial query tree per HeadersContext using "use cache".
@@ -208,6 +211,76 @@ export async function getQueryTreeNodeChildrenAction(nodeId?: string): Promise<A
         node      : (tree.data.nodes[nid as any] ?? root) as unknown as TreeNode,
         children  : (tree.data.childrenByParentId[nid as any] ?? []).map((id: string) => tree.data.nodes[id as any] as unknown as TreeNode)
       } as QueryTreeNodeChildren);
+    }
+  );
+}
+
+// AIDEV-NOTE: Server action to create a new query folder under a given parent node.
+// Delegates to the backend, then invalidates cached query tree payloads so future
+// reads observe the new folder.
+export async function createQueryFolderAction(payload: CreateQueryFolderPayload): Promise<ActionResult<CreateQueryFolderResult>> {
+  const { parentFolderId, name } = payload;
+
+  return withAction(
+    {
+      action : 'queryTree.createFolder',
+      op     : 'write',
+      input  : {
+        parentFolderId,
+        nameLen: typeof name === 'string' ? name.length : undefined
+      }
+    },
+    async ({ ctx, meta }) => {
+      const body = parentFolderId
+        ? { parentFolderId, name }
+        : { name };
+
+      const res = await backendFetchJSON<CreateQueryFolderApiResponse>({
+        // AIDEV-NOTE: Align this path/scope with the backend implementation for folder creation.
+        path    : '/queries/tree/folders',
+        method  : 'POST',
+        scope   : ['queries-tree-folders:write'],
+        logLabel: 'createQueryFolderAction',
+        context : ctx,
+        body
+      });
+
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : res.status,
+          error           : res.error,
+          fallbackMessage : 'Failed to create folder.',
+          request         : {
+            path    : '/queries/tree/folders',
+            method  : 'POST',
+            scope   : ['queries-tree-folders:write'],
+            logLabel: 'createQueryFolderAction'
+          }
+        }));
+      }
+
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to create folder.',
+          request: {
+            path    : '/queries/tree/folders',
+            method  : 'POST',
+            scope   : ['queries-tree-folders:write'],
+            logLabel: 'createQueryFolderAction'
+          }
+        }));
+      }
+
+      // AIDEV-NOTE: Invalidate cached query tree so subsequent reads see the new folder.
+      try {
+        updateTag(queryTreeInitialTag(ctx.opspacePublicId));
+      } catch {}
+
+      try {
+        updateTag(queryTreeChildrenTag(ctx.opspacePublicId));
+      } catch {}
+
+      return ok(meta, res.data.data);
     }
   );
 }
