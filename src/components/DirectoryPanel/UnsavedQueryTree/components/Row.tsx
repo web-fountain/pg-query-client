@@ -17,7 +17,7 @@ import styles                                     from './Row.module.css';
 type RowProps = {
   item            : TreeItemApi<TreeNode>;
   indent          : number;
-  onRename        : OnRename;
+  onRename?       : OnRename;
   onDropMove      : OnDropMove;
   isTopLevel?     : boolean;
   isTreeFocused?  : boolean;
