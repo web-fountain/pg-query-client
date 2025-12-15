@@ -55,3 +55,7 @@ export default createReducer(initialState, (builder) => {
       }
     });
 });
+
+
+// TODO: add a last group focused to the state
+// the 'group' is similar to the 'editor group' in an IDE

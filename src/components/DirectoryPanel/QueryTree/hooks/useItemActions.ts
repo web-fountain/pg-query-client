@@ -9,6 +9,9 @@ type UseItemActionsOptions = {
   // AIDEV-NOTE: Called when the user clicks "New Folder". The caller (QueriesTreeInner)
   // is responsible for inserting a provisional draft node and wiring inline editing.
   onCreateFolderDraft?: () => void | Promise<void>;
+  // AIDEV-NOTE: Called when the user clicks "New File". The caller (QueriesTreeInner)
+  // is responsible for inserting a provisional draft file node and wiring inline editing.
+  onCreateFileDraft?: () => void | Promise<void>;
 };
 
 export function useItemActions(_tree: LoadableTree, _targetFolderId: string, options?: UseItemActionsOptions) {
@@ -28,10 +31,15 @@ export function useItemActions(_tree: LoadableTree, _targetFolderId: string, opt
   };
 
   const handleCreateFile: OnCreateFile = async () => {
-    // AIDEV-TODO: Implement file creation for QueryTree using a thunk that inserts a new
-    // saved query node and syncs with the backend.
+    // AIDEV-NOTE: File creation mirrors folder creation: insert a draft row + inline input,
+    // then commit to the backend on Enter/blur in the QueryTree component.
+    if (options?.onCreateFileDraft) {
+      await options.onCreateFileDraft();
+      return;
+    }
+
     if (typeof window !== 'undefined') {
-      window.alert('Creating files in Queries is not supported yet.');
+      window.alert('File creation is not wired yet.');
     }
   };
 

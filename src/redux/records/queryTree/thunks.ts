@@ -1,15 +1,21 @@
 import type { RootState }                     from '@Redux/store';
 import type { GetNodeChildrenArgs, TreeNode } from '@Redux/records/queryTree/types';
+import type { UUIDv7 }                        from '@Types/primitives';
 
 import { createAsyncThunk }                   from '@reduxjs/toolkit';
 
 import {
-  insertChildSorted, upsertNode
+  insertChildSorted,
+  linkDataQueryIdToNodeIds,
+  upsertNode
 }                                             from '@Redux/records/queryTree';
+import { setDataQueryRecord }                 from '@Redux/records/dataQuery';
+import { addTabFromFetch }                    from '@Redux/records/tabbar';
 import {
   getQueryTreeNodeChildrenAction,
   createQueryFolderAction
 }                                             from '@OpSpaceQueriesActions/queryTree';
+import { createSavedDataQueryAction }          from '@OpSpaceQueriesActions/queries/index';
 import {
   errorEntryFromActionError, updateError
 }                                             from '@Redux/records/errors';
@@ -136,6 +142,146 @@ export const createQueryFolderThunk = createAsyncThunk<TreeNode | null, CreateQu
     dispatch(upsertNode(node));
     const parentId = String((node as any)?.parentNodeId ?? 'queries');
     dispatch(insertChildSorted({ parentId, node }));
+
+    return node;
+  }
+);
+
+type CreateSavedQueryFileArgs = {
+  dataQueryId     : UUIDv7;
+  name            : string;
+  parentFolderId? : string;
+  tabGroup?       : number;
+};
+
+// AIDEV-NOTE: Dedicated flow for QueryTree "New File" creation. This creates a saved DataQuery
+// via a single backend endpoint and returns the authoritative saved QueryTree node.
+export const createSavedQueryFileThunk = createAsyncThunk<TreeNode | null, CreateSavedQueryFileArgs, { state: RootState }>(
+  'queryTree/createSavedQueryFileThunk',
+  async ({ dataQueryId, name, parentFolderId, tabGroup }, { dispatch }) => {
+
+    log.thunkStart({
+      thunk : 'queryTree/createSavedQueryFileThunk',
+      input : {
+        dataQueryId,
+        parentFolderId,
+        tabGroup,
+        nameLen: typeof name === 'string' ? name.length : undefined
+      }
+    });
+
+    let res;
+    try {
+      res = await createSavedDataQueryAction({
+        dataQueryId,
+        name,
+        parentFolderId,
+        tabGroup
+      });
+    } catch (error) {
+      log.thunkException({
+        thunk   : 'queryTree/createSavedQueryFileThunk',
+        message : 'createSavedDataQueryAction threw',
+        error   : error,
+        input   : {
+          dataQueryId,
+          parentFolderId,
+          tabGroup,
+          nameLen: typeof name === 'string' ? name.length : undefined
+        }
+      });
+      dispatch(updateError({
+        actionType  : 'queryTree/createSavedQueryFileThunk',
+        message     : 'Failed to create query.',
+        meta        : { error }
+      }));
+      return null;
+    }
+
+    log.thunkResult({
+      thunk  : 'queryTree/createSavedQueryFileThunk',
+      result : res,
+      input  : {
+        dataQueryId,
+        parentFolderId,
+        tabGroup,
+        nameLen: typeof name === 'string' ? name.length : undefined
+      }
+    });
+
+    if (!res.success) {
+      dispatch(updateError(errorEntryFromActionError({
+        actionType: 'queryTree/createSavedQueryFileThunk',
+        error     : res.error
+      })));
+      return null;
+    }
+
+    const { dataQueryId: resDataQueryId, name: resName, ext, tab, tree } = res.data;
+
+    if (!resDataQueryId || !tree || typeof tree !== 'object' || !tree.nodeId) {
+      log.thunkException({
+        thunk   : 'queryTree/createSavedQueryFileThunk',
+        message : 'Server returned success but payload is missing required fields',
+        error   : { unexpectedMissingData: true, resData: res.data },
+        input   : {
+          dataQueryId,
+          parentFolderId,
+          tabGroup,
+          nameLen: typeof name === 'string' ? name.length : undefined
+        }
+      });
+      dispatch(updateError({
+        actionType  : 'queryTree/createSavedQueryFileThunk',
+        message     : 'Query created but server response was invalid.',
+        meta        : { resData: res.data }
+      }));
+      return null;
+    }
+
+    // AIDEV-NOTE: Ensure the created query is available in Redux immediately so opening
+    // the query later (via openTabThunk) has data to render.
+    dispatch(setDataQueryRecord({
+      dataQueryId : resDataQueryId as UUIDv7,
+      name        : resName,
+      ext         : ext,
+      queryText   : '',
+      description : '',
+      tags        : [],
+      color       : null
+    }));
+
+    // AIDEV-NOTE: Add the tab to the tabbar so the query is immediately openable.
+    if (tab) {
+      dispatch(addTabFromFetch({
+        tab: {
+          groupId  : tab.groupId,
+          tabId    : tab.tabId as UUIDv7,
+          mountId  : tab.mountId as UUIDv7,
+          position : tab.position
+        }
+      }));
+    }
+
+    // AIDEV-NOTE: Build the TreeNode from the response tree object.
+    const node: TreeNode = {
+      nodeId       : tree.nodeId as UUIDv7,
+      parentNodeId : tree.parentNodeId,
+      kind         : tree.kind,
+      label        : tree.label,
+      sortKey      : tree.sortKey,
+      mountId      : tree.mountId as UUIDv7,
+      level        : tree.level
+    };
+
+    // AIDEV-NOTE: Insert the new saved file node into the QueryTree in sorted order.
+    dispatch(upsertNode(node));
+    const parentId = String(tree.parentNodeId ?? 'queries');
+    dispatch(insertChildSorted({ parentId, node }));
+
+    try {
+      dispatch(linkDataQueryIdToNodeIds({ dataQueryId: resDataQueryId as UUIDv7, nodeId: tree.nodeId as UUIDv7 }));
+    } catch {}
 
     return node;
   }

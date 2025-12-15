@@ -7,6 +7,9 @@ import type {
   CreateUnsavedDataQueryApiResponse,
   CreateUnsavedDataQueryResult,
   CreateNewUnsavedDataQueryPayload,
+  CreateSavedDataQueryApiResponse,
+  CreateSavedDataQueryPayload,
+  CreateSavedDataQueryResult,
   ListDataQueriesApiResponse,
   UpdateDataQueryApiResponse,
   UpdateDataQueryPayload,
@@ -146,6 +149,72 @@ export async function createNewUnsavedDataQueryAction(payload: CreateNewUnsavedD
       try {
         updateTag(tabsOpenListTag(ctx.opspacePublicId));
       } catch {}
+
+      return ok(meta, res.data.data);
+    }
+  );
+}
+
+export async function createSavedDataQueryAction(payload: CreateSavedDataQueryPayload): Promise<ActionResult<CreateSavedDataQueryResult>> {
+  const {
+    dataQueryId,
+    name,
+    parentFolderId,
+    tabGroup
+  } = payload;
+
+  return withAction(
+    {
+      action : 'queries.createSaved',
+      op     : 'write',
+      input  : {
+        dataQueryId,
+        parentFolderId,
+        tabGroup,
+        nameLen: typeof name === 'string' ? name.length : undefined
+      }
+    },
+    async ({ ctx, meta }) => {
+      const body: Record<string, unknown> = {
+        dataQueryId,
+        name
+      };
+      if (parentFolderId !== undefined) {
+        body.parentFolderId = parentFolderId;
+      }
+      if (tabGroup !== undefined) {
+        body.tabGroup = tabGroup;
+      }
+
+      const res = await backendFetchJSON<CreateSavedDataQueryApiResponse>({
+        path    : '/queries',
+        method  : 'POST',
+        scope   : ['queries:write'],
+        logLabel: 'createSavedDataQueryAction',
+        context : ctx,
+        body
+      });
+
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : res.status,
+          error           : res.error,
+          fallbackMessage : 'Failed to create query.',
+          request         : { path: '/queries', method: 'POST', scope: ['queries:write'], logLabel: 'createSavedDataQueryAction' }
+        }));
+      }
+
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to create query.',
+          request: { path: '/queries', method: 'POST', scope: ['queries:write'], logLabel: 'createSavedDataQueryAction' }
+        }));
+      }
+
+      // AIDEV-NOTE: New saved query affects the saved QueryTree and the queries list.
+      try { updateTag(queryTreeInitialTag(ctx.opspacePublicId)); } catch {}
+      try { updateTag(queryTreeChildrenTag(ctx.opspacePublicId)); } catch {}
+      try { updateTag(queriesListTag(ctx.opspacePublicId)); } catch {}
 
       return ok(meta, res.data.data);
     }

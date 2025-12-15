@@ -89,23 +89,14 @@ function QueriesRouteProvider({ opspaceId, children }: { opspaceId: Base64Url22;
 
   const navigateToSaved = useEffectEvent((id: UUIDv7) => {
     const url = buildSavedUrl(id);
-    const prev = (window.history.state || {}) as HistoryStateShape;
-    const state: HistoryStateShape = {
-      ...prev,
-      OPSPACE_ROUTE: { opspaceId, routeMode: 'saved', dataQueryId: id },
-    };
-    window.history.pushState(state, '', url);
-    router.replace(url as any);
+    // AIDEV-NOTE: Let Next.js own the actual navigation/history entry creation.
+    // We attach OPSPACE_ROUTE metadata in a separate effect via replaceState,
+    // which merges with Next's internal history state without fighting it.
+    router.push(url as any);
   });
 
   const navigateToNew = useEffectEvent(() => {
     const url = buildNewUrl();
-    const prev = (window.history.state || {}) as HistoryStateShape;
-    const state: HistoryStateShape = {
-      ...prev,
-      OPSPACE_ROUTE: { opspaceId, routeMode: 'new' },
-    };
-    window.history.replaceState(state, '', url);
     if (!pathname.endsWith('/new')) {
       router.replace(url as any);
     }

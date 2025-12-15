@@ -29,6 +29,7 @@ import {
 }                                         from '@Redux/records/queryTree';
 import {
   createQueryFolderThunk,
+  createSavedQueryFileThunk,
   getQueryTreeNodeChildrenThunk
 }                                         from '@Redux/records/queryTree/thunks';
 import {
@@ -39,6 +40,7 @@ import Icon                               from '@Components/Icons';
 
 import { useTreeSectionState }            from '../hooks/useTreeSectionState';
 import { useItemActions }                 from './hooks/useItemActions';
+import { useQueriesRoute }                from '@QueriesProvider/QueriesRouteProvider';
 import Row                                from './components/Row';
 import Toolbar                            from './components/Toolbar';
 import { createLoadingItemData as adapterCreateLoadingItemData } from './adapters/treeItemAdapter';
@@ -54,6 +56,14 @@ type DraftFolderState = {
   isSubmitting  : boolean;
 };
 
+type DraftFileState = {
+  nodeId        : string;
+  parentId      : string;
+  dataQueryId   : UUIDv7;
+  name          : string;
+  isSubmitting  : boolean;
+};
+
 // AIDEV-NOTE: Outer wrapper to remount the hook-owned tree instance on Redux changes.
 // Only remount on node count changes (add/delete). Renames and reordering are handled
 // by surgical invalidation in QueriesTreeInner via pendingInvalidations.
@@ -64,13 +74,16 @@ function QueriesTree(props: { rootId: string; indent?: number; label?: string })
   // AIDEV-NOTE: Draft folder UI state must live in the outer wrapper because
   // QueriesTreeInner is keyed by nodeCount and will remount on structural changes.
   const [draftFolder, setDraftFolder] = useState<DraftFolderState | null>(null);
+  const [draftFile, setDraftFile]     = useState<DraftFileState | null>(null);
 
   // AIDEV-NOTE: Ignore the draft node for reset key purposes. Draft insertion/removal
   // is handled via headless-tree invalidation so the input focus is not lost.
   let nodeCount = Object.keys(queryTree.nodes || {}).length;
-  const draftId = draftFolder?.nodeId;
-  if (draftId && (queryTree.nodes as any)?.[draftId]) {
-    nodeCount = Math.max(0, nodeCount - 1);
+  const draftIds = [draftFolder?.nodeId, draftFile?.nodeId].filter(Boolean) as string[];
+  for (const draftId of draftIds) {
+    if (draftId && (queryTree.nodes as any)?.[draftId]) {
+      nodeCount = Math.max(0, nodeCount - 1);
+    }
   }
   const resetKey  = `${props.rootId}:${nodeCount}`;
 
@@ -82,6 +95,8 @@ function QueriesTree(props: { rootId: string; indent?: number; label?: string })
       setIsOpen={setIsOpen}
       draftFolder={draftFolder}
       setDraftFolder={setDraftFolder}
+      draftFile={draftFile}
+      setDraftFile={setDraftFile}
       {...props}
     />
   );
@@ -96,7 +111,9 @@ function QueriesTreeInner(
     isOpen,
     setIsOpen,
     draftFolder,
-    setDraftFolder
+    setDraftFolder,
+    draftFile,
+    setDraftFile
   }:
   {
     rootId: string;
@@ -107,9 +124,12 @@ function QueriesTreeInner(
     setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
     draftFolder: DraftFolderState | null;
     setDraftFolder: (v: DraftFolderState | null | ((prev: DraftFolderState | null) => DraftFolderState | null)) => void;
+    draftFile: DraftFileState | null;
+    setDraftFile: (v: DraftFileState | null | ((prev: DraftFileState | null) => DraftFileState | null)) => void;
   }
 ) {
-  const dispatch      = useReduxDispatch();
+  const { navigateToSaved } = useQueriesRoute();
+  const dispatch            = useReduxDispatch();
 
   // AIDEV-NOTE: Ref ensures dataLoader always reads latest queryTree,
   // avoiding stale closure issues with useTree config.
@@ -196,7 +216,7 @@ function QueriesTreeInner(
   // so we must refresh the parent's children ids when a draft appears/disappears.
   const lastDraftParentIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const draftParentId = draftFolder?.parentId;
+    const draftParentId = draftFolder?.parentId || draftFile?.parentId;
     if (draftParentId) lastDraftParentIdRef.current = draftParentId;
     const parentId = draftParentId ?? lastDraftParentIdRef.current;
     if (!parentId) return;
@@ -208,12 +228,13 @@ function QueriesTreeInner(
 
     try { (tree as any).loadChildrenWithData?.(parentId); } catch {}
     try { (tree as any).loadChildrenIds?.(parentId); } catch {}
-  }, [draftFolder?.nodeId, draftFolder?.parentId, tree]);
+  }, [draftFolder?.nodeId, draftFolder?.parentId, draftFile?.nodeId, draftFile?.parentId, tree]);
 
   // AIDEV-NOTE: Row actions scoped to this section root
   const actions = useItemActions(tree as any, rootId, {
     onCreateFolderDraft: async () => {
       if (draftFolder) return;
+      if (draftFile) return;
       const parentId  = rootId;
       const nodeId    = generateUUIDv7() as unknown as string;
       const folderId  = generateUUIDv7() as unknown as string;
@@ -239,6 +260,35 @@ function QueriesTreeInner(
       setDraftFolder({
         nodeId,
         parentId,
+        name: '',
+        isSubmitting: false
+      });
+    },
+    onCreateFileDraft: async () => {
+      if (draftFolder) return;
+      if (draftFile) return;
+
+      const parentId    = rootId;
+      const nodeId      = generateUUIDv7() as unknown as string;
+      const dataQueryId = generateUUIDv7() as unknown as UUIDv7;
+
+      const draftNode: TreeNode = {
+        nodeId       : nodeId as unknown as UUIDv7,
+        parentNodeId : parentId,
+        kind         : 'file',
+        label        : '',
+        sortKey      : '',
+        mountId      : dataQueryId,
+        level        : 1
+      };
+
+      dispatch(upsertNode(draftNode));
+      dispatch(insertChildSorted({ parentId, node: draftNode }));
+
+      setDraftFile({
+        nodeId,
+        parentId,
+        dataQueryId,
         name: '',
         isSubmitting: false
       });
@@ -482,8 +532,11 @@ function QueriesTreeInner(
                 const ariaSelected = itemProps?.['aria-selected'];
                 const isSelectedByTree = ariaSelected === true || ariaSelected === 'true';
 
-                const draftNodeId = draftFolder?.nodeId || null;
-                const isDraft = draftNodeId != null && it.getId?.() === draftNodeId;
+                const draftFolderNodeId = draftFolder?.nodeId || null;
+                const draftFileNodeId   = draftFile?.nodeId || null;
+                const isDraftFolder     = draftFolderNodeId != null && it.getId?.() === draftFolderNodeId;
+                const isDraftFile       = draftFileNodeId != null && it.getId?.() === draftFileNodeId;
+                const isDraft           = isDraftFolder || isDraftFile;
 
                 return (
                   <Row
@@ -499,61 +552,117 @@ function QueriesTreeInner(
                     tabId={tabId}
                     isSelectedByTree={isSelectedByTree}
                     isEditing={isDraft}
-                    editingName={isDraft ? (draftFolder?.name ?? '') : undefined}
-                    isEditingSubmitting={isDraft ? !!draftFolder?.isSubmitting : undefined}
+                    editingName={isDraftFolder ? (draftFolder?.name ?? '') : isDraftFile ? (draftFile?.name ?? '') : undefined}
+                    isEditingSubmitting={isDraftFolder ? !!draftFolder?.isSubmitting : isDraftFile ? !!draftFile?.isSubmitting : undefined}
                     onEditingNameChange={(next) => {
                       if (!isDraft) return;
-                      setDraftFolder((prev) => {
-                        if (!prev) return prev;
-                        return { ...prev, name: next };
-                      });
+                      if (isDraftFolder) {
+                        setDraftFolder((prev) => {
+                          if (!prev) return prev;
+                          return { ...prev, name: next };
+                        });
+                      } else if (isDraftFile) {
+                        setDraftFile((prev) => {
+                          if (!prev) return prev;
+                          return { ...prev, name: next };
+                        });
+                      }
                     }}
                     onEditingCommit={async (finalName) => {
                       if (!isDraft) return;
-                      const parentId = draftFolder?.parentId;
-                      const nodeId = draftFolder?.nodeId;
-                      if (!parentId || !nodeId) return;
-                      if (draftFolder?.isSubmitting) return;
+
                       const trimmed = finalName.trim();
                       if (!trimmed) return;
 
-                      setDraftFolder((prev) => {
-                        if (!prev) return prev;
-                        return { ...prev, isSubmitting: true };
-                      });
+                      if (isDraftFolder) {
+                        const parentId = draftFolder?.parentId;
+                        const nodeId = draftFolder?.nodeId;
+                        if (!parentId || !nodeId) return;
+                        if (draftFolder?.isSubmitting) return;
 
-                      let created: TreeNode | null = null;
-                      try {
-                        created = await dispatch(
-                          createQueryFolderThunk({
-                            parentFolderId: undefined,
-                            name        : trimmed
-                          })
-                        ).unwrap();
-                      } catch {
-                        created = null;
-                      }
-
-                      if (created) {
-                        dispatch(removeNode({ parentId, nodeId }));
-                        setDraftFolder(null);
-                      } else {
-                        // AIDEV-NOTE: Backend create failed; keep the draft row so the user
-                        // can retry or cancel, and re-enable the input.
                         setDraftFolder((prev) => {
                           if (!prev) return prev;
-                          return { ...prev, isSubmitting: false };
+                          return { ...prev, isSubmitting: true };
                         });
+
+                        let created: TreeNode | null = null;
+                        try {
+                          created = await dispatch(
+                            createQueryFolderThunk({
+                              parentFolderId: undefined,
+                              name        : trimmed
+                            })
+                          ).unwrap();
+                        } catch {
+                          created = null;
+                        }
+
+                        if (created) {
+                          dispatch(removeNode({ parentId, nodeId }));
+                          setDraftFolder(null);
+                        } else {
+                          // AIDEV-NOTE: Backend create failed; keep the draft row so the user
+                          // can retry or cancel, and re-enable the input.
+                          setDraftFolder((prev) => {
+                            if (!prev) return prev;
+                            return { ...prev, isSubmitting: false };
+                          });
+                        }
+                      } else if (isDraftFile) {
+                        const parentId = draftFile?.parentId;
+                        const nodeId = draftFile?.nodeId;
+                        const dataQueryId = draftFile?.dataQueryId;
+                        if (!parentId || !nodeId || !dataQueryId) return;
+                        if (draftFile?.isSubmitting) return;
+
+                        setDraftFile((prev) => {
+                          if (!prev) return prev;
+                          return { ...prev, isSubmitting: true };
+                        });
+
+                        let created: TreeNode | null = null;
+                        try {
+                          created = await dispatch(
+                            createSavedQueryFileThunk({
+                              dataQueryId,
+                              name: trimmed
+                            })
+                          ).unwrap();
+                        } catch {
+                          created = null;
+                        }
+
+                        if (created) {
+                          dispatch(removeNode({ parentId, nodeId }));
+                          setDraftFile(null);
+                          // AIDEV-NOTE: Navigate to the newly created saved query URL.
+                          navigateToSaved(created.mountId as UUIDv7);
+                        } else {
+                          setDraftFile((prev) => {
+                            if (!prev) return prev;
+                            return { ...prev, isSubmitting: false };
+                          });
+                        }
                       }
                     }}
                     onEditingCancel={async () => {
                       if (!isDraft) return;
-                      const parentId = draftFolder?.parentId;
-                      const nodeId = draftFolder?.nodeId;
-                      if (!parentId || !nodeId) return;
-                      if (draftFolder?.isSubmitting) return;
-                      dispatch(removeNode({ parentId, nodeId }));
-                      setDraftFolder(null);
+
+                      if (isDraftFolder) {
+                        const parentId = draftFolder?.parentId;
+                        const nodeId = draftFolder?.nodeId;
+                        if (!parentId || !nodeId) return;
+                        if (draftFolder?.isSubmitting) return;
+                        dispatch(removeNode({ parentId, nodeId }));
+                        setDraftFolder(null);
+                      } else if (isDraftFile) {
+                        const parentId = draftFile?.parentId;
+                        const nodeId = draftFile?.nodeId;
+                        if (!parentId || !nodeId) return;
+                        if (draftFile?.isSubmitting) return;
+                        dispatch(removeNode({ parentId, nodeId }));
+                        setDraftFile(null);
+                      }
                     }}
                   />
                 );
