@@ -15,16 +15,16 @@ import styles                                     from './Row.module.css';
 
 // AIDEV-NOTE: Presentational row; spreads item props once, renders icon and name.
 type RowProps = {
-  item            : TreeItemApi<TreeNode>;
-  indent          : number;
-  onRename?       : OnRename;
-  onDropMove      : OnDropMove;
-  isTopLevel?     : boolean;
-  isTreeFocused?  : boolean;
-  isActiveFromTab?: boolean;
+  item              : TreeItemApi<TreeNode>;
+  indent            : number;
+  onRename?         : OnRename;
+  onDropMove?       : OnDropMove;
+  isTopLevel?       : boolean;
+  isTreeFocused?    : boolean;
+  isActiveFromTab?  : boolean;
 };
 
-function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, isTreeFocused, isActiveFromTab }: RowProps) {
+function Row({ item, indent, isTopLevel: isTopLevelProp, isTreeFocused, isActiveFromTab }: RowProps) {
   const level     = (item.getItemMeta().level ?? 0) as number;
   const isFolder  = item.isFolder();
   const router    = useRouter();
@@ -75,7 +75,9 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
     const baseIndent = indent;
     const perLevel = 8;
     const pad = baseIndent + Math.max(0, level) * perLevel;
-    return { ...(mergedStyle || {}), paddingLeft: `${pad}px` };
+    // NOTE: hardcoding to 20px for now until we add 'grouping' to the unsaved query tree
+    // return { ...(mergedStyle || {}), paddingLeft: `${pad}px` };
+    return { ...(mergedStyle || {}), paddingLeft: `20px` };
   })();
 
   // AIDEV-NOTE: Row click selects/focuses; for files with a valid mountId, sync tabbar and
@@ -152,10 +154,6 @@ function Row({ item, indent, onRename, onDropMove, isTopLevel: isTopLevelProp, i
       aria-label={isTopLevel ? item.getItemName() : undefined}
       onClick={handleRowClick}
       /* AIDEV-NOTE: DnD handled by headless-tree dragAndDropFeature; no row-level HTML5 DnD. */
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onRename(id);
-      }}
     >
       {isFolder ? (
         <span

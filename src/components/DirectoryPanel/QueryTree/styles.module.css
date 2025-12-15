@@ -105,8 +105,9 @@
   z-index: 1; /* lift above header-left for interaction when visible */
 }
 
-/* AIDEV-NOTE: Reveal tools only when the expanded section is hovered (including header/title area) */
-.tree[data-open="true"]:hover .header-tools {
+/* AIDEV-NOTE: Reveal tools when the expanded section is hovered or when a row in the tree has focus. */
+.tree[data-open="true"]:hover .header-tools,
+.tree[data-open="true"][data-row-focused="true"] .header-tools {
   opacity: 1;
   pointer-events: auto;
 }

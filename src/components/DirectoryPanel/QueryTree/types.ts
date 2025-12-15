@@ -40,6 +40,7 @@ export type OnRename        = (id: string) => void | Promise<void>;
 export type OnDropMove      = (dragId: string, dropTargetId: string, isTargetFolder: boolean) => void | Promise<void>;
 export type OnCreateFolder  = () => void | Promise<void>;
 export type OnCreateFile    = () => void | Promise<void>;
+export type OnCollapseAll   = () => void | Promise<void>;
 
 export type DragPayload = string;
 

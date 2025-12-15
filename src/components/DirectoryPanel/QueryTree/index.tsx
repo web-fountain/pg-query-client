@@ -4,8 +4,8 @@ import type { QueryTreeRecord, TreeNode } from '@Redux/records/queryTree/types';
 import type { UUIDv7 }                    from '@Types/primitives';
 
 import {
-  useCallback, useEffect,
-  useRef, useState
+  useCallback, useEffect, useRef,
+  useState
 }                                         from 'react';
 import { usePathname }                    from 'next/navigation';
 import { useTree }                        from '@headless-tree/react';
@@ -13,7 +13,8 @@ import {
   asyncDataLoaderFeature,
   selectionFeature,
   hotkeysCoreFeature,
-  dragAndDropFeature
+  dragAndDropFeature,
+  expandAllFeature
 }                                         from '@headless-tree/core';
 import {
   useReduxSelector,
@@ -76,7 +77,7 @@ function QueriesTreeInner(
     indent, // AIDEV-NOTE: The library computes left offset per row from this indent; we keep row styles from item.getProps()
     getItemName: (item) => item.getItemData()?.label,
     isItemFolder: (item) => item.getItemData()?.kind === 'folder',
-    features: [asyncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature],
+    features: [asyncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature, expandAllFeature],
     dataLoader: {
       getItem: async (nodeId) => {
         // Read from ref instead of closure to get latest data
@@ -180,14 +181,50 @@ function QueriesTreeInner(
   // AIDEV-NOTE: Ref for scroll host (used for scrollbar gutter detection).
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  // Track whether the tree (scroller) currently contains focus
+  // AIDEV-NOTE: Ref for the section element, used to detect clicks outside the tree.
+  const sectionRef = useRef<HTMLElement | null>(null);
+
+  // AIDEV-NOTE: Track whether the user has selected a row in this tree section.
+  // This state drives toolbar visibility when the mouse leaves but the user hasn't
+  // clicked outside the tree section yet.
   const [isTreeFocused, setIsTreeFocused] = useState<boolean>(false);
 
   // AIDEV-NOTE: Stable callback to avoid breaking Row memo
   const handleTreeFocusFromRow = useCallback(() => setIsTreeFocused(true), []);
 
+  // AIDEV-NOTE: Listen for mousedown outside the tree section to clear the focused state.
+  // This is more robust than blur events which can fire unexpectedly during navigation.
+  useEffect(() => {
+    if (!isTreeFocused) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const section = sectionRef.current;
+      if (!section) return;
+
+      const target = e.target as Node | null;
+      if (target && !section.contains(target)) {
+        setIsTreeFocused(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown, true);
+    };
+  }, [isTreeFocused]);
+
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
+  // AIDEV-NOTE: Detect whether any folder (excluding the synthetic section root) is expanded.
+  const hasExpandedFolder = allItems.some((it: any) => {
+    try {
+      if (!it?.isFolder?.()) return false;
+      if (it?.getId?.() === rootId) return false;
+      return it?.isExpanded?.() === true;
+    } catch {
+      return false;
+    }
+  });
   // AIDEV-NOTE: Baseline diagnostic — disable custom virtualization, render all items
   const renderItems = allItems.filter((it: any) => it?.getId?.() !== rootId);
 
@@ -233,9 +270,11 @@ function QueriesTreeInner(
 
   return (
     <section
+      ref={sectionRef}
       className={styles['tree']}
       aria-label={label}
       data-open={isOpen ? 'true' : 'false'}
+      data-row-focused={isTreeFocused ? 'true' : 'false'}
     >
       {/* Header with toggle and per-section tools */}
       <div
@@ -272,6 +311,7 @@ function QueriesTreeInner(
           <Toolbar
             onCreateFolder={actions.handleCreateFolder}
             onCreateFile={actions.handleCreateFile}
+            onCollapseAll={actions.handleCollapseAll}
             disableNewFolder={(() => {
               try {
                 const rootItemMeta = (rootItem as any)?.getItemMeta?.() ?? {};
@@ -281,6 +321,7 @@ function QueriesTreeInner(
               } catch {}
               return false;
             })()}
+            disableCollapseAll={!hasExpandedFolder}
           />
         </div>
       </div>
@@ -309,13 +350,11 @@ function QueriesTreeInner(
           try { containerOnFocus?.(e as any); } catch {}
           try { if ((e.currentTarget as HTMLElement).matches('[data-scrollable]')) setIsTreeFocused(true); } catch {}
         };
+        // AIDEV-NOTE: We no longer reset isTreeFocused on blur; instead we use a document
+        // mousedown listener to detect clicks outside the section. This is more robust
+        // because blur events can fire unexpectedly during navigation or async actions.
         const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
           try { containerOnBlur?.(e as any); } catch {}
-          try {
-            const current = e.currentTarget as HTMLElement;
-            const next = e.relatedTarget as Node | null;
-            if (!next || !current.contains(next)) setIsTreeFocused(false);
-          } catch {}
         };
 
         return (
