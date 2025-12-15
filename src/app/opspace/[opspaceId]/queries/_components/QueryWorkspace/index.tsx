@@ -143,6 +143,24 @@ function QueryWorkspace() {
     editorRef.current?.runCurrentQuery();
   }, []);
 
+  // AIDEV-NOTE: When on /queries/new with at least one tab, prefer focusing the SQLEditor
+  // so the user can type immediately after creating a new unsaved query. We defer focus
+  // to the next animation frame to ensure it wins over TabBar roving-focus effects.
+  useEffect(() => {
+    if (!hasAnyTabs || routeMode !== 'new') return;
+    try {
+      requestAnimationFrame(() => {
+        try {
+          editorRef.current?.focusEditor();
+        } catch {}
+      });
+    } catch {
+      try {
+        editorRef.current?.focusEditor();
+      } catch {}
+    }
+  }, [hasAnyTabs, routeMode, activeDataQueryId]);
+
   return (
     <div className={styles['query-workspace']} ref={containerRef}>
       <TabBar />

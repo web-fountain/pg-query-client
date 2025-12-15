@@ -29,6 +29,7 @@ import type { UUIDv7 }                            from '@Types/primitives';
 export type SQLEditorHandle = {
   runCurrentQuery: () => void;
   getCurrentText: () => string;
+  focusEditor: () => void;
 };
 
 // AIDEV-NOTE: Centralized Vim configuration so keybindings can be adjusted in one place.
@@ -355,7 +356,14 @@ function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEdit
     if (!editorRef) return;
     const handle: SQLEditorHandle = {
       runCurrentQuery: triggerSubmit,
-      getCurrentText: () => latestTextRef.current || ''
+      getCurrentText: () => latestTextRef.current || '',
+      focusEditor: () => {
+        try {
+          editorViewRef.current?.focus();
+        } catch {
+          // no-op
+        }
+      }
     };
     if (typeof editorRef === 'function') {
       editorRef(handle);
