@@ -40,6 +40,7 @@
     "@lezer/highlight": "1.2.3",
     "@modelcontextprotocol/sdk": "1.24.3",
     "@reduxjs/toolkit": "2.11.2",
+    "@replit/codemirror-vim": "6.3.0",
     "@uiw/codemirror-themes": "4.25.4",
     "@uiw/react-codemirror": "4.25.4",
     "ai": "5.0.113",

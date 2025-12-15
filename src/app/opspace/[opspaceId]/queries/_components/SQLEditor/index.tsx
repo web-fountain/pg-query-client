@@ -13,6 +13,7 @@ import { EditorSelection, Prec, Compartment, Transaction } from '@codemirror/sta
 import { lintGutter }                             from '@codemirror/lint';
 import { createTheme }                            from '@uiw/codemirror-themes';
 import { tags as t }                              from '@lezer/highlight';
+import { vim, Vim }                               from '@replit/codemirror-vim';
 
 import { useReduxDispatch }                       from '@Redux/storeHooks';
 import { updateDataQueryText }                    from '@Redux/records/dataQuery';
@@ -28,6 +29,27 @@ import type { UUIDv7 }                            from '@Types/primitives';
 export type SQLEditorHandle = {
   runCurrentQuery: () => void;
   getCurrentText: () => string;
+};
+
+// AIDEV-NOTE: Centralized Vim configuration so keybindings can be adjusted in one place.
+type VimMode = 'normal' | 'insert' | 'visual';
+
+type VimKeybinding = {
+  // AIDEV-NOTE: Keys can be declared as a chord array (['j','k']) or a literal Vim key string ('jk').
+  keys    : string | string[];
+  target  : string;
+  mode    : VimMode;
+};
+
+const vimConfig: { keybindings: VimKeybinding[] } = {
+  keybindings: [
+    {
+      // AIDEV-NOTE: Map the 'j' then 'k' chord in insert mode to behave like <Esc>.
+      keys    : ['j', 'k'],
+      target  : '<Esc>',
+      mode    : 'insert'
+    }
+  ]
 };
 
 // AIDEV-NOTE: CodeMirror theming via extensions, not CSS module classes. See docs: https://codemirror.net/docs/
@@ -113,18 +135,18 @@ const cmColorTheme = createTheme({
   },
   styles: [
     { tag: [t.lineComment, t.blockComment, t.comment], color: '#6a9955' },
-    { tag: t.name, color: '#cccccc' },
-    { tag: t.typeName, color: '#569cd6' },
-    { tag: t.squareBracket, color: '#da70d6' },
-    { tag: t.punctuation, color: '#cccccc' },
-    { tag: t.keyword, color: '#569cd6' },
-    { tag: t.string, color: '#ce9178' },
-    { tag: t.literal, color: '#b5cea8' },
-    { tag: t.number, color: '#b5cea8' },
-    { tag: t.bool, color: '#cccccc' },
-    { tag: t.null, color: '#569cd6' },
-    { tag: t.operator, color: '#d4d4d4' },
-    { tag: t.brace, color: 'var(--syntax-brace)' }
+    { tag: t.name           , color: '#cccccc' },
+    { tag: t.typeName       , color: '#569cd6' },
+    { tag: t.squareBracket  , color: '#da70d6' },
+    { tag: t.punctuation    , color: '#cccccc' },
+    { tag: t.keyword        , color: '#569cd6' },
+    { tag: t.string         , color: '#ce9178' },
+    { tag: t.literal        , color: '#b5cea8' },
+    { tag: t.number         , color: '#b5cea8' },
+    { tag: t.bool           , color: '#cccccc' },
+    { tag: t.null           , color: '#569cd6' },
+    { tag: t.operator       , color: '#d4d4d4' },
+    { tag: t.brace          , color: 'var(--syntax-brace)' }
   ]
 });
 
@@ -215,6 +237,7 @@ function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEdit
       highlightWhitespace(),
       lintGutter(),
       lintCompartmentRef.current.of([]),
+      vim(),
       keymapCompartmentRef.current.of(
         Prec.highest(
           keymap.of([
@@ -227,6 +250,32 @@ function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEdit
       themeCompartmentRef.current.of(cmStructuralTheme),
       editingRevealPlugin
     ];
+  }, []);
+
+  // AIDEV-NOTE: Apply centralized Vim keybindings (e.g. 'j' then 'k' → <Esc> in insert mode).
+  useEffect(() => {
+    const applied: VimKeybinding[] = [];
+
+    try {
+      vimConfig.keybindings.forEach((binding) => {
+        const keys = Array.isArray(binding.keys) ? binding.keys.join('') : binding.keys;
+        Vim.map(keys, binding.target, binding.mode);
+        applied.push(binding);
+      });
+    } catch {
+      // no-op
+    }
+
+    return () => {
+      try {
+        applied.forEach((binding) => {
+          const keys = Array.isArray(binding.keys) ? binding.keys.join('') : binding.keys;
+          Vim.unmap(keys, binding.mode);
+        });
+      } catch {
+        // no-op
+      }
+    };
   }, []);
 
   // AIDEV-NOTE: Stable submit that reads from refs; decoupled from React state.
