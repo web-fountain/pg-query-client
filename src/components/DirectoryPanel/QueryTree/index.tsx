@@ -23,7 +23,7 @@ import {
 import { logClientJson }                  from '@Observability/client';
 import {
   clearInvalidations,
-  insertChildSorted,
+  insertChildAtIndex,
   removeNode,
   selectQueryTree,
   upsertNode
@@ -34,7 +34,6 @@ import {
   getQueryTreeNodeChildrenThunk
 }                                         from '@Redux/records/queryTree/thunks';
 import {
-  canCreateFolderChildAtParentMetaLevel,
   DEFAULT_QUERY_FILE_EXT,
   getMoveViolationCodeBaseFromNodes,
   getMoveViolationCodeBaseFolderFromNodes,
@@ -1005,11 +1004,58 @@ function QueriesTreeInner(
   // AIDEV-NOTE: Row actions scoped to this section root
   const actions = useItemActions(tree as any, rootId, {
     onCreateFolderDraft: async () => {
-      if (draftFolder) return;
-      if (draftFile) return;
-      const parentId  = rootId;
+      // AIDEV-NOTE: Only one draft row can exist at a time. If the user clicks “New Folder”
+      // while an empty draft exists, cancel it and proceed. If it has text or is submitting,
+      // keep it and focus it instead to avoid data loss.
+      if (draftFolder) {
+        if (draftFolder.isSubmitting) return;
+        const trimmed = (draftFolder.name ?? '').trim();
+        if (!trimmed) {
+          dispatch(removeNode({ parentId: draftFolder.parentId, nodeId: draftFolder.nodeId }));
+          setDraftFolder(null);
+        } else {
+          selectTreeItem(draftFolder.nodeId);
+          return;
+        }
+      }
+      if (draftFile) {
+        if (draftFile.isSubmitting) return;
+        const trimmed = (draftFile.name ?? '').trim();
+        if (!trimmed) {
+          dispatch(removeNode({ parentId: draftFile.parentId, nodeId: draftFile.nodeId }));
+          setDraftFile(null);
+        } else {
+          selectTreeItem(draftFile.nodeId);
+          return;
+        }
+      }
+
+      const placement = getCreatePlacement('folder');
+      const parentId  = placement.parentNodeId;
+
+      // AIDEV-NOTE: If creating inside a folder, ensure it is expanded and its children
+      // are present in Redux so we don't replace previously loaded children.
+      if (parentId && parentId !== rootId) {
+        try {
+          const known = queryTreeRef.current?.childrenByParentId?.[parentId as any];
+          if (known === undefined) {
+            await dispatch(getQueryTreeNodeChildrenThunk({ nodeId: parentId })).unwrap();
+          }
+        } catch {}
+
+        // AIDEV-NOTE: Expand after children are known so headless-tree can render the draft reliably.
+        await ensureFolderExpanded(parentId);
+      }
+
       const nodeId    = generateUUIDv7() as unknown as string;
       const folderId  = generateUUIDv7() as unknown as string;
+
+      const parentLevel = (() => {
+        if (parentId === rootId) return 0;
+        const p = queryTreeRef.current?.nodes?.[String(parentId) as any] as any;
+        const lvl = Number(p?.level ?? 0);
+        return Number.isFinite(lvl) ? lvl : 0;
+      })();
 
       const draftNode: TreeNode = {
         nodeId       : nodeId as UUIDv7,
@@ -1019,13 +1065,40 @@ function QueriesTreeInner(
         sortKey      : '',
         // AIDEV-NOTE: mountId is the canonical folder id (queryTreeFolderId), distinct from nodeId.
         mountId      : folderId as UUIDv7,
-        level        : 1
+        level        : parentLevel + 1
       };
 
       // AIDEV-NOTE: Draft insertion is synchronous; prefer direct actions over a thunk
       // to avoid extra pending/fulfilled actions and reduce render churn.
       dispatch(upsertNode(draftNode));
-      dispatch(insertChildSorted({ parentId, node: draftNode }));
+      dispatch(insertChildAtIndex({
+        parentId,
+        node: draftNode,
+        index: getInsertIndexForPlacement(
+          parentId,
+          placement.placement === 'top' ? 'top' : 'after-last-folder'
+        )
+      }));
+      // AIDEV-NOTE: For empty folders, some headless-tree configs won't “open” a folder until
+      // it has a child. Re-attempt expansion after insertion so the draft is visible.
+      if (parentId && parentId !== rootId) {
+        try {
+          requestAnimationFrame(() => {
+            void ensureFolderExpanded(parentId);
+            selectTreeItem(nodeId);
+            scrollSelectedRowIntoView();
+            debugLog('draftCreated', { kind: 'folder', parentId, nodeId });
+          });
+        } catch {
+          selectTreeItem(nodeId);
+          scrollSelectedRowIntoView();
+          debugLog('draftCreated', { kind: 'folder', parentId, nodeId });
+        }
+      } else {
+        selectTreeItem(nodeId);
+        scrollSelectedRowIntoView();
+        debugLog('draftCreated', { kind: 'folder', parentId, nodeId });
+      }
 
       // AIDEV-NOTE: Persist draft editing state across the keyed remount by storing
       // it in the outer wrapper.
@@ -1037,12 +1110,59 @@ function QueriesTreeInner(
       });
     },
     onCreateFileDraft: async () => {
-      if (draftFolder) return;
-      if (draftFile) return;
+      // AIDEV-NOTE: Only one draft row can exist at a time. If the user clicks “New File”
+      // while an empty draft exists, cancel it and proceed. If it has text or is submitting,
+      // keep it and focus it instead to avoid data loss.
+      if (draftFolder) {
+        if (draftFolder.isSubmitting) return;
+        const trimmed = (draftFolder.name ?? '').trim();
+        if (!trimmed) {
+          dispatch(removeNode({ parentId: draftFolder.parentId, nodeId: draftFolder.nodeId }));
+          setDraftFolder(null);
+        } else {
+          selectTreeItem(draftFolder.nodeId);
+          return;
+        }
+      }
+      if (draftFile) {
+        if (draftFile.isSubmitting) return;
+        const trimmed = (draftFile.name ?? '').trim();
+        if (!trimmed) {
+          dispatch(removeNode({ parentId: draftFile.parentId, nodeId: draftFile.nodeId }));
+          setDraftFile(null);
+        } else {
+          selectTreeItem(draftFile.nodeId);
+          return;
+        }
+      }
 
-      const parentId    = rootId;
+      const placement   = getCreatePlacement('file');
+      const parentId    = placement.parentNodeId;
+      let fetchedChildren: TreeNode[] | null = null;
+
+      // AIDEV-NOTE: If creating inside a folder, ensure it is expanded and its children
+      // are present in Redux so we don't replace previously loaded children.
+      if (parentId && parentId !== rootId) {
+        try {
+          const known = queryTreeRef.current?.childrenByParentId?.[parentId as any];
+          if (known === undefined) {
+            fetchedChildren = await dispatch(getQueryTreeNodeChildrenThunk({ nodeId: parentId })).unwrap();
+          }
+        } catch {}
+
+        // AIDEV-NOTE: Expand after children are known so headless-tree can render the draft reliably.
+        await ensureFolderExpanded(parentId);
+      }
+
       const nodeId      = generateUUIDv7() as unknown as string;
       const dataQueryId = generateUUIDv7() as unknown as UUIDv7;
+
+      const parentLevel = (() => {
+        if (parentId === rootId) return 0;
+        const p = queryTreeRef.current?.nodes?.[String(parentId) as any] as any;
+        const lvl = Number(p?.level ?? 0);
+        return Number.isFinite(lvl) ? lvl : 0;
+      })();
 
       const draftNode: TreeNode = {
         nodeId       : nodeId as unknown as UUIDv7,
@@ -1052,11 +1172,79 @@ function QueriesTreeInner(
         ext          : DEFAULT_QUERY_FILE_EXT,
         sortKey      : '',
         mountId      : dataQueryId,
-        level        : 1
+        level        : parentLevel + 1
       };
 
       dispatch(upsertNode(draftNode));
-      dispatch(insertChildSorted({ parentId, node: draftNode }));
+      const insertIndex = (() => {
+        if (placement.placement === 'after-selected' && placement.afterNodeId) {
+          const ids = queryTreeRef.current?.childrenByParentId?.[String(parentId) as any] || [];
+          if (Array.isArray(ids)) {
+            const i = ids.indexOf(String(placement.afterNodeId));
+            if (i >= 0) return i + 1;
+          }
+        }
+        if (fetchedChildren && placement.placement !== 'after-selected') {
+          // AIDEV-NOTE: If we just loaded children for a previously-collapsed folder, use the
+          // fetched list (not queryTreeRef) to compute the folder/file boundary deterministically.
+          let idx = 0;
+          for (; idx < fetchedChildren.length; idx++) {
+            const k = (fetchedChildren[idx] as any)?.kind;
+            if (k !== 'folder') break;
+          }
+          return idx;
+        }
+        return getInsertIndexForPlacement(
+          parentId,
+          placement.placement === 'top' ? 'top' : 'after-last-folder'
+        );
+      })();
+      dispatch(insertChildAtIndex({
+        parentId,
+        node: draftNode,
+        index: insertIndex
+      }));
+      // AIDEV-NOTE: For empty folders, some headless-tree configs won't “open” a folder until
+      // it has a child. Re-attempt expansion after insertion so the draft is visible.
+      if (parentId && parentId !== rootId) {
+        try {
+          requestAnimationFrame(() => {
+            void ensureFolderExpanded(parentId);
+            selectTreeItem(nodeId);
+            scrollSelectedRowIntoView();
+            debugLog('draftCreated', {
+              kind: 'file',
+              parentId,
+              nodeId,
+              insertIndex,
+              placement: (placement as any)?.placement,
+              afterNodeId: (placement as any)?.afterNodeId
+            });
+          });
+        } catch {
+          selectTreeItem(nodeId);
+          scrollSelectedRowIntoView();
+          debugLog('draftCreated', {
+            kind: 'file',
+            parentId,
+            nodeId,
+            insertIndex,
+            placement: (placement as any)?.placement,
+            afterNodeId: (placement as any)?.afterNodeId
+          });
+        }
+      } else {
+        selectTreeItem(nodeId);
+        scrollSelectedRowIntoView();
+        debugLog('draftCreated', {
+          kind: 'file',
+          parentId,
+          nodeId,
+          insertIndex,
+          placement: (placement as any)?.placement,
+          afterNodeId: (placement as any)?.afterNodeId
+        });
+      }
 
       setDraftFile({
         nodeId,
@@ -1114,6 +1302,306 @@ function QueriesTreeInner(
   // clicked outside the tree section yet.
   const [isTreeFocused, setIsTreeFocused] = useState<boolean>(false);
 
+  // AIDEV-NOTE: Keep the latest draft refs for global event handlers so we don't rely on
+  // React state timing (e.g., dblclick can fire before blur-driven draft cancel commits).
+  const draftFolderRef = useRef<DraftFolderState | null>(null);
+  const draftFileRef   = useRef<DraftFileState | null>(null);
+  draftFolderRef.current = draftFolder;
+  draftFileRef.current   = draftFile;
+
+  const selectTreeItem = useCallback((nodeId: string) => {
+    const id = String(nodeId || '');
+    if (!id) return;
+    try {
+      if (typeof (tree as any).setSelectedItems === 'function') {
+        (tree as any).setSelectedItems([id]);
+      }
+    } catch {}
+
+    try {
+      tree.setConfig((prev) => ({
+        ...prev,
+        state: {
+          ...(prev.state || {}),
+          focusedItem: id
+        }
+      }));
+    } catch {}
+
+    // AIDEV-NOTE: Treat toolbar-driven create as an explicit tree interaction.
+    setIsTreeFocused(true);
+  }, [tree]);
+
+  const debugLog = useCallback((event: string, payload?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV === 'production') return;
+    // eslint-disable-next-line no-console
+    console.log('[QueryTree]', event, payload || {});
+  }, []);
+
+  const scrollSelectedRowIntoView = useCallback(() => {
+    try {
+      requestAnimationFrame(() => {
+        try {
+          const el = document.querySelector('[data-row="true"][aria-selected="true"]') as HTMLElement | null;
+          el?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+        } catch {}
+      });
+    } catch {}
+  }, []);
+
+  const getCreatePlacement = useCallback((createKind: 'folder' | 'file') => {
+    // AIDEV-NOTE: Derive draft placement from headless-tree selection/focus state.
+    // Prefer selectedItems (matches visible highlight), fallback to focusedItem.
+    // AIDEV-NOTE: In this headless-tree version, `focusedItem` is not reliably settable
+    // via config updates, so it can lag behind selection after programmatic selects.
+    const state = tree.getState?.() as any;
+    const selectedItems = (state?.selectedItems || []) as string[];
+    const focusedItem = String(state?.focusedItem || '');
+
+    const pickSelectedId = () => {
+      // Prefer the most recent non-root selection if multiple exist.
+      for (let i = selectedItems.length - 1; i >= 0; i--) {
+        const id = String(selectedItems[i]);
+        if (id && id !== String(rootId)) return id;
+      }
+      if (focusedItem && focusedItem !== String(rootId)) return String(focusedItem);
+      return '';
+    };
+
+    const selectedId = pickSelectedId();
+    const selectedNode = selectedId ? (queryTreeRef.current?.nodes?.[selectedId] as any) : null;
+
+    // No selection => root, after last folder boundary.
+    if (!selectedId || !selectedNode) {
+      return { parentNodeId: String(rootId), placement: 'after-last-folder' as const };
+    }
+
+    if (selectedNode.kind === 'folder') {
+      if (createKind === 'file') {
+        // Folder selected + new file => within folder, after last folder boundary.
+        return { parentNodeId: String(selectedId), placement: 'after-last-folder' as const };
+      }
+      // Folder selected + new folder => within folder, first child (visually right below folder row).
+      return { parentNodeId: String(selectedId), placement: 'top' as const };
+    }
+
+    // File selected => create in its parent.
+    const parentNodeId = String(selectedNode.parentNodeId ?? rootId);
+    if (!parentNodeId || parentNodeId === String(rootId)) {
+      if (createKind === 'file') {
+        // File under root + new file => insert directly below selected file.
+        return { parentNodeId: String(rootId), placement: 'after-selected' as const, afterNodeId: String(selectedId) };
+      }
+      // File under root + new folder => root, after last folder boundary.
+      return { parentNodeId: String(rootId), placement: 'after-last-folder' as const };
+    }
+    if (createKind === 'file') {
+      // File inside folder + new file => insert directly below selected file.
+      return { parentNodeId, placement: 'after-selected' as const, afterNodeId: String(selectedId) };
+    }
+    // File inside folder + new folder => parent folder, first child (visually right below folder row).
+    return { parentNodeId, placement: 'top' as const };
+  }, [tree, rootId]);
+
+  const getInsertIndexForPlacement = useCallback((parentNodeId: string, placement: 'top' | 'after-last-folder') => {
+    if (placement === 'top') return 0;
+    // AIDEV-NOTE: Root children are folder-first, so the first non-folder index is “after last folder”.
+    const ids = queryTreeRef.current?.childrenByParentId?.[String(parentNodeId) as any] || [];
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    let idx = 0;
+    for (; idx < ids.length; idx++) {
+      const n = queryTreeRef.current?.nodes?.[String(ids[idx]) as any] as any;
+      if (!n || n.kind !== 'folder') break;
+    }
+    return idx;
+  }, []);
+
+  const ensureFolderExpanded = useCallback((folderNodeId: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const id = String(folderNodeId || '');
+      if (!id) {
+        resolve();
+        return;
+      }
+      if (id === String(rootId)) {
+        resolve();
+        return;
+      }
+
+      const debug = (...args: any[]) => {
+        if (process.env.NODE_ENV === 'production') return;
+        // eslint-disable-next-line no-console
+        console.log('[QueryTree]', ...args);
+      };
+
+      const readExpandedIds = () => {
+        try {
+          const cur = (tree.getState?.()?.expandedItems || []) as any;
+          return Array.isArray(cur) ? cur.map((x) => String(x)) : [];
+        } catch {
+          return [];
+        }
+      };
+
+      const expandedStateBefore = (() => {
+        try {
+          const curArr = readExpandedIds();
+          return curArr.includes(id);
+        } catch {
+          return null;
+        }
+      })();
+
+      debug('ensureFolderExpanded:start', { folderNodeId: id, expandedStateBefore });
+
+      // AIDEV-NOTE: If already expanded, resolve immediately (avoids unnecessary RAF delays).
+      if (expandedStateBefore === true) {
+        debug('ensureFolderExpanded:already-expanded', { folderNodeId: id });
+        resolve();
+        return;
+      }
+
+      // AIDEV-NOTE: Use getItemInstance for reliable item lookup by ID (doesn't depend on rendered items).
+      let didExpandByItem = false;
+      try {
+        const it = (tree as any).getItemInstance?.(id);
+        if (it) {
+          const isFolder = !!it?.isFolder?.();
+          const isExpanded = it?.isExpanded?.();
+          debug('ensureFolderExpanded:item-check', { folderNodeId: id, hasItem: true, isFolder, isExpanded });
+          if (isFolder && isExpanded === false) {
+            it.expand?.();
+            didExpandByItem = true;
+          }
+        } else {
+          debug('ensureFolderExpanded:item-not-found-via-instance', { folderNodeId: id });
+        }
+      } catch (err) {
+        debug('ensureFolderExpanded:getItemInstance-error', { folderNodeId: id, error: err });
+      }
+
+      // Fallback: set expandedItems via tree API / config (works even if item API isn't available).
+      if (!didExpandByItem) {
+        try {
+          const curArr = readExpandedIds();
+          const next = Array.from(new Set([...curArr, String(rootId), id]));
+
+          // AIDEV-NOTE: Prefer the library's state setter if present (mirrors setSelectedItems behavior).
+          if (typeof (tree as any).setExpandedItems === 'function') {
+            debug('ensureFolderExpanded:setExpandedItems', { folderNodeId: id, nextCount: next.length });
+            (tree as any).setExpandedItems(next);
+          } else if (!curArr.includes(id)) {
+            debug('ensureFolderExpanded:setConfig-expandedItems', { folderNodeId: id, nextCount: next.length });
+            tree.setConfig((prev) => {
+              const prevState = (prev as any).state || {};
+              return {
+                ...(prev as any),
+                state: {
+                  ...prevState,
+                  expandedItems: next
+                }
+              };
+            });
+          }
+        } catch {}
+      }
+
+      // AIDEV-NOTE: Some headless-tree paths only load children when expand() is called.
+      // Ensure children load when we toggle expandedItems via config.
+      try { (tree as any).loadChildrenWithData?.(id); } catch {}
+      try { (tree as any).loadChildrenIds?.(id); } catch {}
+
+      const finish = () => {
+        try {
+          const curArr = readExpandedIds();
+          let itemExpanded: boolean | null = null;
+          try {
+            const it = (tree as any).getItemInstance?.(id);
+            itemExpanded = it?.isExpanded?.() ?? null;
+          } catch {}
+          debug('ensureFolderExpanded:done', { folderNodeId: id, didExpandByItem, expandedStateAfter: curArr.includes(id), itemExpanded, expandedItems: curArr });
+        } catch {}
+        resolve();
+      };
+
+      // AIDEV-NOTE: Wait for the next animation frame(s) so expansion state is reflected in the UI
+      // before callers insert/select draft nodes.
+      try {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            finish();
+          });
+        });
+      } catch {
+        try {
+          window.setTimeout(() => finish(), 0);
+        } catch {
+          finish();
+        }
+      }
+    });
+  }, [tree, rootId]);
+
+  const getMetaLevelForNodeId = useCallback((nodeId: string) => {
+    const id = String(nodeId || '');
+    if (!id) return 0;
+
+    try {
+      const inst = (tree as any).getItemInstance?.(id);
+      const meta = inst?.getItemMeta?.() ?? {};
+      const lvl = Number((meta as any).level);
+      if (Number.isFinite(lvl)) return lvl;
+    } catch {}
+
+    if (id === String(rootId)) return 0;
+    const n = queryTreeRef.current?.nodes?.[id as any] as any;
+    const abs = Number(n?.level ?? 0);
+    if (Number.isFinite(abs) && abs > 0) return Math.max(0, abs - 1);
+    return 0;
+  }, [tree, rootId]);
+
+  const createRootFileDraft = useCallback(() => {
+    const parentId = rootId;
+    const nodeId = generateUUIDv7() as unknown as string;
+    const dataQueryId = generateUUIDv7() as unknown as UUIDv7;
+
+    const draftNode: TreeNode = {
+      nodeId       : nodeId as unknown as UUIDv7,
+      parentNodeId : parentId,
+      kind         : 'file',
+      label        : '',
+      ext          : DEFAULT_QUERY_FILE_EXT,
+      sortKey      : '',
+      mountId      : dataQueryId,
+      level        : 1
+    };
+
+    dispatch(upsertNode(draftNode));
+    dispatch(insertChildAtIndex({
+      parentId,
+      node: draftNode,
+      index: getInsertIndexForPlacement(parentId, 'after-last-folder')
+    }));
+
+    setDraftFile({
+      nodeId,
+      parentId,
+      dataQueryId,
+      name: '',
+      isSubmitting: false
+    });
+
+    selectTreeItem(nodeId);
+
+    // AIDEV-NOTE: Best-effort scroll into view so the user always sees the draft row.
+    try {
+      requestAnimationFrame(() => {
+        const el = document.querySelector('[data-row="true"][aria-selected="true"]') as HTMLElement | null;
+        el?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+      });
+    } catch {}
+  }, [dispatch, getInsertIndexForPlacement, rootId, selectTreeItem, setDraftFile]);
+
   // AIDEV-NOTE: Stable callback to avoid breaking Row memo
   const handleTreeFocusFromRow = useCallback(() => setIsTreeFocused(true), []);
 
@@ -1130,9 +1618,9 @@ function QueriesTreeInner(
 
       // Check if click is outside the tree section
       if (!section.contains(target)) {
-        // Check if click is within DirectoryPanel (by finding parent with directory-panel class)
+        // Check if click is within DirectoryPanel (stable attribute on panel root)
         const targetElement   = target as Element;
-        const directoryPanel  = targetElement?.closest?.('[class*="directory-panel"]');
+        const directoryPanel  = targetElement?.closest?.('[data-panel-side]');
 
         if (directoryPanel) {
           // Click is within DirectoryPanel but outside this tree section
@@ -1192,6 +1680,58 @@ function QueriesTreeInner(
       document.removeEventListener('mousedown', handleMouseDown, true);
     };
   }, [isTreeFocused, tree, rootId]);
+
+  // AIDEV-NOTE: When nothing is selected, dblclick outside the tree (but within DirectoryPanel)
+  // creates a new *file* draft at the root after the last folder boundary.
+  useEffect(() => {
+    const handleDoubleClick = (e: MouseEvent) => {
+      const section = sectionRef.current;
+      if (!section) return;
+
+      const target = e.target as Node | null;
+      if (!target) return;
+
+      if (section.contains(target)) return;
+
+      const targetElement = target as Element;
+      const directoryPanel = targetElement?.closest?.('[data-panel-side]');
+      if (!directoryPanel) return;
+
+      // AIDEV-NOTE: If a draft already exists, bring it into view instead of doing nothing.
+      // If the dblclick's first click causes a blur that cancels the draft, defer creation
+      // to the next tick so we see the updated draft refs.
+      try {
+        e.preventDefault();
+      } catch {}
+
+      window.setTimeout(() => {
+        const existingFolderDraft = draftFolderRef.current;
+        const existingFileDraft   = draftFileRef.current;
+
+        if (existingFolderDraft?.nodeId) {
+          selectTreeItem(existingFolderDraft.nodeId);
+          return;
+        }
+        if (existingFileDraft?.nodeId) {
+          selectTreeItem(existingFileDraft.nodeId);
+          try {
+            requestAnimationFrame(() => {
+              const el = document.querySelector('[data-row="true"][aria-selected="true"]') as HTMLElement | null;
+              el?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+            });
+          } catch {}
+          return;
+        }
+
+        createRootFileDraft();
+      }, 0);
+    };
+
+    document.addEventListener('dblclick', handleDoubleClick, true);
+    return () => {
+      document.removeEventListener('dblclick', handleDoubleClick, true);
+    };
+  }, [tree, rootId, selectTreeItem, createRootFileDraft]);
 
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
@@ -1292,15 +1832,6 @@ function QueriesTreeInner(
             onCreateFolder={actions.handleCreateFolder}
             onCreateFile={actions.handleCreateFile}
             onCollapseAll={actions.handleCollapseAll}
-            disableNewFolder={(() => {
-              try {
-                const rootItemMeta = (rootItem as any)?.getItemMeta?.() ?? {};
-                const rootLevel = (rootItemMeta.level ?? 0) as number;
-                // AIDEV-NOTE: Block New Folder when a new child would exceed the max folder depth constraint.
-                return !canCreateFolderChildAtParentMetaLevel(rootLevel);
-              } catch {}
-              return false;
-            })()}
             disableCollapseAll={!hasExpandedFolder}
           />
         </div>
@@ -1415,10 +1946,18 @@ function QueriesTreeInner(
 
                         let created: TreeNode | null = null;
                         try {
+                          const parentFolderId = (() => {
+                            if (String(parentId) === String(rootId)) return undefined;
+                            const p = queryTreeRef.current?.nodes?.[String(parentId) as any] as any;
+                            if (!p || p.kind !== 'folder') return undefined;
+                            const fid = p.mountId;
+                            return fid ? String(fid) : undefined;
+                          })();
+
                           created = await dispatch(
                             createQueryFolderThunk({
-                              parentFolderId: undefined,
-                              name        : trimmed
+                              parentFolderId,
+                              name: trimmed
                             })
                           ).unwrap();
                         } catch {
@@ -1428,6 +1967,7 @@ function QueriesTreeInner(
                         if (created) {
                           dispatch(removeNode({ parentId, nodeId }));
                           setDraftFolder(null);
+                          try { selectTreeItem(String((created as any).nodeId ?? '')); } catch {}
                         } else {
                           // AIDEV-NOTE: Backend create failed; keep the draft row so the user
                           // can retry or cancel, and re-enable the input.
@@ -1450,10 +1990,19 @@ function QueriesTreeInner(
 
                         let created: TreeNode | null = null;
                         try {
+                          const parentFolderId = (() => {
+                            if (String(parentId) === String(rootId)) return undefined;
+                            const p = queryTreeRef.current?.nodes?.[String(parentId) as any] as any;
+                            if (!p || p.kind !== 'folder') return undefined;
+                            const fid = p.mountId;
+                            return fid ? String(fid) : undefined;
+                          })();
+
                           created = await dispatch(
                             createSavedQueryFileThunk({
                               dataQueryId,
-                              name: trimmed
+                              name: trimmed,
+                              parentFolderId
                             })
                           ).unwrap();
                         } catch {
@@ -1463,6 +2012,7 @@ function QueriesTreeInner(
                         if (created) {
                           dispatch(removeNode({ parentId, nodeId }));
                           setDraftFile(null);
+                          try { selectTreeItem(String((created as any).nodeId ?? '')); } catch {}
                           // AIDEV-NOTE: Navigate to the newly created saved query URL.
                           navigateToSaved(created.mountId as UUIDv7);
                         } else {

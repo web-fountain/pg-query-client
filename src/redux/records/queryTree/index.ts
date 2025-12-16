@@ -16,6 +16,7 @@ type AddChild                   = { parentId: string; node: TreeNode };
 type MoveNode                   = { nodeId: string; oldParentNodeId: string; newParentNodeId: string; index?: number };
 type ResortChildren             = { parentId: string };
 type InsertChildSorted          = { parentId: string; node: TreeNode };
+type InsertChildAtIndex         = { parentId: string; node: TreeNode; index: number };
 type RemoveNode                 = { parentId: string; nodeId: string };
 type BulkUpsertNodes            = { nodes: TreeNode[] };
 type LinkDataQueryIdToNodeIds   = { dataQueryId: UUIDv7; nodeId: UUIDv7 };
@@ -33,6 +34,9 @@ export const addChild             = createAction<AddChild>          ('queryTree/
 export const moveNode             = createAction<MoveNode>          ('queryTree/moveNode');
 export const resortChildren       = createAction<ResortChildren>    ('queryTree/resortChildren');
 export const insertChildSorted    = createAction<InsertChildSorted> ('queryTree/insertChildSorted');
+// AIDEV-NOTE: Draft-only insertion helper. Inserts at an explicit index without sorting.
+// Used to place inline draft rows “right below” a folder/root boundary for better UX.
+export const insertChildAtIndex   = createAction<InsertChildAtIndex>('queryTree/insertChildAtIndex');
 export const removeNode           = createAction<RemoveNode>        ('queryTree/removeNode');
 
 // AIDEV-NOTE: Explicitly link a dataQueryId to a tree nodeId so renameNodeWithInvalidation
@@ -116,6 +120,26 @@ export default createReducer(initialState, (builder) => {
           ids.push(r.nodeId as string);
         }
 
+        // AIDEV-NOTE: Preserve local draft children (inline create rows) if a background
+        // children load races with draft insertion. Draft nodes have empty label/sortKey
+        // until committed/cancelled.
+        const existing = state.childrenByParentId[parentId] || [];
+        if (Array.isArray(existing) && existing.length > 0) {
+          const nextSet = new Set(ids);
+          let offset = 0;
+          for (let i = 0; i < existing.length; i++) {
+            const id = String(existing[i]);
+            if (!id || nextSet.has(id)) continue;
+            const n = state.nodes[id] as any;
+            const isDraft = !!n && String(n.label ?? '') === '' && String(n.sortKey ?? '') === '';
+            if (!isDraft) continue;
+            const insertIdx = Math.max(0, Math.min(ids.length, i + offset));
+            ids.splice(insertIdx, 0, id);
+            nextSet.add(id);
+            offset++;
+          }
+        }
+
         state.childrenByParentId[parentId] = ids;
       }
     )
@@ -185,6 +209,21 @@ export default createReducer(initialState, (builder) => {
 
         const idx = findInsertIndexIds(arr, resolve(node.nodeId), resolve, compareBySortKey);
         if (!arr.includes(node.nodeId as UUIDv7)) arr.splice(idx, 0, node.nodeId as UUIDv7);
+        state.childrenByParentId[parentId] = arr;
+      }
+    )
+    .addCase(insertChildAtIndex,
+      function (state: QueryTreeRecord, action: PayloadAction<InsertChildAtIndex>) {
+        const { parentId, node } = action.payload;
+        state.nodes[node.nodeId] = { ...node, parentNodeId: parentId };
+        const arr = state.childrenByParentId[parentId] || [];
+
+        const id = node.nodeId as UUIDv7;
+        if (arr.includes(id)) return;
+
+        const rawIndex = Number(action.payload.index ?? 0);
+        const idx = Number.isFinite(rawIndex) ? Math.max(0, Math.min(arr.length, rawIndex)) : arr.length;
+        arr.splice(idx, 0, id);
         state.childrenByParentId[parentId] = arr;
       }
     )

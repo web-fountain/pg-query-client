@@ -11,6 +11,7 @@ import {
   moveNode,
   registerInvalidations,
   resortChildren,
+  setChildren,
   upsertNode
 }                                             from '@Redux/records/queryTree';
 import {
@@ -44,7 +45,7 @@ import * as log                               from '@Observability/client/thunks
 
 export const getQueryTreeNodeChildrenThunk = createAsyncThunk<TreeNode[], GetNodeChildrenArgs, { state: RootState }>(
   'queryTree/getQueryTreeNodeChildren',
-  async ({ nodeId }) => {
+  async ({ nodeId }, { dispatch }) => {
     log.thunkStart({
       thunk : 'queryTree/getQueryTreeNodeChildren',
       input : { nodeId }
@@ -76,7 +77,16 @@ export const getQueryTreeNodeChildrenThunk = createAsyncThunk<TreeNode[], GetNod
     }
 
     const { children } = res.data;
-    return children as TreeNode[];
+    const rows = (children || []) as TreeNode[];
+
+    // AIDEV-NOTE: Persist loaded children into Redux so future operations (draft insertion,
+    // DnD duplicate checks, etc.) can treat Redux as the source of truth for that parent.
+    // This also prevents headless-tree from “forgetting” existing children when we insert drafts.
+    try {
+      dispatch(setChildren({ parentId: String(nodeId), rows }));
+    } catch {}
+
+    return rows;
   }
 );
 
