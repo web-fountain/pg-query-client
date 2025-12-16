@@ -554,6 +554,14 @@ function QueriesTreeInner(
       const dropTargetId = targetItem?.getId?.();
       if (!dragId || !dropTargetId) return false;
 
+      // AIDEV-NOTE: Headless-tree provides `childIndex` targets for "between row" drops.
+      // This is our UX hook for outdenting: dropping above `reports_01` should land in `reports_01`'s parent (root).
+      const isBetweenRows =
+        !!target
+        && typeof target === 'object'
+        && ('childIndex' in (target as any))
+        && typeof (target as any).childIndex === 'number';
+
       // AIDEV-NOTE: Disallow cross-section moves (cannot drag between different section roots).
       try {
         const draggedRoot = dragged?.getTree?.()?.getRootItem?.()?.getId?.();
@@ -618,6 +626,43 @@ function QueriesTreeInner(
 
       if (!effectiveTargetData) return false;
 
+      // AIDEV-NOTE: Resolve destination parent id:
+      // - Drop ON a folder row => destination is that folder
+      // - Drop BETWEEN rows (above/below a row) => destination is the hovered row's parent folder
+      const resolvedDropTargetId = (() => {
+        if (!isBetweenRows) return String(dropTargetId);
+        const pid = (targetData as any)?.parentNodeId;
+        if (pid == null || pid === '') return String(rootId);
+        return String(pid);
+      })();
+
+      // AIDEV-NOTE: Resolve destination folder node data for validation.
+      const resolvedTargetData: TreeNode | undefined = (() => {
+        if (String(resolvedDropTargetId) === String(rootId)) {
+          return {
+            nodeId       : String(rootId),
+            parentNodeId : null,
+            kind         : 'folder',
+            label        : String(label ?? 'QUERIES'),
+            sortKey      : '',
+            mountId      : String(rootId),
+            level        : 0
+          } as unknown as TreeNode;
+        }
+        if (!isBetweenRows) return effectiveTargetData;
+        const candidate = queryTreeRef.current?.nodes?.[String(resolvedDropTargetId) as any] as TreeNode | undefined;
+        return candidate ?? effectiveTargetData;
+      })();
+
+      if (!resolvedTargetData) return false;
+
+      // AIDEV-NOTE: Dropping BETWEEN rows within the same parent would only reorder siblings,
+      // which is not persisted (server sorts). Treat as a no-op and disallow.
+      const draggedParentId = String((draggedData as any).parentNodeId ?? rootId);
+      if (isBetweenRows && draggedParentId && draggedParentId === String(resolvedDropTargetId)) {
+        return false;
+      }
+
       // AIDEV-NOTE: If we're dragging a folder, initialize subtree exploration once per drag session.
       if (draggedData.kind === 'folder' && activeFolderDragIdRef.current !== String(dragId)) {
         activeFolderDragIdRef.current = String(dragId);
@@ -642,8 +687,8 @@ function QueriesTreeInner(
 
       const base =
         draggedData.kind === 'folder'
-          ? getMoveViolationCodeBaseFolderFromNodes(draggedData, effectiveTargetData)
-          : getMoveViolationCodeBaseFromNodes(draggedData, effectiveTargetData);
+          ? getMoveViolationCodeBaseFolderFromNodes(draggedData, resolvedTargetData)
+          : getMoveViolationCodeBaseFromNodes(draggedData, resolvedTargetData);
       if (base !== MoveViolationCode.Ok) {
         logConstraintOnce(
           `${dragId}:${dropTargetId}:base-${base}`,
@@ -654,7 +699,9 @@ function QueriesTreeInner(
             code          : base,
             reason        : getMoveViolationLabel(base),
             dragId        : String(dragId),
-            dropTargetId  : String(dropTargetId)
+            dropTargetId  : String(dropTargetId),
+            resolvedDropTargetId : String(resolvedDropTargetId),
+            isBetweenRows : isBetweenRows
           }
         );
         return false;
@@ -663,10 +710,11 @@ function QueriesTreeInner(
       // AIDEV-NOTE: Folder moves must not create cycles (dropping into own descendant subtree).
       if (draggedData.kind === 'folder') {
         try {
-          let curId = String(dropTargetId);
+          let curId = String(resolvedDropTargetId);
           let unknown = false;
           for (let i = 0; i < (MAX_QUERY_TREE_DEPTH + 2); i++) {
             if (!curId) break;
+            if (curId === String(rootId)) break;
             if (curId === String(dragId)) {
               logConstraintOnce(
                 `${dragId}:${dropTargetId}:cycle`,
@@ -675,7 +723,8 @@ function QueriesTreeInner(
                   phase         : 'constraint-violation',
                   constraint    : 'cycle',
                   dragId        : String(dragId),
-                  dropTargetId  : String(dropTargetId)
+                  dropTargetId  : String(dropTargetId),
+                  resolvedDropTargetId : String(resolvedDropTargetId)
                 }
               );
               return false;
@@ -709,7 +758,7 @@ function QueriesTreeInner(
 
       // AIDEV-NOTE: Server-enforced max depth for moves (root children are level 1).
       try {
-        const parentLevelRaw = (effectiveTargetData as any)?.level;
+        const parentLevelRaw = (resolvedTargetData as any)?.level;
         const parentLevel = Number(parentLevelRaw);
         const newLevel = (Number.isFinite(parentLevel) ? parentLevel : 0) + 1;
         if (newLevel > MAX_QUERY_TREE_DEPTH) {
@@ -721,6 +770,7 @@ function QueriesTreeInner(
               constraint    : 'max-depth',
               dragId        : String(dragId),
               dropTargetId  : String(dropTargetId),
+              resolvedDropTargetId : String(resolvedDropTargetId),
               newLevel      : newLevel,
               maxDepth      : MAX_QUERY_TREE_DEPTH
             }
@@ -744,6 +794,7 @@ function QueriesTreeInner(
                 constraint    : 'max-depth-subtree',
                 dragId        : String(dragId),
                 dropTargetId  : String(dropTargetId),
+                resolvedDropTargetId : String(resolvedDropTargetId),
                 newMaxLevel   : newMax,
                 maxDepth      : MAX_QUERY_TREE_DEPTH,
                 loadedComplete: folderSubtreeMissingChildrenRef.current.size === 0
@@ -777,7 +828,7 @@ function QueriesTreeInner(
         const draggedExt = (draggedData as any)?.ext;
         const normalized = normalizeFileKeyForUniqueness(draggedLabel, draggedExt);
 
-        const dupe = getDuplicateFileStatus(String(dropTargetId), normalized, String(dragId));
+        const dupe = getDuplicateFileStatus(String(resolvedDropTargetId), normalized, String(dragId));
         if (dupe === true) {
           logConstraintOnce(
             `${dragId}:${dropTargetId}:duplicate-name`,
@@ -786,17 +837,18 @@ function QueriesTreeInner(
               phase         : 'constraint-violation',
               constraint    : 'duplicate-name',
               dragId        : String(dragId),
-              dropTargetId  : String(dropTargetId)
+              dropTargetId  : String(dropTargetId),
+              resolvedDropTargetId : String(resolvedDropTargetId)
             }
           );
           return false;
         }
         if (dupe === null) {
-          enqueuePrefetchChildren(String(dropTargetId));
+          enqueuePrefetchChildren(String(resolvedDropTargetId));
         }
       } else if (draggedData.kind === 'folder') {
         const normalized = normalizeLabelForUniqueness(draggedLabel);
-        const dupe = getDuplicateFolderStatus(String(dropTargetId), normalized, String(dragId));
+        const dupe = getDuplicateFolderStatus(String(resolvedDropTargetId), normalized, String(dragId));
         if (dupe === true) {
           logConstraintOnce(
             `${dragId}:${dropTargetId}:duplicate-folder`,
@@ -805,13 +857,14 @@ function QueriesTreeInner(
               phase         : 'constraint-violation',
               constraint    : 'duplicate-folder',
               dragId        : String(dragId),
-              dropTargetId  : String(dropTargetId)
+              dropTargetId  : String(dropTargetId),
+              resolvedDropTargetId : String(resolvedDropTargetId)
             }
           );
           return false;
         }
         if (dupe === null) {
-          enqueuePrefetchChildren(String(dropTargetId));
+          enqueuePrefetchChildren(String(resolvedDropTargetId));
         }
       }
 
@@ -822,10 +875,32 @@ function QueriesTreeInner(
       if (!Array.isArray(items) || items.length !== 1) return;
       const dragged = items[0];
       const dragId = dragged?.getId?.();
-      const dropTargetId = target.item?.getId?.();
+      const targetItem = target.item;
+      const dropTargetId = targetItem?.getId?.();
       if (!dragId || !dropTargetId) return;
-      // AIDEV-NOTE: For saved QueryTree we treat allowed drops as "move into folder".
-      await actions.handleDropMove(dragId, dropTargetId, true);
+
+      const draggedData = dragged.getItemData?.() as TreeNode | undefined;
+      if (!draggedData) return;
+
+      const isBetweenRows =
+        !!target
+        && typeof target === 'object'
+        && ('childIndex' in (target as any))
+        && typeof (target as any).childIndex === 'number';
+
+      const targetData  = targetItem.getItemData?.() as TreeNode | undefined;
+      const resolvedDropTargetId = (() => {
+        if (!isBetweenRows) return String(dropTargetId);
+        const pid = (targetData as any)?.parentNodeId;
+        if (pid == null || pid === '') return String(rootId);
+        return String(pid);
+      })();
+
+      const draggedParentId = String((draggedData as any).parentNodeId ?? rootId);
+      if (draggedParentId && draggedParentId === String(resolvedDropTargetId)) return;
+
+      // AIDEV-NOTE: For saved QueryTree we treat allowed drops as "move into folder/root".
+      await actions.handleDropMove(String(dragId), String(resolvedDropTargetId), true);
     }
   });
 
