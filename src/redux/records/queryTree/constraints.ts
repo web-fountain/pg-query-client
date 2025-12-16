@@ -1,5 +1,4 @@
 import type { QueryTreeRecord, TreeNode } from './types';
-import { fsSortKeyEn }                    from '@Utils/collation';
 
 // AIDEV-NOTE: Centralized QueryTree constraints. This module is intentionally framework-agnostic:
 // - Pure functions (no Redux/React imports)
@@ -30,7 +29,11 @@ export const MoveViolationCode = {
   DragNotFile     : 3,
   TargetNotFolder : 4,
   SameParent      : 5,
-  DuplicateName   : 6
+  DuplicateName   : 6,
+  DragNotFolder   : 7,
+  SelfParent      : 8,
+  Cycle           : 9,
+  MaxDepth        : 10
 } as const;
 
 export type MoveViolationCode = (typeof MoveViolationCode)[keyof typeof MoveViolationCode];
@@ -42,7 +45,11 @@ const MOVE_VIOLATION_LABEL: Record<number, string> = {
   [MoveViolationCode.DragNotFile]     : 'drag-not-file',
   [MoveViolationCode.TargetNotFolder] : 'target-not-folder',
   [MoveViolationCode.SameParent]      : 'same-parent',
-  [MoveViolationCode.DuplicateName]   : 'duplicate-name'
+  [MoveViolationCode.DuplicateName]   : 'duplicate-name',
+  [MoveViolationCode.DragNotFolder]   : 'drag-not-folder',
+  [MoveViolationCode.SelfParent]      : 'self-parent',
+  [MoveViolationCode.Cycle]           : 'cycle',
+  [MoveViolationCode.MaxDepth]        : 'max-depth'
 };
 
 export function getMoveViolationLabel(code: MoveViolationCode): string {
@@ -119,6 +126,79 @@ export function getMoveViolationCodeBaseFromNodes(
   return MoveViolationCode.Ok;
 }
 
+// AIDEV-NOTE: Base validation for moving *folders* (folder → folder/root) without scanning descendants.
+// Cycle and depth checks are layered on separately since they may require walking parent chains or scanning loaded subtrees.
+export function getMoveViolationCodeBaseFolder(
+  tree: QueryTreeRecord,
+  nodeId: string,
+  destParentId: string
+): MoveViolationCode {
+  const node = tree.nodes?.[String(nodeId)];
+  if (!node) return MoveViolationCode.MissingNode;
+
+  const destId = String(destParentId);
+  const dest = tree.nodes?.[destId];
+  const isRootTarget = destId === QUERY_TREE_ROOT_ID && !dest;
+  if (!dest && !isRootTarget) return MoveViolationCode.MissingTarget;
+
+  if (node.kind !== 'folder') return MoveViolationCode.DragNotFolder;
+  if (!isRootTarget && dest.kind !== 'folder') return MoveViolationCode.TargetNotFolder;
+
+  if (String(nodeId) === destId) return MoveViolationCode.SelfParent;
+
+  const currentParentId = String((node as any).parentNodeId ?? QUERY_TREE_ROOT_ID);
+  if (currentParentId === destId) {
+    return MoveViolationCode.SameParent;
+  }
+
+  return MoveViolationCode.Ok;
+}
+
+export function getMoveViolationCodeBaseFolderFromNodes(
+  dragged: TreeNode | undefined,
+  dest: TreeNode | undefined
+): MoveViolationCode {
+  if (!dragged) return MoveViolationCode.MissingNode;
+  if (!dest) return MoveViolationCode.MissingTarget;
+  if (dragged.kind !== 'folder') return MoveViolationCode.DragNotFolder;
+  if (dest.kind !== 'folder') return MoveViolationCode.TargetNotFolder;
+  if (String((dragged as any).nodeId) === String((dest as any).nodeId)) return MoveViolationCode.SelfParent;
+  if (String((dragged as any).parentNodeId ?? QUERY_TREE_ROOT_ID) === String((dest as any).nodeId)) {
+    return MoveViolationCode.SameParent;
+  }
+  return MoveViolationCode.Ok;
+}
+
+// AIDEV-NOTE: Cycle detection for folder moves. Returns:
+// - true  => cycle would be created (dropping into own descendant or self)
+// - false => no cycle detected
+// - null  => cannot know (missing ancestor data)
+export function wouldFolderMoveCreateCycle(
+  tree: QueryTreeRecord,
+  folderNodeId: string,
+  destParentId: string
+): boolean | null {
+  const dragId = String(folderNodeId);
+  const destId = String(destParentId);
+  if (!dragId || !destId) return null;
+  if (destId === QUERY_TREE_ROOT_ID) return false;
+  if (destId === dragId) return true;
+
+  let curId = destId;
+  // AIDEV-NOTE: Depth is capped by MAX_QUERY_TREE_DEPTH; keep a guard to avoid infinite loops in corrupted states.
+  for (let i = 0; i < (MAX_QUERY_TREE_DEPTH + 2); i++) {
+    if (curId === dragId) return true;
+    const cur = tree.nodes?.[curId] as any;
+    if (!cur) return null;
+    const pid = String(cur.parentNodeId ?? '');
+    if (!pid) return false;
+    if (pid === QUERY_TREE_ROOT_ID) return false;
+    curId = pid;
+  }
+
+  return null;
+}
+
 // AIDEV-NOTE: Tri-state result for duplicate checks:
 // - true  => duplicate exists
 // - false => no duplicate
@@ -146,4 +226,88 @@ export function isDuplicateNameInParent(
   }
 
   return false;
+}
+
+// AIDEV-NOTE: Folder-name uniqueness under a destination parent is per-kind. This checks *folders only*.
+export function isDuplicateFolderLabelInParent(
+  tree: QueryTreeRecord,
+  destParentId: string,
+  normalizedFolderLabel: string,
+  excludeNodeId?: string
+): boolean | null {
+  const ids = tree.childrenByParentId?.[String(destParentId) as any];
+  if (ids === undefined) return null;
+  if (!Array.isArray(ids)) return false;
+
+  for (const cid of ids) {
+    const id = String(cid);
+    if (excludeNodeId && id === String(excludeNodeId)) continue;
+    const n = tree.nodes?.[id] as TreeNode | undefined;
+    if (!n || n.kind !== 'folder') continue;
+    const nLabel = normalizeLabelForUniqueness(String((n as any).label ?? ''));
+    if (nLabel === normalizedFolderLabel) return true;
+  }
+
+  return false;
+}
+
+export type LoadedFolderSubtreeScan = {
+  // Max `level` observed in the loaded subtree (includes the root folder).
+  maxLevel     : number;
+  // Whether the subtree scan was complete (all descendant folders had loaded children arrays).
+  complete     : boolean;
+  // Descendant node ids that were visited (excludes the root folder id).
+  descendantIds: string[];
+};
+
+// AIDEV-NOTE: Scan the *loaded* subtree under a folder using `childrenByParentId`.
+// This is designed for thunks (not hot-path hover checks). If a folder's children are not loaded,
+// `complete` will be false and `maxLevel` is a lower bound.
+export function scanLoadedFolderSubtree(
+  tree: QueryTreeRecord,
+  folderNodeId: string
+): LoadedFolderSubtreeScan {
+  const root = tree.nodes?.[String(folderNodeId)] as any;
+  const rootLevel = Number(root?.level ?? 0);
+  let maxLevel = Number.isFinite(rootLevel) ? rootLevel : 0;
+  let complete = true;
+  const descendantIds: string[] = [];
+
+  const stack: string[] = [String(folderNodeId)];
+  const MAX_SCAN_NODES = 50000;
+
+  while (stack.length > 0) {
+    const fid = stack.pop() as string;
+    const ids = tree.childrenByParentId?.[fid as any];
+    if (ids === undefined) {
+      complete = false;
+      continue;
+    }
+    if (!Array.isArray(ids) || ids.length === 0) continue;
+
+    for (const cid of ids) {
+      const id = String(cid);
+      descendantIds.push(id);
+      if (descendantIds.length > MAX_SCAN_NODES) {
+        complete = false;
+        stack.length = 0;
+        break;
+      }
+
+      const n = tree.nodes?.[id] as any;
+      if (!n) {
+        complete = false;
+        continue;
+      }
+
+      const lvl = Number(n.level ?? 0);
+      if (Number.isFinite(lvl) && lvl > maxLevel) maxLevel = lvl;
+
+      if (n.kind === 'folder') {
+        stack.push(id);
+      }
+    }
+  }
+
+  return { maxLevel, complete, descendantIds };
 }

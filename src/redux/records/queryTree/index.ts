@@ -17,6 +17,7 @@ type MoveNode                   = { nodeId: string; oldParentNodeId: string; new
 type ResortChildren             = { parentId: string };
 type InsertChildSorted          = { parentId: string; node: TreeNode };
 type RemoveNode                 = { parentId: string; nodeId: string };
+type BulkUpsertNodes            = { nodes: TreeNode[] };
 type LinkDataQueryIdToNodeIds   = { dataQueryId: UUIDv7; nodeId: UUIDv7 };
 type RenameNodeWithInvalidation = { dataQueryId: UUIDv7; name: string };
 type ClearInvalidations         = { items: string[]; parents: string[] };
@@ -27,6 +28,7 @@ export const setInitialQueryTree  = createAction<QueryTreeRecord>   ('queryTree/
 export const setQueryTree         = createAction<QueryTreeRecord>   ('queryTree/setQueryTree');
 export const setChildren          = createAction<SetChildren>       ('queryTree/setChildren');
 export const upsertNode           = createAction<TreeNode>          ('queryTree/upsertNode');
+export const bulkUpsertNodes      = createAction<BulkUpsertNodes>   ('queryTree/bulkUpsertNodes');
 export const addChild             = createAction<AddChild>          ('queryTree/addChild');
 export const moveNode             = createAction<MoveNode>          ('queryTree/moveNode');
 export const resortChildren       = createAction<ResortChildren>    ('queryTree/resortChildren');
@@ -122,6 +124,19 @@ export default createReducer(initialState, (builder) => {
         const { nodeId } = action.payload;
         const cur = state.nodes[nodeId];
         state.nodes[nodeId] = { ...(cur || {}), ...action.payload };
+      }
+    )
+    .addCase(bulkUpsertNodes,
+      function (state: QueryTreeRecord, action: PayloadAction<BulkUpsertNodes>) {
+        // AIDEV-NOTE: Batch node merges to reduce dispatch overhead in thunks that update many nodes
+        // at once (e.g., moving a folder and shifting loaded descendant levels).
+        const nodes = action.payload?.nodes || [];
+        for (const node of nodes) {
+          if (!node || !(node as any).nodeId) continue;
+          const nodeId = (node as any).nodeId as string;
+          const cur = state.nodes[nodeId];
+          state.nodes[nodeId] = { ...(cur || {}), ...node };
+        }
       }
     )
     .addCase(addChild,

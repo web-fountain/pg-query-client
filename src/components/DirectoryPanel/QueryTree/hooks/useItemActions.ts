@@ -3,7 +3,7 @@
 import type { OnCreateFolder, OnCreateFile, OnRename, OnDropMove }  from '../types';
 
 import { useReduxDispatch }                                         from '@Redux/storeHooks';
-import { moveSavedQueryFileThunk }                                  from '@Redux/records/queryTree/thunks';
+import { moveSavedQueryNodeThunk }                                  from '@Redux/records/queryTree/thunks';
 
 
 type LoadableTree = { loadChildrenIds: (id: string) => void } & { [key: string]: unknown };
@@ -56,13 +56,12 @@ export function useItemActions(_tree: LoadableTree, _targetFolderId: string, opt
   };
 
   const handleDropMove: OnDropMove = async (dragId, dropTargetId, isTargetFolder) => {
-    // AIDEV-NOTE: Saved QueryTree DnD currently supports moving files into folders only.
-    // Reordering and folder moves are handled by future, more general thunks.
+    // AIDEV-NOTE: Saved QueryTree DnD supports moving files and folders into folders (or root).
     if (!isTargetFolder) {
       return;
     }
 
-    await dispatch(moveSavedQueryFileThunk({
+    await dispatch(moveSavedQueryNodeThunk({
       nodeId          : dragId,
       newParentNodeId : dropTargetId
     }));

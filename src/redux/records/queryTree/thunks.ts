@@ -5,6 +5,7 @@ import type { UUIDv7 }                        from '@Types/primitives';
 import { createAsyncThunk }                   from '@reduxjs/toolkit';
 
 import {
+  bulkUpsertNodes,
   insertChildSorted,
   linkDataQueryIdToNodeIds,
   moveNode,
@@ -14,11 +15,16 @@ import {
 }                                             from '@Redux/records/queryTree';
 import {
   getMoveViolationCodeBase,
+  getMoveViolationCodeBaseFolder,
   getMoveViolationLabel,
+  isDuplicateFolderLabelInParent,
   isDuplicateNameInParent,
   MAX_QUERY_TREE_DEPTH,
+  normalizeLabelForUniqueness,
   normalizeFileKeyForUniqueness,
   QUERY_TREE_ROOT_ID,
+  scanLoadedFolderSubtree,
+  wouldFolderMoveCreateCycle,
   MoveViolationCode
 }                                             from '@Redux/records/queryTree/constraints';
 import { setDataQueryRecord }                 from '@Redux/records/dataQuery';
@@ -307,9 +313,8 @@ type MoveSavedQueryFileArgs = {
   newParentNodeId : string;
 };
 
-// AIDEV-NOTE: Move a saved QueryTree *file* node under a new parent folder. This is used by
-// the DirectoryPanel QueryTree DnD flow (file → folder). Folder moves and explicit reordering
-// will be handled by future, more general thunks.
+// AIDEV-NOTE: Move a saved QueryTree *file* node under a new parent folder. Used by
+// the DirectoryPanel QueryTree DnD flow (file → folder/root).
 export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFileArgs, { state: RootState }>(
   'queryTree/moveSavedQueryFileThunk',
   async ({ nodeId, newParentNodeId }, { getState, dispatch }) => {
@@ -467,6 +472,264 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
       });
 
       rollback(true, error);
+    }
+  }
+);
+
+type MoveSavedQueryFolderArgs = {
+  nodeId          : string;
+  newParentNodeId : string;
+};
+
+// AIDEV-NOTE: Move a saved QueryTree *folder* node under a new parent folder (or root).
+// Backend is authoritative; client performs fast cycle/dup/depth checks when possible and
+// rolls back optimistic updates on failure.
+export const moveSavedQueryFolderThunk = createAsyncThunk<void, MoveSavedQueryFolderArgs, { state: RootState }>(
+  'queryTree/moveSavedQueryFolderThunk',
+  async ({ nodeId, newParentNodeId }, { getState, dispatch }) => {
+    const state = getState().queryTree;
+    const node  = state.nodes[nodeId];
+    const dest  = state.nodes[newParentNodeId];
+
+    const base = getMoveViolationCodeBaseFolder(state, nodeId, newParentNodeId);
+    if (base !== MoveViolationCode.Ok) {
+      logClientJson('warn', () => ({
+        event         : 'queryTree',
+        phase         : 'constraint-violation',
+        action        : 'moveSavedQueryFolderThunk',
+        constraint    : 'move-base',
+        code          : base,
+        reason        : getMoveViolationLabel(base),
+        nodeId        : String(nodeId),
+        newParentNodeId: String(newParentNodeId)
+      }));
+      return;
+    }
+
+    const isRootTarget = String(newParentNodeId) === QUERY_TREE_ROOT_ID;
+    if (!node) return;
+    if (!dest && !isRootTarget) return;
+
+    const label = String((node as any)?.label ?? '').trim();
+    if (!label) {
+      logClientJson('warn', () => ({
+        event         : 'queryTree',
+        phase         : 'constraint-violation',
+        action        : 'moveSavedQueryFolderThunk',
+        constraint    : 'empty-label',
+        nodeId        : String(nodeId),
+        newParentNodeId: String(newParentNodeId)
+      }));
+      return;
+    }
+
+    // AIDEV-NOTE: Reject self/descendant drops (cycle).
+    try {
+      const cycle = wouldFolderMoveCreateCycle(state, nodeId, newParentNodeId);
+      if (cycle === true) {
+        logClientJson('warn', () => ({
+          event         : 'queryTree',
+          phase         : 'constraint-violation',
+          action        : 'moveSavedQueryFolderThunk',
+          constraint    : 'cycle',
+          nodeId        : String(nodeId),
+          newParentNodeId: String(newParentNodeId)
+        }));
+        return;
+      }
+    } catch {}
+
+    const oldParentNodeId = String((node as any).parentNodeId ?? QUERY_TREE_ROOT_ID);
+    const oldLevel = Number((node as any).level ?? 0);
+
+    // AIDEV-NOTE: Enforce server max depth for the moved folder node itself.
+    const destLevel = isRootTarget ? 0 : Number((dest as any)?.level ?? 0);
+    const newFolderLevel = (Number.isFinite(destLevel) ? destLevel : 0) + 1;
+    if (newFolderLevel > MAX_QUERY_TREE_DEPTH) {
+      logClientJson('warn', () => ({
+        event         : 'queryTree',
+        phase         : 'constraint-violation',
+        action        : 'moveSavedQueryFolderThunk',
+        constraint    : 'max-depth',
+        nodeId        : String(nodeId),
+        newParentNodeId: String(newParentNodeId),
+        newLevel      : newFolderLevel,
+        maxDepth      : MAX_QUERY_TREE_DEPTH
+      }));
+      return;
+    }
+
+    // AIDEV-NOTE: Best-effort folder-name uniqueness under destination parent (folders-only).
+    // If destination children are not loaded (null), allow and rely on backend enforcement + rollback.
+    try {
+      const normalized = normalizeLabelForUniqueness(label);
+      const dupe = isDuplicateFolderLabelInParent(state, newParentNodeId, normalized, nodeId);
+      if (dupe === true) {
+        logClientJson('warn', () => ({
+          event         : 'queryTree',
+          phase         : 'constraint-violation',
+          action        : 'moveSavedQueryFolderThunk',
+          constraint    : 'duplicate-folder-name',
+          nodeId        : String(nodeId),
+          newParentNodeId: String(newParentNodeId),
+          labelLen      : label.length
+        }));
+        return;
+      }
+    } catch {}
+
+    // AIDEV-NOTE: Best-effort subtree depth check using loaded descendants.
+    const scan = scanLoadedFolderSubtree(state, nodeId);
+    const delta = newFolderLevel - (Number.isFinite(oldLevel) ? oldLevel : 0);
+    const newMax = scan.maxLevel + delta;
+    if (newMax > MAX_QUERY_TREE_DEPTH) {
+      logClientJson('warn', () => ({
+        event         : 'queryTree',
+        phase         : 'constraint-violation',
+        action        : 'moveSavedQueryFolderThunk',
+        constraint    : 'max-depth-subtree',
+        nodeId        : String(nodeId),
+        newParentNodeId: String(newParentNodeId),
+        newMaxLevel   : newMax,
+        maxDepth      : MAX_QUERY_TREE_DEPTH,
+        loadedComplete: scan.complete
+      }));
+      return;
+    }
+
+    log.thunkStart({
+      thunk : 'queryTree/moveSavedQueryFolderThunk',
+      input : {
+        nodeId,
+        oldParentNodeId,
+        newParentNodeId,
+        deltaLevel: delta,
+        loadedSubtreeComplete: scan.complete
+      }
+    });
+
+    // AIDEV-NOTE: Optimistic local move:
+    // - moveNode updates childrenByParentId for old/new parents plus parentNodeId for the folder.
+    // - resortChildren re-applies sortKey/name ordering under the destination parent.
+    dispatch(moveNode({ nodeId, oldParentNodeId, newParentNodeId }));
+    dispatch(resortChildren({ parentId: newParentNodeId }));
+
+    // AIDEV-NOTE: Shift levels for the moved folder and any loaded descendants by a constant delta.
+    // This keeps subsequent depth checks correct without needing to recompute levels from scratch.
+    try {
+      const updates: TreeNode[] = [];
+      updates.push({
+        ...(node as any),
+        parentNodeId : newParentNodeId,
+        level        : newFolderLevel
+      } as TreeNode);
+
+      if (delta !== 0 && scan.descendantIds.length > 0) {
+        for (const did of scan.descendantIds) {
+          const dn = state.nodes[did] as any;
+          if (!dn) continue;
+          const lvl = Number(dn.level ?? 0);
+          if (!Number.isFinite(lvl)) continue;
+          updates.push({ ...(dn as any), level: (lvl + delta) } as TreeNode);
+        }
+      }
+
+      dispatch(bulkUpsertNodes({ nodes: updates }));
+    } catch {}
+
+    dispatch(registerInvalidations({
+      parents: [oldParentNodeId, newParentNodeId]
+    }));
+
+    const rollback = (emitError: boolean, reason?: unknown) => {
+      try {
+        dispatch(moveNode({ nodeId, oldParentNodeId: newParentNodeId, newParentNodeId: oldParentNodeId }));
+        dispatch(resortChildren({ parentId: oldParentNodeId }));
+        dispatch(resortChildren({ parentId: newParentNodeId }));
+
+        const updates: TreeNode[] = [];
+        updates.push({
+          ...(node as any),
+          parentNodeId : oldParentNodeId,
+          level        : oldLevel
+        } as TreeNode);
+
+        if (delta !== 0 && scan.descendantIds.length > 0) {
+          for (const did of scan.descendantIds) {
+            const dn = state.nodes[did] as any;
+            if (!dn) continue;
+            const lvl = Number(dn.level ?? 0);
+            if (!Number.isFinite(lvl)) continue;
+            updates.push({ ...(dn as any), level: lvl } as TreeNode);
+          }
+        }
+
+        dispatch(bulkUpsertNodes({ nodes: updates }));
+        dispatch(registerInvalidations({ parents: [oldParentNodeId, newParentNodeId] }));
+      } catch {}
+
+      if (emitError && reason) {
+        dispatch(updateError({
+          actionType  : 'queryTree/moveSavedQueryFolderThunk',
+          message     : 'Failed to move folder.',
+          meta        : { reason }
+        }));
+      }
+    };
+
+    try {
+      const res = await moveQueryTreeNodeAction({ nodeId, newParentNodeId });
+
+      log.thunkResult({
+        thunk  : 'queryTree/moveSavedQueryFolderThunk',
+        result : res,
+        input  : {
+          nodeId,
+          oldParentNodeId,
+          newParentNodeId
+        }
+      });
+
+      if (!res.success) {
+        dispatch(updateError(errorEntryFromActionError({
+          actionType: 'queryTree/moveSavedQueryFolderThunk',
+          error     : res.error
+        })));
+        rollback(false);
+      }
+    } catch (error) {
+      log.thunkException({
+        thunk   : 'queryTree/moveSavedQueryFolderThunk',
+        message : 'moveQueryTreeNodeAction threw',
+        error   : error,
+        input   : {
+          nodeId,
+          oldParentNodeId,
+          newParentNodeId
+        }
+      });
+      rollback(true, error);
+    }
+  }
+);
+
+type MoveSavedQueryNodeArgs = {
+  nodeId          : string;
+  newParentNodeId : string;
+};
+
+// AIDEV-NOTE: DnD entrypoint that routes to file/folder move thunks based on the node kind.
+export const moveSavedQueryNodeThunk = createAsyncThunk<void, MoveSavedQueryNodeArgs, { state: RootState }>(
+  'queryTree/moveSavedQueryNodeThunk',
+  async ({ nodeId, newParentNodeId }, { getState, dispatch }) => {
+    const node = getState().queryTree.nodes[nodeId] as any;
+    if (!node) return;
+    if (node.kind === 'file') {
+      await dispatch(moveSavedQueryFileThunk({ nodeId, newParentNodeId }));
+      return;
+    }
+    if (node.kind === 'folder') {
+      await dispatch(moveSavedQueryFolderThunk({ nodeId, newParentNodeId }));
     }
   }
 );
