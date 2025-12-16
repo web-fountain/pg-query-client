@@ -1,6 +1,9 @@
 'use client';
 
-import type { ChangeEvent }                   from 'react';
+import type {
+  ChangeEvent,
+  KeyboardEvent as ReactKeyboardEvent
+}                                             from 'react';
 import type { UUIDv7 }                        from '@Types/primitives';
 
 import {
@@ -101,6 +104,13 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
     }
   }, [dataQueryId, debouncedCommit, dispatch, getCurrentEditorText, navigateToSaved]);
 
+  const onNameKeyDown = useCallback((e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && canSave) {
+      e.preventDefault();
+      handleSaveClick();
+    }
+  }, [canSave, handleSaveClick]);
+
   useEffect(() => {
     const name = record?.current?.name ?? record?.persisted?.name ?? '';
     setQueryName(name);
@@ -158,6 +168,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
           className={inputClassName}
           value={queryName}
           onChange={onNameChange}
+          onKeyDown={onNameKeyDown}
           placeholder="Query Name"
           aria-label="Query name"
           aria-invalid={nameValidationError ? true : undefined}
