@@ -22,7 +22,8 @@ import {
   insertChildSorted,
   linkDataQueryIdToNodeIds,
   renameNodeWithInvalidation,
-  upsertNode
+  upsertNode,
+  registerInvalidations
 }                                       from '@Redux/records/queryTree';
 import { fsSortKeyEn }                  from '@Utils/collation';
 import {
@@ -238,6 +239,11 @@ export const saveDataQueryThunk = createAsyncThunk<SaveDataQueryResult, { dataQu
       dispatch(upsertNode(node));
       dispatch(insertChildSorted({ parentId: rootId, node }));
       dispatch(linkDataQueryIdToNodeIds({ dataQueryId, nodeId: treeNodeId }));
+      // AIDEV-NOTE: Mark the QUERIES root for childrenId invalidation so headless-tree
+      // can refresh its cached children array without remounting the entire tree.
+      dispatch(registerInvalidations({
+        parents: [rootId]
+      }));
     }
 
     return {

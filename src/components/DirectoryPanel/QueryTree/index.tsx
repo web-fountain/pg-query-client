@@ -76,16 +76,10 @@ function QueriesTree(props: { rootId: string; indent?: number; label?: string })
   const [draftFolder, setDraftFolder] = useState<DraftFolderState | null>(null);
   const [draftFile, setDraftFile]     = useState<DraftFileState | null>(null);
 
-  // AIDEV-NOTE: Ignore the draft node for reset key purposes. Draft insertion/removal
-  // is handled via headless-tree invalidation so the input focus is not lost.
-  let nodeCount = Object.keys(queryTree.nodes || {}).length;
-  const draftIds = [draftFolder?.nodeId, draftFile?.nodeId].filter(Boolean) as string[];
-  for (const draftId of draftIds) {
-    if (draftId && (queryTree.nodes as any)?.[draftId]) {
-      nodeCount = Math.max(0, nodeCount - 1);
-    }
-  }
-  const resetKey  = `${props.rootId}:${nodeCount}`;
+  // AIDEV-NOTE: Keep a stable key per section root so headless-tree preserves expanded
+  // folder state across structural updates. Changes to the underlying Redux tree are
+  // propagated via targeted invalidations in QueriesTreeInner instead of full remounts.
+  const resetKey = props.rootId;
 
   return (
     <QueriesTreeInner
