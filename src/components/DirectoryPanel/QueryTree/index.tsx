@@ -4,7 +4,7 @@ import type { QueryTreeRecord, TreeNode } from '@Redux/records/queryTree/types';
 import type { UUIDv7 }                    from '@Types/primitives';
 
 import {
-  useCallback, useEffect, useRef,
+  useCallback, useEffect, useMemo, useRef,
   useState
 }                                         from 'react';
 import { usePathname }                    from 'next/navigation';
@@ -40,6 +40,7 @@ import Icon                               from '@Components/Icons';
 
 import { useTreeSectionState }            from '../hooks/useTreeSectionState';
 import { useItemActions }                 from './hooks/useItemActions';
+import { useExpandedFoldersState }        from './hooks/useExpandedFoldersState';
 import { useQueriesRoute }                from '@QueriesProvider/QueriesRouteProvider';
 import Row                                from './components/Row';
 import Toolbar                            from './components/Toolbar';
@@ -122,7 +123,7 @@ function QueriesTreeInner(
     setDraftFile: (v: DraftFileState | null | ((prev: DraftFileState | null) => DraftFileState | null)) => void;
   }
 ) {
-  const { navigateToSaved } = useQueriesRoute();
+  const { navigateToSaved, opspaceId } = useQueriesRoute();
   const dispatch            = useReduxDispatch();
 
   // AIDEV-NOTE: Ref ensures dataLoader always reads latest queryTree,
@@ -137,6 +138,20 @@ function QueriesTreeInner(
   // AIDEV-NOTE: Only treat rows as "active from tabbar" when the QueryWorkspace route is mounted.
   // On the opspace landing page (/opspace/{id}) we always want a click to navigate.
   const isOnQueriesRoute  = (pathname || '').split('/').filter(Boolean).includes('queries');
+
+  // AIDEV-NOTE: Scope persisted expansion state by opspace + section root id to avoid cross-opspace bleed.
+  const expandedScopeId   = `${opspaceId}:${rootId}`;
+  const {
+    expanded    : persistedExpandedFolders,
+    setExpanded : setPersistedExpandedFolders
+  } = useExpandedFoldersState(expandedScopeId);
+
+  const expansionRestoreCompleteRef = useRef<boolean>(false);
+  const lastExpandedScopeRef        = useRef<string | null>(null);
+  if (lastExpandedScopeRef.current !== expandedScopeId) {
+    lastExpandedScopeRef.current        = expandedScopeId;
+    expansionRestoreCompleteRef.current = false;
+  }
 
   const tree = useTree<TreeNode>({
     rootItemId: rootId,
@@ -210,6 +225,86 @@ function QueriesTreeInner(
       await actions.handleDropMove(dragId, dropTargetId, isTargetFolder);
     }
   });
+
+  const expandedItems = tree.getState().expandedItems;
+  const expandedFolderIds = useMemo(() => {
+    // AIDEV-NOTE: Preserve order and let the persistence hook normalize/sort. This avoids
+    // double-sorting on every expand/collapse interaction.
+    return (expandedItems || []).filter((id) => id !== rootId);
+  }, [expandedItems, rootId]);
+
+  // AIDEV-NOTE: Restore expanded folders from localStorage after hydration.
+  // We set expandedItems directly so deep expansions work with async children.
+  useEffect(() => {
+    if (persistedExpandedFolders === null) return;
+    // Once restored for this scope, do not keep re-applying state on every persisted update.
+    if (expansionRestoreCompleteRef.current) return;
+
+    // AIDEV-NOTE: persistedExpandedFolders is already normalized by the hook.
+    const targetFolders = persistedExpandedFolders.filter((id) => id !== rootId);
+    const targetExpandedItems = [rootId, ...targetFolders];
+    const currentExpandedItems = tree.getState().expandedItems || [];
+
+    // AIDEV-NOTE: Compare as sets to avoid unnecessary work due to ordering differences.
+    const currentSet  = new Set(currentExpandedItems);
+    const targetSet   = new Set(targetExpandedItems);
+    if (currentSet.size === targetSet.size) {
+      let match = true;
+      for (const id of currentSet) {
+        if (!targetSet.has(id)) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return;
+    }
+
+    try {
+      tree.setConfig((prev) => ({
+        ...prev,
+        state: {
+          ...(prev.state || {}),
+          expandedItems: targetExpandedItems
+        }
+      }));
+    } catch {
+      // Ignore restore failures; fallback is the in-memory tree state.
+    }
+  }, [persistedExpandedFolders, rootId, tree]);
+
+  // AIDEV-NOTE: Persist expanded folder state once restoration has completed.
+  // This prevents clobbering localStorage with the default (root-only) state on first load.
+  useEffect(() => {
+    if (persistedExpandedFolders === null) return;
+
+    // AIDEV-NOTE: Compare as sets to avoid extra sorting/normalization on every expand/collapse.
+    const currentSet    = new Set(expandedFolderIds);
+    const persistedSet  = new Set<string>();
+    for (const id of persistedExpandedFolders) {
+      if (id === rootId) continue;
+      persistedSet.add(id);
+    }
+
+    let isEqual = currentSet.size === persistedSet.size;
+    if (isEqual) {
+      for (const id of currentSet) {
+        if (!persistedSet.has(id)) {
+          isEqual = false;
+          break;
+        }
+      }
+    }
+
+    if (!expansionRestoreCompleteRef.current) {
+      if (!isEqual) {
+        return;
+      }
+      expansionRestoreCompleteRef.current = true;
+    }
+
+    if (isEqual) return;
+    setPersistedExpandedFolders(expandedFolderIds);
+  }, [expandedFolderIds, persistedExpandedFolders, rootId, setPersistedExpandedFolders]);
 
   // AIDEV-NOTE: Draft node insertion/removal does not remount the tree (see resetKey above),
   // so we must refresh the parent's children ids when a draft appears/disappears.
