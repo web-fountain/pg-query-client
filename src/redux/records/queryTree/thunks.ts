@@ -16,7 +16,8 @@ import {
   getMoveViolationCodeBase,
   getMoveViolationLabel,
   isDuplicateNameInParent,
-  normalizeLabelForUniqueness,
+  MAX_QUERY_TREE_DEPTH,
+  normalizeFileKeyForUniqueness,
   QUERY_TREE_ROOT_ID,
   MoveViolationCode
 }                                             from '@Redux/records/queryTree/constraints';
@@ -282,6 +283,7 @@ export const createSavedQueryFileThunk = createAsyncThunk<TreeNode | null, Creat
       parentNodeId : tree.parentNodeId,
       kind         : tree.kind,
       label        : tree.label,
+      ext          : (tree as any).ext,
       sortKey      : tree.sortKey,
       mountId      : tree.mountId as UUIDv7,
       level        : tree.level
@@ -331,10 +333,36 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
       return;
     }
 
+    const isRootTarget = String(newParentNodeId) === QUERY_TREE_ROOT_ID;
+    if (!node) return;
+    if (!dest && !isRootTarget) return;
+
+    // AIDEV-NOTE: Server-enforced max depth for file moves (root children are level 1).
+    try {
+      const parentLevel = isRootTarget ? 0 : Number((dest as any)?.level ?? 0);
+      const nextLevel = (Number.isFinite(parentLevel) ? parentLevel : 0) + 1;
+      if (nextLevel > MAX_QUERY_TREE_DEPTH) {
+        logClientJson('warn', () => ({
+          event         : 'queryTree',
+          phase         : 'constraint-violation',
+          action        : 'moveSavedQueryFileThunk',
+          constraint    : 'max-depth',
+          nodeId        : String(nodeId),
+          newParentNodeId: String(newParentNodeId),
+          newLevel      : nextLevel,
+          maxDepth      : MAX_QUERY_TREE_DEPTH
+        }));
+        return;
+      }
+    } catch {}
+
     // AIDEV-NOTE: Best-effort duplicate-name guard when destination children are loaded.
     // If children are not loaded (null), we allow and rely on backend enforcement + rollback.
     try {
-      const normalized = normalizeLabelForUniqueness(String((node as any)?.label ?? ''));
+      const normalized = normalizeFileKeyForUniqueness(
+        String((node as any)?.label ?? ''),
+        (node as any)?.ext
+      );
       const dupe = isDuplicateNameInParent(state, newParentNodeId, normalized, nodeId);
       if (dupe === true) {
         logClientJson('warn', () => ({
@@ -349,10 +377,6 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
         return;
       }
     } catch {}
-
-    const isRootTarget = String(newParentNodeId) === QUERY_TREE_ROOT_ID;
-    if (!node) return;
-    if (!dest && !isRootTarget) return;
 
     const oldParentNodeId = String((node as any).parentNodeId);
     const oldLevel = (node as any).level as number | undefined;
@@ -373,7 +397,7 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
     dispatch(resortChildren({ parentId: newParentNodeId }));
 
     // AIDEV-NOTE: Update the moved file's level to be one deeper than the destination folder.
-    const destLevel = ((dest as any)?.level ?? 0) + 1;
+    const destLevel = (isRootTarget ? 0 : Number((dest as any)?.level ?? 0)) + 1;
     dispatch(upsertNode({
       ...node,
       parentNodeId : newParentNodeId,

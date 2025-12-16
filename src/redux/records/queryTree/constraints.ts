@@ -10,9 +10,16 @@ import { fsSortKeyEn }                    from '@Utils/collation';
 // To block folders at aria-level=4, disallow folder semantics at meta level >= 3.
 export const MAX_FOLDER_META_LEVEL = 3;
 
+// AIDEV-NOTE: Server-enforced maximum depth for the saved QueryTree. Root children are level 1.
+export const MAX_QUERY_TREE_DEPTH = 16;
+
 // AIDEV-NOTE: Saved QueryTree section root id. This root is synthetic (not always present in `nodes`)
 // but is a valid folder target for moves (e.g., moving a file back out of a folder).
 export const QUERY_TREE_ROOT_ID = 'queries';
+
+// AIDEV-NOTE: Backend defaults file ext to 'sql' when omitted. Keep the default centralized
+// so client uniqueness checks and draft nodes are consistent.
+export const DEFAULT_QUERY_FILE_EXT = 'sql';
 
 // AIDEV-NOTE: We avoid `const enum` because this repo uses `isolatedModules: true`.
 // Use a frozen value object + derived union type for fast comparisons and nice autocompletion.
@@ -56,6 +63,19 @@ export function canCreateFolderChildAtParentMetaLevel(parentLevel: number): bool
 // - Uniqueness should treat them as distinct names (filesystem-like semantics).
 export function normalizeLabelForUniqueness(label: string): string {
   return label.trim().toLowerCase();
+}
+
+export function normalizeExtForUniqueness(ext: string | null | undefined): string {
+  const raw = String(ext ?? DEFAULT_QUERY_FILE_EXT).trim().toLowerCase();
+  if (!raw) return DEFAULT_QUERY_FILE_EXT;
+  if (raw.startsWith('.')) return raw.slice(1) || DEFAULT_QUERY_FILE_EXT;
+  return raw;
+}
+
+// AIDEV-NOTE: Normalized uniqueness key for saved QueryTree *files* (per-parent, per-kind).
+// Uses a delimiter unlikely to occur in filenames to avoid collisions.
+export function normalizeFileKeyForUniqueness(label: string, ext: string | null | undefined): string {
+  return `${normalizeLabelForUniqueness(label)}\u0000${normalizeExtForUniqueness(ext)}`;
 }
 
 // AIDEV-NOTE: Fast base move validation without scanning destination siblings.
@@ -106,7 +126,7 @@ export function getMoveViolationCodeBaseFromNodes(
 export function isDuplicateNameInParent(
   tree: QueryTreeRecord,
   destParentId: string,
-  normalizedLabel: string,
+  normalizedFileKey: string,
   excludeNodeId?: string
 ): boolean | null {
   const ids = tree.childrenByParentId?.[String(destParentId) as any];
@@ -118,8 +138,11 @@ export function isDuplicateNameInParent(
     if (excludeNodeId && id === String(excludeNodeId)) continue;
     const n = tree.nodes?.[id] as TreeNode | undefined;
     if (!n || n.kind !== 'file') continue;
-    const nLabel = normalizeLabelForUniqueness(String((n as any).label ?? ''));
-    if (nLabel === normalizedLabel) return true;
+    const nKey = normalizeFileKeyForUniqueness(
+      String((n as any).label ?? ''),
+      (n as any).ext
+    );
+    if (nKey === normalizedFileKey) return true;
   }
 
   return false;

@@ -16,6 +16,9 @@ type QueryTreeNode = {
   parentNodeId  : string | UUIDv7;
   kind          : 'file';
   label         : string;
+  // AIDEV-NOTE: File extension for uniqueness and editor semantics. Backend defaults to 'sql'
+  // when omitted; client should treat missing ext as 'sql'.
+  ext?          : string;
   sortKey       : string;
   mountId       : UUIDv7;
   level         : number;

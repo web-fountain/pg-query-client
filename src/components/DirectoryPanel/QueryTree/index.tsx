@@ -35,10 +35,11 @@ import {
 }                                         from '@Redux/records/queryTree/thunks';
 import {
   canCreateFolderChildAtParentMetaLevel,
+  DEFAULT_QUERY_FILE_EXT,
   getMoveViolationCodeBaseFromNodes,
   getMoveViolationLabel,
-  isDuplicateNameInParent,
-  normalizeLabelForUniqueness,
+  MAX_QUERY_TREE_DEPTH,
+  normalizeFileKeyForUniqueness,
   MoveViolationCode
 }                                         from '@Redux/records/queryTree/constraints';
 import {
@@ -167,16 +168,17 @@ function QueriesTreeInner(
   }
 
   // AIDEV-NOTE: DnD constraint runtime caches. These keep `canDrop` fast and let us prefetch
-  // missing children once per drag session so duplicate-name checks become accurate.
-  const activeDragIdRef            = useRef<string | null>(null);
-  const prefetchedFoldersRef       = useRef<Set<string>>(new Set());
-  const inFlightPrefetchRef        = useRef<Set<string>>(new Set());
-  const prefetchedChildrenNamesRef = useRef<Map<string, Set<string>>>(new Map());
-  const loggedConstraintKeysRef    = useRef<Set<string>>(new Set());
-  const prefetchQueueRef           = useRef<string[]>([]);
-  const prefetchTimerRef           = useRef<number | null>(null);
-  const prefetchLastTsRef          = useRef<number>(0);
-  const PREFETCH_THROTTLE_MS       = 120;
+  // missing children once per drag session so duplicate checks become accurate (keyed by label+ext).
+  const activeDragIdRef               = useRef<string | null>(null);
+  const prefetchedFoldersRef          = useRef<Set<string>>(new Set());
+  const inFlightPrefetchRef           = useRef<Set<string>>(new Set());
+  const prefetchedChildrenFileKeysRef = useRef<Map<string, Set<string>>>(new Map());
+  const cachedChildrenFileKeysRef     = useRef<Map<string, Set<string>>>(new Map());
+  const loggedConstraintKeysRef       = useRef<Set<string>>(new Set());
+  const prefetchQueueRef              = useRef<string[]>([]);
+  const prefetchTimerRef              = useRef<number | null>(null);
+  const prefetchLastTsRef             = useRef<number>(0);
+  const PREFETCH_THROTTLE_MS          = 120;
 
   // AIDEV-NOTE: Clear per-drag caches on drag end/drop to avoid memory growth across sessions.
   useEffect(() => {
@@ -184,7 +186,8 @@ function QueriesTreeInner(
       activeDragIdRef.current = null;
       prefetchedFoldersRef.current.clear();
       inFlightPrefetchRef.current.clear();
-      prefetchedChildrenNamesRef.current.clear();
+      prefetchedChildrenFileKeysRef.current.clear();
+      cachedChildrenFileKeysRef.current.clear();
       loggedConstraintKeysRef.current.clear();
       prefetchQueueRef.current = [];
       prefetchLastTsRef.current = 0;
@@ -208,7 +211,8 @@ function QueriesTreeInner(
     const inv = queryTree.pendingInvalidations;
     if (!inv) return;
     if ((inv.items?.length ?? 0) > 0 || (inv.parents?.length ?? 0) > 0) {
-      prefetchedChildrenNamesRef.current.clear();
+      prefetchedChildrenFileKeysRef.current.clear();
+      cachedChildrenFileKeysRef.current.clear();
     }
   }, [queryTree.pendingInvalidations]);
 
@@ -246,9 +250,12 @@ function QueriesTreeInner(
           const set = new Set<string>();
           for (const child of (children || [])) {
             if (!child || (child as any).kind !== 'file') continue;
-            set.add(normalizeLabelForUniqueness(String((child as any).label ?? '')));
+            set.add(normalizeFileKeyForUniqueness(
+              String((child as any).label ?? ''),
+              (child as any).ext
+            ));
           }
-          prefetchedChildrenNamesRef.current.set(folderId, set);
+          prefetchedChildrenFileKeysRef.current.set(folderId, set);
         })
         .catch(() => {})
         .finally(() => {
@@ -266,7 +273,7 @@ function QueriesTreeInner(
     const current = queryTreeRef.current;
     const alreadyKnown = current?.childrenByParentId?.[fid as any] !== undefined;
     if (alreadyKnown) return;
-    if (prefetchedChildrenNamesRef.current.has(fid)) return;
+    if (prefetchedChildrenFileKeysRef.current.has(fid)) return;
     if (prefetchedFoldersRef.current.has(fid)) return;
 
     prefetchedFoldersRef.current.add(fid);
@@ -274,14 +281,38 @@ function QueriesTreeInner(
     schedulePrefetchDrain();
   };
 
-  const getDuplicateNameStatus = (folderId: string, normalizedLabel: string, excludeNodeId: string): boolean | null => {
+  const getDuplicateNameStatus = (folderId: string, normalizedFileKey: string, excludeNodeId: string): boolean | null => {
     const fid = String(folderId);
     if (!fid) return null;
-    const fromRedux = isDuplicateNameInParent(queryTreeRef.current, fid, normalizedLabel, excludeNodeId);
-    if (fromRedux != null) return fromRedux;
-    const prefetched = prefetchedChildrenNamesRef.current.get(fid);
-    if (prefetched) return prefetched.has(normalizedLabel);
-    return null;
+
+    const cached = cachedChildrenFileKeysRef.current.get(fid);
+    if (cached) return cached.has(normalizedFileKey);
+
+    const current = queryTreeRef.current;
+    const ids = current?.childrenByParentId?.[fid as any];
+    if (ids === undefined) {
+      const prefetched = prefetchedChildrenFileKeysRef.current.get(fid);
+      if (prefetched) return prefetched.has(normalizedFileKey);
+      return null;
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      const empty = new Set<string>();
+      cachedChildrenFileKeysRef.current.set(fid, empty);
+      return false;
+    }
+
+    const set = new Set<string>();
+    const nodes = current?.nodes || {};
+    for (const cid of ids) {
+      const id = String(cid);
+      if (excludeNodeId && id === excludeNodeId) continue;
+      const n = nodes[id] as any;
+      if (!n || n.kind !== 'file') continue;
+      set.add(normalizeFileKeyForUniqueness(String(n.label ?? ''), n.ext));
+    }
+    cachedChildrenFileKeysRef.current.set(fid, set);
+    return set.has(normalizedFileKey);
   };
 
   const tree = useTree<TreeNode>({
@@ -318,8 +349,19 @@ function QueriesTreeInner(
     // AIDEV-NOTE: DnD configuration per headless-tree docs: https://headless-tree.lukasbach.com/features/dnd/
     // For saved QueryTree we currently support **file → folder** moves only. Folder moves and explicit
     // reordering will be layered on later once backend semantics are finalized.
-    canDrag: (items) => items.length > 0,
+    canDrag: (items) => {
+      if (!Array.isArray(items) || items.length !== 1) return false;
+      const it = items[0];
+      if (!it) return false;
+      const id = it?.getId?.();
+      if (!id) return false;
+      if (String(id) === String(rootId)) return false;
+      const data = it?.getItemData?.() as TreeNode | undefined;
+      if (!data) return false;
+      return data.kind === 'file';
+    },
     canDrop: (items, target) => {
+      if (!Array.isArray(items) || items.length !== 1) return false;
       const dragged = items[0];
       const targetItem = target.item;
       if (!dragged || !targetItem) return false;
@@ -353,7 +395,8 @@ function QueriesTreeInner(
       if (activeDragIdRef.current !== String(dragId)) {
         activeDragIdRef.current = String(dragId);
         prefetchedFoldersRef.current.clear();
-        prefetchedChildrenNamesRef.current.clear();
+        prefetchedChildrenFileKeysRef.current.clear();
+        cachedChildrenFileKeysRef.current.clear();
         loggedConstraintKeysRef.current.clear();
         prefetchQueueRef.current = [];
         prefetchLastTsRef.current = 0;
@@ -393,6 +436,28 @@ function QueriesTreeInner(
         return false;
       }
 
+      // AIDEV-NOTE: Server-enforced max depth for file moves (root children are level 1).
+      try {
+        const parentLevelRaw = (effectiveTargetData as any)?.level;
+        const parentLevel = Number(parentLevelRaw);
+        const nextLevel = (Number.isFinite(parentLevel) ? parentLevel : 0) + 1;
+        if (nextLevel > MAX_QUERY_TREE_DEPTH) {
+          logConstraintOnce(
+            `${dragId}:${dropTargetId}:max-depth`,
+            {
+              event         : 'queryTree',
+              phase         : 'constraint-violation',
+              constraint    : 'max-depth',
+              dragId        : String(dragId),
+              dropTargetId  : String(dropTargetId),
+              newLevel      : nextLevel,
+              maxDepth      : MAX_QUERY_TREE_DEPTH
+            }
+          );
+          return false;
+        }
+      } catch {}
+
       // AIDEV-NOTE: Duplicate-name constraint (best-effort):
       // - If we can determine destination children (Redux or prefetched), disallow duplicates.
       // - If unknown, optimistically allow but schedule a one-time prefetch so subsequent hover checks
@@ -411,7 +476,8 @@ function QueriesTreeInner(
         );
         return false;
       }
-      const normalized = normalizeLabelForUniqueness(draggedLabel);
+      const draggedExt = (draggedData as any)?.ext;
+      const normalized = normalizeFileKeyForUniqueness(draggedLabel, draggedExt);
 
       const dupe = getDuplicateNameStatus(String(dropTargetId), normalized, String(dragId));
       if (dupe === true) {
@@ -435,6 +501,7 @@ function QueriesTreeInner(
     },
     openOnDropDelay: 250,
     onDrop: async (items, target) => {
+      if (!Array.isArray(items) || items.length !== 1) return;
       const dragged = items[0];
       const dragId = dragged?.getId?.();
       const dropTargetId = target.item?.getId?.();
@@ -589,6 +656,7 @@ function QueriesTreeInner(
         parentNodeId : parentId,
         kind         : 'file',
         label        : '',
+        ext          : DEFAULT_QUERY_FILE_EXT,
         sortKey      : '',
         mountId      : dataQueryId,
         level        : 1
