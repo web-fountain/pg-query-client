@@ -17,6 +17,7 @@ import type {
 }                                          from './types';
 
 import { cacheLife, cacheTag, updateTag } from 'next/cache';
+import { QUERY_TREE_ROOT_ID }             from '@Redux/records/queryTree/constraints';
 import { withAction }                     from '@Observability/server/action';
 import {
   actionErrorFromBackendFetch,
@@ -306,6 +307,13 @@ export async function moveQueryTreeNodeAction(
       }
     },
     async ({ ctx, meta }) => {
+      // AIDEV-NOTE: The saved QueryTree root (`queries`) is a synthetic node used by the client.
+      // Backend expects "move to root" to omit `newParentNodeId` entirely (send only `{ nodeId }`).
+      const body =
+        newParentNodeId === QUERY_TREE_ROOT_ID
+          ? { nodeId }
+          : { nodeId, newParentNodeId };
+
       const res = await backendFetchJSON<MoveQueryTreeNodeApiResponse>({
         // AIDEV-NOTE: Align this path/scope with the backend implementation for moves.
         path    : '/queries/tree/nodes/move',
@@ -313,7 +321,7 @@ export async function moveQueryTreeNodeAction(
         scope   : ['queries-tree-nodes-move:write'],
         logLabel: 'moveQueryTreeNodeAction',
         context : ctx,
-        body    : { nodeId, newParentNodeId }
+        body
       });
 
       if (!res.ok) {

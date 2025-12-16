@@ -17,6 +17,7 @@ import {
   getMoveViolationLabel,
   isDuplicateNameInParent,
   normalizeLabelForUniqueness,
+  QUERY_TREE_ROOT_ID,
   MoveViolationCode
 }                                             from '@Redux/records/queryTree/constraints';
 import { setDataQueryRecord }                 from '@Redux/records/dataQuery';
@@ -349,7 +350,9 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
       }
     } catch {}
 
-    if (!node || !dest) return;
+    const isRootTarget = String(newParentNodeId) === QUERY_TREE_ROOT_ID;
+    if (!node) return;
+    if (!dest && !isRootTarget) return;
 
     const oldParentNodeId = String((node as any).parentNodeId);
     const oldLevel = (node as any).level as number | undefined;
@@ -370,7 +373,7 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
     dispatch(resortChildren({ parentId: newParentNodeId }));
 
     // AIDEV-NOTE: Update the moved file's level to be one deeper than the destination folder.
-    const destLevel = (dest.level ?? 0) + 1;
+    const destLevel = ((dest as any)?.level ?? 0) + 1;
     dispatch(upsertNode({
       ...node,
       parentNodeId : newParentNodeId,

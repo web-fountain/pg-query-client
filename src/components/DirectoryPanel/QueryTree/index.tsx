@@ -359,28 +359,24 @@ function QueriesTreeInner(
         prefetchLastTsRef.current = 0;
       }
 
-      const isOrderedTarget = 'childIndex' in target && typeof (target as any).childIndex === 'number';
-      // AIDEV-NOTE: UX improvement: allow dropping into a folder section (ordered target where `target.item`
-      // is the parent folder). However, keep behavior unchanged for root-level "between siblings" drops:
-      // an ordered target with `target.item === rootId` is treated as reordering and remains disallowed.
-      if (isOrderedTarget && String(dropTargetId) === String(rootId)) {
-        logConstraintOnce(
-          `${dragId}:${dropTargetId}:ordered-root`,
-          {
-            event         : 'queryTree',
-            phase         : 'constraint-violation',
-            constraint    : 'ordered-target-root-disallowed',
-            dragId        : String(dragId),
-            dropTargetId  : String(dropTargetId)
-          }
-        );
-        return false;
-      }
-
       const draggedData = dragged.getItemData?.() as TreeNode | undefined;
       const targetData  = targetItem.getItemData?.() as TreeNode | undefined;
 
-      const base = getMoveViolationCodeBaseFromNodes(draggedData, targetData);
+      // AIDEV-NOTE: The section root (`queries`) is a synthetic item that is not stored in Redux
+      // `nodes`, so headless-tree may not have itemData for it. Treat it as a folder target so
+      // users can drag files back out of folders into the root section.
+      const isRootTarget = String(dropTargetId) === String(rootId);
+      const effectiveTargetData = isRootTarget ? ({
+        nodeId       : String(rootId),
+        parentNodeId : null,
+        kind         : 'folder',
+        label        : String(label ?? 'QUERIES'),
+        sortKey      : '',
+        mountId      : String(rootId),
+        level        : 0
+      } as unknown as TreeNode) : targetData;
+
+      const base = getMoveViolationCodeBaseFromNodes(draggedData, effectiveTargetData);
       if (base !== MoveViolationCode.Ok) {
         logConstraintOnce(
           `${dragId}:${dropTargetId}:base-${base}`,

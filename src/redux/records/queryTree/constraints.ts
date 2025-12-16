@@ -10,6 +10,10 @@ import { fsSortKeyEn }                    from '@Utils/collation';
 // To block folders at aria-level=4, disallow folder semantics at meta level >= 3.
 export const MAX_FOLDER_META_LEVEL = 3;
 
+// AIDEV-NOTE: Saved QueryTree section root id. This root is synthetic (not always present in `nodes`)
+// but is a valid folder target for moves (e.g., moving a file back out of a folder).
+export const QUERY_TREE_ROOT_ID = 'queries';
+
 // AIDEV-NOTE: We avoid `const enum` because this repo uses `isolatedModules: true`.
 // Use a frozen value object + derived union type for fast comparisons and nice autocompletion.
 export const MoveViolationCode = {
@@ -47,10 +51,11 @@ export function canCreateFolderChildAtParentMetaLevel(parentLevel: number): bool
   return (parentLevel + 1) < MAX_FOLDER_META_LEVEL;
 }
 
-// AIDEV-NOTE: Normalization for uniqueness checks. We prefer fsSortKeyEn because it mirrors
-// backend-friendly normalization (lowercase + zero-padded digit runs) and avoids locale issues.
+// AIDEV-NOTE: Normalization for uniqueness checks. Do NOT reuse sortKey formatting here:
+// - Sorting wants numeric equivalence (e.g., "1" == "01") for nicer ordering.
+// - Uniqueness should treat them as distinct names (filesystem-like semantics).
 export function normalizeLabelForUniqueness(label: string): string {
-  return fsSortKeyEn(label.trim());
+  return label.trim().toLowerCase();
 }
 
 // AIDEV-NOTE: Fast base move validation without scanning destination siblings.
@@ -63,13 +68,15 @@ export function getMoveViolationCodeBase(
   const node = tree.nodes?.[String(nodeId)];
   if (!node) return MoveViolationCode.MissingNode;
 
-  const dest = tree.nodes?.[String(destParentId)];
-  if (!dest) return MoveViolationCode.MissingTarget;
+  const destId = String(destParentId);
+  const dest = tree.nodes?.[destId];
+  const isRootTarget = destId === QUERY_TREE_ROOT_ID && !dest;
+  if (!dest && !isRootTarget) return MoveViolationCode.MissingTarget;
 
   if (node.kind !== 'file') return MoveViolationCode.DragNotFile;
-  if (dest.kind !== 'folder') return MoveViolationCode.TargetNotFolder;
+  if (!isRootTarget && dest.kind !== 'folder') return MoveViolationCode.TargetNotFolder;
 
-  if (String((node as any).parentNodeId) === String(destParentId)) {
+  if (String((node as any).parentNodeId) === destId) {
     return MoveViolationCode.SameParent;
   }
 
