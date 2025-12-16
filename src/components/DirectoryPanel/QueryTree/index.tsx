@@ -1117,18 +1117,73 @@ function QueriesTreeInner(
   // AIDEV-NOTE: Stable callback to avoid breaking Row memo
   const handleTreeFocusFromRow = useCallback(() => setIsTreeFocused(true), []);
 
-  // AIDEV-NOTE: Listen for mousedown outside the tree section to clear the focused state.
-  // This is more robust than blur events which can fire unexpectedly during navigation.
+  // AIDEV-NOTE: Listen for mousedown outside the tree section to clear the focused state
+  // and selection. This is more robust than blur events which can fire unexpectedly during navigation.
+  // When clicking within DirectoryPanel but outside this tree section, clear both focus and selection.
   useEffect(() => {
-    if (!isTreeFocused) return;
-
     const handleMouseDown = (e: MouseEvent) => {
       const section = sectionRef.current;
       if (!section) return;
 
       const target = e.target as Node | null;
-      if (target && !section.contains(target)) {
-        setIsTreeFocused(false);
+      if (!target) return;
+
+      // Check if click is outside the tree section
+      if (!section.contains(target)) {
+        // Check if click is within DirectoryPanel (by finding parent with directory-panel class)
+        const targetElement   = target as Element;
+        const directoryPanel  = targetElement?.closest?.('[class*="directory-panel"]');
+
+        if (directoryPanel) {
+          // Click is within DirectoryPanel but outside this tree section
+          // Clear focus state
+          setIsTreeFocused(false);
+
+          // Clear tree selection by updating state after event processing
+          // Use requestAnimationFrame to ensure the update happens after the click event
+          requestAnimationFrame(() => {
+            try {
+              const currentState    = tree.getState();
+              const currentSelected = currentState?.selectedItems || [];
+
+              // Clear selection if there are any selected items other than root
+              const nonRootSelected = currentSelected.filter((id: string) => id !== rootId);
+              if (nonRootSelected.length > 0 || (currentSelected.length > 0 && currentSelected.includes(rootId) && currentSelected.length > 1)) {
+                // Use setSelectedItems to clear selection (keep root selected to match initial state)
+                if (typeof (tree as any).setSelectedItems === 'function') {
+                  (tree as any).setSelectedItems([rootId]);
+
+                  // Also update focusedItem to root
+                  tree.setConfig((prev) => {
+                    const prevState = prev.state || {};
+                    return {
+                      ...prev,
+                      state: {
+                        ...prevState,
+                        focusedItem: rootId
+                      }
+                    };
+                  });
+                } else {
+                  // Fallback to setConfig if setSelectedItems is not available
+                  tree.setConfig((prev) => {
+                    const prevState = prev.state || {};
+                    return {
+                      ...prev,
+                      state: {
+                        ...prevState,
+                        selectedItems: [rootId],
+                        focusedItem: rootId
+                      }
+                    };
+                  });
+                }
+              }
+            } catch (error) {
+              // Ignore errors in selection clearing
+            }
+          });
+        }
       }
     };
 
@@ -1136,7 +1191,7 @@ function QueriesTreeInner(
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true);
     };
-  }, [isTreeFocused]);
+  }, [isTreeFocused, tree, rootId]);
 
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
