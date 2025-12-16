@@ -7,13 +7,17 @@ import { createAsyncThunk }                   from '@reduxjs/toolkit';
 import {
   insertChildSorted,
   linkDataQueryIdToNodeIds,
+  moveNode,
+  registerInvalidations,
+  resortChildren,
   upsertNode
 }                                             from '@Redux/records/queryTree';
 import { setDataQueryRecord }                 from '@Redux/records/dataQuery';
 import { addTabFromFetch }                    from '@Redux/records/tabbar';
 import {
   getQueryTreeNodeChildrenAction,
-  createQueryFolderAction
+  createQueryFolderAction,
+  moveQueryTreeNodeAction
 }                                             from '@OpSpaceQueriesActions/queryTree';
 import { createSavedDataQueryAction }          from '@OpSpaceQueriesActions/queries/index';
 import {
@@ -284,5 +288,104 @@ export const createSavedQueryFileThunk = createAsyncThunk<TreeNode | null, Creat
     } catch {}
 
     return node;
+  }
+);
+
+type MoveSavedQueryFileArgs = {
+  nodeId          : string;
+  newParentNodeId : string;
+};
+
+// AIDEV-NOTE: Move a saved QueryTree *file* node under a new parent folder. This is used by
+// the DirectoryPanel QueryTree DnD flow (file → folder). Folder moves and explicit reordering
+// will be handled by future, more general thunks.
+export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFileArgs, { state: RootState }>(
+  'queryTree/moveSavedQueryFileThunk',
+  async ({ nodeId, newParentNodeId }, { getState, dispatch }) => {
+    const state = getState().queryTree;
+    const node  = state.nodes[nodeId];
+    const dest  = state.nodes[newParentNodeId];
+
+    if (!node || !dest) return;
+
+    if (node.kind !== 'file') {
+      // AIDEV-NOTE: Current scope is file → folder only; ignore folder moves for now.
+      return;
+    }
+
+    if (dest.kind !== 'folder') return;
+
+    const oldParentNodeId = String(node.parentNodeId);
+    if (oldParentNodeId === newParentNodeId) {
+      // AIDEV-NOTE: Reordering within the same parent is out-of-scope for this thunk.
+      return;
+    }
+
+    log.thunkStart({
+      thunk : 'queryTree/moveSavedQueryFileThunk',
+      input : {
+        nodeId,
+        oldParentNodeId,
+        newParentNodeId
+      }
+    });
+
+    // AIDEV-NOTE: Optimistic local move:
+    // - moveNode updates childrenByParentId for old/new parents plus parentNodeId.
+    // - resortChildren re-applies sortKey/name ordering under the destination parent.
+    dispatch(moveNode({ nodeId, oldParentNodeId, newParentNodeId }));
+    dispatch(resortChildren({ parentId: newParentNodeId }));
+
+    // AIDEV-NOTE: Update the moved file's level to be one deeper than the destination folder.
+    const destLevel = (dest.level ?? 0) + 1;
+    dispatch(upsertNode({
+      ...node,
+      parentNodeId : newParentNodeId,
+      level        : destLevel
+    } as TreeNode));
+
+    // AIDEV-NOTE: Mark parent nodes for childrenId invalidation so headless-tree refreshes
+    // their children arrays without forcing a full tree remount.
+    dispatch(registerInvalidations({
+      parents: [oldParentNodeId, newParentNodeId]
+    }));
+
+    try {
+      const res = await moveQueryTreeNodeAction({ nodeId, newParentNodeId });
+
+      log.thunkResult({
+        thunk  : 'queryTree/moveSavedQueryFileThunk',
+        result : res,
+        input  : {
+          nodeId,
+          oldParentNodeId,
+          newParentNodeId
+        }
+      });
+
+      if (!res.success) {
+        dispatch(updateError(errorEntryFromActionError({
+          actionType: 'queryTree/moveSavedQueryFileThunk',
+          error     : res.error
+        })));
+      }
+    } catch (error) {
+      log.thunkException({
+        thunk   : 'queryTree/moveSavedQueryFileThunk',
+        message : 'moveQueryTreeNodeAction threw',
+        error   : error,
+        input   : {
+          nodeId,
+          oldParentNodeId,
+          newParentNodeId
+        }
+      });
+
+      dispatch(updateError({
+        actionType  : 'queryTree/moveSavedQueryFileThunk',
+        message     : 'Failed to move query.',
+        meta        : { error }
+      }));
+    }
   }
 );

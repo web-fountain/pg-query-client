@@ -1,6 +1,9 @@
 // AIDEV-NOTE: Encapsulates create/rename/move behaviors and parent refreshes.
-// AIDEV-TODO: Implement real QueryTree thunks for rename/move and wire them here.
+// AIDEV-TODO: Implement real QueryTree thunks for rename and wire them here.
 import type { OnCreateFolder, OnCreateFile, OnRename, OnDropMove }  from '../types';
+
+import { useReduxDispatch }                                         from '@Redux/storeHooks';
+import { moveSavedQueryFileThunk }                                  from '@Redux/records/queryTree/thunks';
 
 
 type LoadableTree = { loadChildrenIds: (id: string) => void } & { [key: string]: unknown };
@@ -15,6 +18,7 @@ type UseItemActionsOptions = {
 };
 
 export function useItemActions(_tree: LoadableTree, _targetFolderId: string, options?: UseItemActionsOptions) {
+  const dispatch = useReduxDispatch();
 
   const handleCreateFolder: OnCreateFolder = async () => {
     // AIDEV-NOTE: Folder creation is a two-phase flow:
@@ -51,10 +55,17 @@ export function useItemActions(_tree: LoadableTree, _targetFolderId: string, opt
     }
   };
 
-  const handleDropMove: OnDropMove = async () => {
-    // AIDEV-TODO: Implement drag-and-drop move for QueryTree nodes backed by a thunk that
-    // enforces depth/section constraints and syncs with the backend.
-    return;
+  const handleDropMove: OnDropMove = async (dragId, dropTargetId, isTargetFolder) => {
+    // AIDEV-NOTE: Saved QueryTree DnD currently supports moving files into folders only.
+    // Reordering and folder moves are handled by future, more general thunks.
+    if (!isTargetFolder) {
+      return;
+    }
+
+    await dispatch(moveSavedQueryFileThunk({
+      nodeId          : dragId,
+      newParentNodeId : dropTargetId
+    }));
   };
 
   return {

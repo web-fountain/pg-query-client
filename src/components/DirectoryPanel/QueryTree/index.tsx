@@ -176,30 +176,35 @@ function QueriesTreeInner(
     initialState: { expandedItems: [rootId], selectedItems: [rootId], focusedItem: rootId },
     createLoadingItemData: () => adapterCreateLoadingItemData() as unknown as TreeNode,
     // AIDEV-NOTE: DnD configuration per headless-tree docs: https://headless-tree.lukasbach.com/features/dnd/
+    // For saved QueryTree we currently support **file → folder** moves only. Folder moves and explicit
+    // reordering will be layered on later once backend semantics are finalized.
     canDrag: (items) => items.length > 0,
     canDrop: (items, target) => {
-      // AIDEV-NOTE: Disallow cross-section moves
+      // AIDEV-NOTE: Disallow cross-section moves (cannot drag between different section roots).
       try {
         const draggedRoot = items[0]?.getTree?.()?.getRootItem?.()?.getId?.();
         const targetRoot = target.item?.getTree?.()?.getRootItem?.()?.getId?.();
         if (draggedRoot && targetRoot && draggedRoot !== targetRoot) return false;
       } catch {}
 
+      const dragged = items[0];
+      const targetItem = target.item;
+      if (!dragged || !targetItem) return false;
+
       const isReorder = 'childIndex' in target && typeof target.childIndex === 'number';
-      // Base allowance: reorder within same parent OR drop into a folder
-      let allowed = isReorder ? true : target.item?.isFolder?.() === true;
-      if (!allowed) return false;
+      // AIDEV-NOTE: Reordering (drop between siblings) is out of scope for now; only allow drops
+      // directly *onto* folders. This keeps the visual affordance aligned with the behaviors we
+      // actually implement in useItemActions/handleDropMove.
+      if (isReorder) return false;
 
-      // AIDEV-NOTE: Enforce depth rule: no folders at aria-level >= 4 (meta level >= 3)
-      try {
-        const parentItem = target.item;
-        const parentLevel = (parentItem?.getItemMeta?.()?.level ?? 0) as number;
-        const newLevel = parentLevel + 1; // child meta level
-        const draggedIsFolder = !!items[0]?.isFolder?.();
-        if (draggedIsFolder && newLevel >= 3) return false;
-      } catch {}
+      const draggedIsFolder = !!dragged.isFolder?.();
+      const targetIsFolder = !!targetItem.isFolder?.();
 
-      return allowed;
+      // AIDEV-NOTE: Initial scope: move files into folders only.
+      if (draggedIsFolder) return false;
+      if (!targetIsFolder) return false;
+
+      return true;
     },
     openOnDropDelay: 250,
     onDrop: async (items, target) => {

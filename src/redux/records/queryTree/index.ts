@@ -20,6 +20,7 @@ type RemoveNode                 = { parentId: string; nodeId: string };
 type LinkDataQueryIdToNodeIds   = { dataQueryId: UUIDv7; nodeId: UUIDv7 };
 type RenameNodeWithInvalidation = { dataQueryId: UUIDv7; name: string };
 type ClearInvalidations         = { items: string[]; parents: string[] };
+type RegisterInvalidations      = { items?: string[]; parents?: string[] };
 
 // Action Creators
 export const setInitialQueryTree  = createAction<QueryTreeRecord>   ('queryTree/setInitialQueryTree');
@@ -42,6 +43,11 @@ export const renameNodeWithInvalidation = createAction<RenameNodeWithInvalidatio
 
 // AIDEV-NOTE: Clear invalidations after processing (pass what was processed to avoid races).
 export const clearInvalidations         = createAction<ClearInvalidations>          ('queryTree/clearInvalidations');
+
+// AIDEV-NOTE: Register additional pending invalidations for headless-tree cache updates.
+// This is used by structural operations like move where we need to invalidate parents'
+// childrenId caches without changing labels.
+export const registerInvalidations      = createAction<RegisterInvalidations>       ('queryTree/registerInvalidations');
 
 
 // Selectors
@@ -265,6 +271,31 @@ export default createReducer(initialState, (builder) => {
                 state.pendingInvalidations.parents.push(parentId);
               }
             }
+          }
+        }
+      }
+    )
+    // AIDEV-NOTE: Merge additional pending invalidations in a race-safe way. Callers pass
+    // only the IDs they want to mark; this helper ensures the arrays remain de-duplicated.
+    .addCase(registerInvalidations,
+      function (state: QueryTreeRecord, action: PayloadAction<RegisterInvalidations>) {
+        const items   = action.payload.items || [];
+        const parents = action.payload.parents || [];
+        if (!items.length && !parents.length) return;
+
+        if (!state.pendingInvalidations) {
+          state.pendingInvalidations = { items: [], parents: [] };
+        }
+
+        for (const id of items) {
+          if (!state.pendingInvalidations.items.includes(id)) {
+            state.pendingInvalidations.items.push(id);
+          }
+        }
+
+        for (const id of parents) {
+          if (!state.pendingInvalidations.parents.includes(id)) {
+            state.pendingInvalidations.parents.push(id);
           }
         }
       }

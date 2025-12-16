@@ -10,7 +10,10 @@ import type {
   QueryTreeNodeChildren,
   CreateQueryFolderApiResponse,
   CreateQueryFolderPayload,
-  CreateQueryFolderResult
+  CreateQueryFolderResult,
+  MoveQueryTreeNodeApiResponse,
+  MoveQueryTreeNodePayload,
+  MoveQueryTreeNodeResult
 }                                          from './types';
 
 import { cacheLife, cacheTag, updateTag } from 'next/cache';
@@ -279,6 +282,69 @@ export async function createQueryFolderAction(payload: CreateQueryFolderPayload)
       try {
         updateTag(queryTreeChildrenTag(ctx.opspacePublicId));
       } catch {}
+
+      return ok(meta, res.data.data);
+    }
+  );
+}
+
+// AIDEV-NOTE: Server action to move an existing QueryTree node under a new parent folder.
+// This is used by the DirectoryPanel QueryTree for file → folder drag-and-drop. The backend
+// is expected to enforce folder-only targets, no cycles, and depth/section constraints.
+export async function moveQueryTreeNodeAction(
+  payload: MoveQueryTreeNodePayload
+): Promise<ActionResult<MoveQueryTreeNodeResult>> {
+  const { nodeId, newParentNodeId } = payload;
+
+  return withAction(
+    {
+      action : 'queryTree.moveNode',
+      op     : 'write',
+      input  : {
+        nodeId,
+        newParentNodeId
+      }
+    },
+    async ({ ctx, meta }) => {
+      const res = await backendFetchJSON<MoveQueryTreeNodeApiResponse>({
+        // AIDEV-NOTE: Align this path/scope with the backend implementation for moves.
+        path    : '/queries/tree/nodes/move',
+        method  : 'PATCH',
+        scope   : ['queries-tree-nodes-move:write'],
+        logLabel: 'moveQueryTreeNodeAction',
+        context : ctx,
+        body    : { nodeId, newParentNodeId }
+      });
+
+      if (!res.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : res.status,
+          error           : res.error,
+          fallbackMessage : 'Failed to move query.',
+          request         : {
+            path    : '/queries/tree/nodes/move',
+            method  : 'PATCH',
+            scope   : ['queries-tree-nodes-move:write'],
+            logLabel: 'moveQueryTreeNodeAction'
+          }
+        }));
+      }
+
+      if (!res.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to move query.',
+          request: {
+            path    : '/queries/tree/nodes/move',
+            method  : 'PATCH',
+            scope   : ['queries-tree-nodes-move:write'],
+            logLabel: 'moveQueryTreeNodeAction'
+          }
+        }));
+      }
+
+      // AIDEV-NOTE: Moving a node affects both the initial tree payload and children cache.
+      try { updateTag(queryTreeInitialTag(ctx.opspacePublicId)); } catch {}
+      try { updateTag(queryTreeChildrenTag(ctx.opspacePublicId)); } catch {}
 
       return ok(meta, res.data.data);
     }
