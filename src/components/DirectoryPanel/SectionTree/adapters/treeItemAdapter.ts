@@ -1,5 +1,6 @@
-import type { TreeNode } from '@Redux/records/queryTree/types';
-import type { TreeItemApi } from '../types';
+import type { TreeNode }              from '@Redux/records/queryTree/types';
+import type { TreeItemApi }           from '../../QueryTree/types';
+import { canTreatMetaLevelAsFolder }  from '@Redux/records/queryTree/constraints';
 
 // AIDEV-NOTE: Adapter functions that translate TreeNode and item API into the
 // shapes expected by Headless Tree configuration points. These are pure functions.
@@ -14,7 +15,7 @@ export function isItemFolder(item: TreeItemApi<TreeNode>): boolean {
   const level = (item.getItemMeta()?.level ?? 0) as number;
   // AIDEV-NOTE: Library meta level appears 0-based relative to visible rows; aria-level is 1-based.
   // To block folders at aria-level=4, we disallow meta level >= 3.
-  if (level >= 3) return false;
+  if (!canTreatMetaLevelAsFolder(level)) return false;
   return item.getItemData()?.kind === 'folder';
 }
 

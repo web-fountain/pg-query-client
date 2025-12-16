@@ -17,6 +17,7 @@ import {
   syncDataLoaderFeature, selectionFeature,
   hotkeysCoreFeature, dragAndDropFeature
 }                                               from '@headless-tree/core';
+import { canCreateFolderChildAtParentMetaLevel } from '@Redux/records/queryTree/constraints';
 import {
   useReduxDispatch, useReduxSelector
 }                                               from '@Redux/storeHooks';
@@ -158,9 +159,8 @@ function UnsavedQueriesTreeInner(
       try {
         const parentItem = target.item;
         const parentLevel = (parentItem?.getItemMeta?.()?.level ?? 0) as number;
-        const newLevel = parentLevel + 1; // child meta level
         const draggedIsFolder = !!items[0]?.isFolder?.();
-        if (draggedIsFolder && newLevel >= 3) return false;
+        if (draggedIsFolder && !canCreateFolderChildAtParentMetaLevel(parentLevel)) return false;
       } catch {}
 
       return allowed;

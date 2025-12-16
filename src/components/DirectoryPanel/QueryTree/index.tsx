@@ -20,6 +20,7 @@ import {
   useReduxSelector,
   useReduxDispatch
 }                                         from '@Redux/storeHooks';
+import { logClientJson }                  from '@Observability/client';
 import {
   clearInvalidations,
   insertChildSorted,
@@ -33,6 +34,14 @@ import {
   getQueryTreeNodeChildrenThunk
 }                                         from '@Redux/records/queryTree/thunks';
 import {
+  canCreateFolderChildAtParentMetaLevel,
+  getMoveViolationCodeBaseFromNodes,
+  getMoveViolationLabel,
+  isDuplicateNameInParent,
+  normalizeLabelForUniqueness,
+  MoveViolationCode
+}                                         from '@Redux/records/queryTree/constraints';
+import {
   selectActiveTabId,
   selectTabIdByMountIdMap,
 }                                         from '@Redux/records/tabbar';
@@ -44,7 +53,11 @@ import { useExpandedFoldersState }        from './hooks/useExpandedFoldersState'
 import { useQueriesRoute }                from '@QueriesProvider/QueriesRouteProvider';
 import Row                                from './components/Row';
 import Toolbar                            from './components/Toolbar';
-import { createLoadingItemData as adapterCreateLoadingItemData } from './adapters/treeItemAdapter';
+import {
+  createLoadingItemData as adapterCreateLoadingItemData,
+  getItemName as adapterGetItemName,
+  isItemFolder as adapterIsItemFolder
+}                                         from './adapters/treeItemAdapter';
 import { generateUUIDv7 }                 from '@Utils/generateId';
 
 import styles                             from './styles.module.css';
@@ -153,11 +166,129 @@ function QueriesTreeInner(
     expansionRestoreCompleteRef.current = false;
   }
 
+  // AIDEV-NOTE: DnD constraint runtime caches. These keep `canDrop` fast and let us prefetch
+  // missing children once per drag session so duplicate-name checks become accurate.
+  const activeDragIdRef            = useRef<string | null>(null);
+  const prefetchedFoldersRef       = useRef<Set<string>>(new Set());
+  const inFlightPrefetchRef        = useRef<Set<string>>(new Set());
+  const prefetchedChildrenNamesRef = useRef<Map<string, Set<string>>>(new Map());
+  const loggedConstraintKeysRef    = useRef<Set<string>>(new Set());
+  const prefetchQueueRef           = useRef<string[]>([]);
+  const prefetchTimerRef           = useRef<number | null>(null);
+  const prefetchLastTsRef          = useRef<number>(0);
+  const PREFETCH_THROTTLE_MS       = 120;
+
+  // AIDEV-NOTE: Clear per-drag caches on drag end/drop to avoid memory growth across sessions.
+  useEffect(() => {
+    const clear = () => {
+      activeDragIdRef.current = null;
+      prefetchedFoldersRef.current.clear();
+      inFlightPrefetchRef.current.clear();
+      prefetchedChildrenNamesRef.current.clear();
+      loggedConstraintKeysRef.current.clear();
+      prefetchQueueRef.current = [];
+      prefetchLastTsRef.current = 0;
+      if (prefetchTimerRef.current != null) {
+        try { window.clearTimeout(prefetchTimerRef.current); } catch {}
+        prefetchTimerRef.current = null;
+      }
+    };
+
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    return () => {
+      window.removeEventListener('dragend', clear);
+      window.removeEventListener('drop', clear);
+    };
+  }, []);
+
+  // AIDEV-NOTE: If the Redux tree reports structural/label invalidations, drop any prefetch caches.
+  // This keeps duplicate checks conservative when data has changed underneath us.
+  useEffect(() => {
+    const inv = queryTree.pendingInvalidations;
+    if (!inv) return;
+    if ((inv.items?.length ?? 0) > 0 || (inv.parents?.length ?? 0) > 0) {
+      prefetchedChildrenNamesRef.current.clear();
+    }
+  }, [queryTree.pendingInvalidations]);
+
+  const logConstraintOnce = (key: string, payload: Record<string, unknown>) => {
+    try {
+      if (loggedConstraintKeysRef.current.has(key)) return;
+      loggedConstraintKeysRef.current.add(key);
+      logClientJson('debug', () => payload);
+    } catch {}
+  };
+
+  const schedulePrefetchDrain = () => {
+    if (prefetchTimerRef.current != null) return;
+    if (prefetchQueueRef.current.length === 0) return;
+
+    const elapsed = Date.now() - prefetchLastTsRef.current;
+    const wait = elapsed >= PREFETCH_THROTTLE_MS ? 0 : (PREFETCH_THROTTLE_MS - elapsed);
+
+    prefetchTimerRef.current = window.setTimeout(() => {
+      prefetchTimerRef.current = null;
+
+      const folderId = prefetchQueueRef.current.shift();
+      if (!folderId) return;
+
+      prefetchLastTsRef.current = Date.now();
+      if (inFlightPrefetchRef.current.has(folderId)) {
+        schedulePrefetchDrain();
+        return;
+      }
+
+      inFlightPrefetchRef.current.add(folderId);
+      dispatch(getQueryTreeNodeChildrenThunk({ nodeId: folderId }))
+        .unwrap()
+        .then((children) => {
+          const set = new Set<string>();
+          for (const child of (children || [])) {
+            if (!child || (child as any).kind !== 'file') continue;
+            set.add(normalizeLabelForUniqueness(String((child as any).label ?? '')));
+          }
+          prefetchedChildrenNamesRef.current.set(folderId, set);
+        })
+        .catch(() => {})
+        .finally(() => {
+          inFlightPrefetchRef.current.delete(folderId);
+        });
+
+      schedulePrefetchDrain();
+    }, wait);
+  };
+
+  const enqueuePrefetchChildren = (folderId: string) => {
+    const fid = String(folderId);
+    if (!fid) return;
+    // AIDEV-NOTE: Only prefetch if children are not already known in Redux and not already prefetched.
+    const current = queryTreeRef.current;
+    const alreadyKnown = current?.childrenByParentId?.[fid as any] !== undefined;
+    if (alreadyKnown) return;
+    if (prefetchedChildrenNamesRef.current.has(fid)) return;
+    if (prefetchedFoldersRef.current.has(fid)) return;
+
+    prefetchedFoldersRef.current.add(fid);
+    prefetchQueueRef.current.push(fid);
+    schedulePrefetchDrain();
+  };
+
+  const getDuplicateNameStatus = (folderId: string, normalizedLabel: string, excludeNodeId: string): boolean | null => {
+    const fid = String(folderId);
+    if (!fid) return null;
+    const fromRedux = isDuplicateNameInParent(queryTreeRef.current, fid, normalizedLabel, excludeNodeId);
+    if (fromRedux != null) return fromRedux;
+    const prefetched = prefetchedChildrenNamesRef.current.get(fid);
+    if (prefetched) return prefetched.has(normalizedLabel);
+    return null;
+  };
+
   const tree = useTree<TreeNode>({
     rootItemId: rootId,
     indent, // AIDEV-NOTE: The library computes left offset per row from this indent; we keep row styles from item.getProps()
-    getItemName: (item) => item.getItemData()?.label,
-    isItemFolder: (item) => item.getItemData()?.kind === 'folder',
+    getItemName: (item) => adapterGetItemName(item as any),
+    isItemFolder: (item) => adapterIsItemFolder(item as any),
     features: [asyncDataLoaderFeature, selectionFeature, hotkeysCoreFeature, dragAndDropFeature, expandAllFeature],
     dataLoader: {
       getItem: async (nodeId) => {
@@ -189,29 +320,120 @@ function QueriesTreeInner(
     // reordering will be layered on later once backend semantics are finalized.
     canDrag: (items) => items.length > 0,
     canDrop: (items, target) => {
-      // AIDEV-NOTE: Disallow cross-section moves (cannot drag between different section roots).
-      try {
-        const draggedRoot = items[0]?.getTree?.()?.getRootItem?.()?.getId?.();
-        const targetRoot = target.item?.getTree?.()?.getRootItem?.()?.getId?.();
-        if (draggedRoot && targetRoot && draggedRoot !== targetRoot) return false;
-      } catch {}
-
       const dragged = items[0];
       const targetItem = target.item;
       if (!dragged || !targetItem) return false;
 
-      const isReorder = 'childIndex' in target && typeof target.childIndex === 'number';
-      // AIDEV-NOTE: Reordering (drop between siblings) is out of scope for now; only allow drops
-      // directly *onto* folders. This keeps the visual affordance aligned with the behaviors we
-      // actually implement in useItemActions/handleDropMove.
-      if (isReorder) return false;
+      const dragId = dragged?.getId?.();
+      const dropTargetId = targetItem?.getId?.();
+      if (!dragId || !dropTargetId) return false;
 
-      const draggedIsFolder = !!dragged.isFolder?.();
-      const targetIsFolder = !!targetItem.isFolder?.();
+      // AIDEV-NOTE: Disallow cross-section moves (cannot drag between different section roots).
+      try {
+        const draggedRoot = dragged?.getTree?.()?.getRootItem?.()?.getId?.();
+        const targetRoot = targetItem?.getTree?.()?.getRootItem?.()?.getId?.();
+        if (draggedRoot && targetRoot && draggedRoot !== targetRoot) {
+          logConstraintOnce(
+            `${dragId}:${dropTargetId}:cross-section`,
+            {
+              event         : 'queryTree',
+              phase         : 'constraint-violation',
+              constraint    : 'cross-section',
+              dragId        : String(dragId),
+              dropTargetId  : String(dropTargetId),
+              draggedRoot   : String(draggedRoot),
+              targetRoot    : String(targetRoot)
+            }
+          );
+          return false;
+        }
+      } catch {}
 
-      // AIDEV-NOTE: Initial scope: move files into folders only.
-      if (draggedIsFolder) return false;
-      if (!targetIsFolder) return false;
+      // AIDEV-NOTE: Detect drag session changes and reset per-drag caches.
+      if (activeDragIdRef.current !== String(dragId)) {
+        activeDragIdRef.current = String(dragId);
+        prefetchedFoldersRef.current.clear();
+        prefetchedChildrenNamesRef.current.clear();
+        loggedConstraintKeysRef.current.clear();
+        prefetchQueueRef.current = [];
+        prefetchLastTsRef.current = 0;
+      }
+
+      const isOrderedTarget = 'childIndex' in target && typeof (target as any).childIndex === 'number';
+      // AIDEV-NOTE: UX improvement: allow dropping into a folder section (ordered target where `target.item`
+      // is the parent folder). However, keep behavior unchanged for root-level "between siblings" drops:
+      // an ordered target with `target.item === rootId` is treated as reordering and remains disallowed.
+      if (isOrderedTarget && String(dropTargetId) === String(rootId)) {
+        logConstraintOnce(
+          `${dragId}:${dropTargetId}:ordered-root`,
+          {
+            event         : 'queryTree',
+            phase         : 'constraint-violation',
+            constraint    : 'ordered-target-root-disallowed',
+            dragId        : String(dragId),
+            dropTargetId  : String(dropTargetId)
+          }
+        );
+        return false;
+      }
+
+      const draggedData = dragged.getItemData?.() as TreeNode | undefined;
+      const targetData  = targetItem.getItemData?.() as TreeNode | undefined;
+
+      const base = getMoveViolationCodeBaseFromNodes(draggedData, targetData);
+      if (base !== MoveViolationCode.Ok) {
+        logConstraintOnce(
+          `${dragId}:${dropTargetId}:base-${base}`,
+          {
+            event         : 'queryTree',
+            phase         : 'constraint-violation',
+            constraint    : 'move-base',
+            code          : base,
+            reason        : getMoveViolationLabel(base),
+            dragId        : String(dragId),
+            dropTargetId  : String(dropTargetId)
+          }
+        );
+        return false;
+      }
+
+      // AIDEV-NOTE: Duplicate-name constraint (best-effort):
+      // - If we can determine destination children (Redux or prefetched), disallow duplicates.
+      // - If unknown, optimistically allow but schedule a one-time prefetch so subsequent hover checks
+      //   become accurate before the user drops.
+      const draggedLabel = String((draggedData as any)?.label ?? '').trim();
+      if (!draggedLabel) {
+        logConstraintOnce(
+          `${dragId}:${dropTargetId}:empty-label`,
+          {
+            event         : 'queryTree',
+            phase         : 'constraint-violation',
+            constraint    : 'empty-label',
+            dragId        : String(dragId),
+            dropTargetId  : String(dropTargetId)
+          }
+        );
+        return false;
+      }
+      const normalized = normalizeLabelForUniqueness(draggedLabel);
+
+      const dupe = getDuplicateNameStatus(String(dropTargetId), normalized, String(dragId));
+      if (dupe === true) {
+        logConstraintOnce(
+          `${dragId}:${dropTargetId}:duplicate-name`,
+          {
+            event         : 'queryTree',
+            phase         : 'constraint-violation',
+            constraint    : 'duplicate-name',
+            dragId        : String(dragId),
+            dropTargetId  : String(dropTargetId)
+          }
+        );
+        return false;
+      }
+      if (dupe === null) {
+        enqueuePrefetchChildren(String(dropTargetId));
+      }
 
       return true;
     },
@@ -221,8 +443,8 @@ function QueriesTreeInner(
       const dragId = dragged?.getId?.();
       const dropTargetId = target.item?.getId?.();
       if (!dragId || !dropTargetId) return;
-      const isTargetFolder = !('childIndex' in target && typeof target.childIndex === 'number');
-      await actions.handleDropMove(dragId, dropTargetId, isTargetFolder);
+      // AIDEV-NOTE: For saved QueryTree we treat allowed drops as "move into folder".
+      await actions.handleDropMove(dragId, dropTargetId, true);
     }
   });
 
@@ -562,8 +784,8 @@ function QueriesTreeInner(
               try {
                 const rootItemMeta = (rootItem as any)?.getItemMeta?.() ?? {};
                 const rootLevel = (rootItemMeta.level ?? 0) as number;
-                // AIDEV-NOTE: Block New Folder when a new child would be meta level >= 3 (aria-level >= 4)
-                return rootLevel + 1 >= 3;
+                // AIDEV-NOTE: Block New Folder when a new child would exceed the max folder depth constraint.
+                return !canCreateFolderChildAtParentMetaLevel(rootLevel);
               } catch {}
               return false;
             })()}

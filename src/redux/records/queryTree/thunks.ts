@@ -12,6 +12,13 @@ import {
   resortChildren,
   upsertNode
 }                                             from '@Redux/records/queryTree';
+import {
+  getMoveViolationCodeBase,
+  getMoveViolationLabel,
+  isDuplicateNameInParent,
+  normalizeLabelForUniqueness,
+  MoveViolationCode
+}                                             from '@Redux/records/queryTree/constraints';
 import { setDataQueryRecord }                 from '@Redux/records/dataQuery';
 import { addTabFromFetch }                    from '@Redux/records/tabbar';
 import {
@@ -19,10 +26,11 @@ import {
   createQueryFolderAction,
   moveQueryTreeNodeAction
 }                                             from '@OpSpaceQueriesActions/queryTree';
-import { createSavedDataQueryAction }          from '@OpSpaceQueriesActions/queries/index';
+import { createSavedDataQueryAction }         from '@OpSpaceQueriesActions/queries/index';
 import {
   errorEntryFromActionError, updateError
 }                                             from '@Redux/records/errors';
+import { logClientJson }                      from '@Observability/client';
 import * as log                               from '@Observability/client/thunks';
 
 
@@ -306,20 +314,45 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
     const node  = state.nodes[nodeId];
     const dest  = state.nodes[newParentNodeId];
 
+    // AIDEV-NOTE: Centralized constraint gate (cheap checks) to keep DnD and other callers consistent.
+    const base = getMoveViolationCodeBase(state, nodeId, newParentNodeId);
+    if (base !== MoveViolationCode.Ok) {
+      logClientJson('warn', () => ({
+        event         : 'queryTree',
+        phase         : 'constraint-violation',
+        action        : 'moveSavedQueryFileThunk',
+        constraint    : 'move-base',
+        code          : base,
+        reason        : getMoveViolationLabel(base),
+        nodeId        : String(nodeId),
+        newParentNodeId: String(newParentNodeId)
+      }));
+      return;
+    }
+
+    // AIDEV-NOTE: Best-effort duplicate-name guard when destination children are loaded.
+    // If children are not loaded (null), we allow and rely on backend enforcement + rollback.
+    try {
+      const normalized = normalizeLabelForUniqueness(String((node as any)?.label ?? ''));
+      const dupe = isDuplicateNameInParent(state, newParentNodeId, normalized, nodeId);
+      if (dupe === true) {
+        logClientJson('warn', () => ({
+          event         : 'queryTree',
+          phase         : 'constraint-violation',
+          action        : 'moveSavedQueryFileThunk',
+          constraint    : 'duplicate-name',
+          nodeId        : String(nodeId),
+          newParentNodeId: String(newParentNodeId),
+          labelLen      : String((node as any)?.label ?? '').length
+        }));
+        return;
+      }
+    } catch {}
+
     if (!node || !dest) return;
 
-    if (node.kind !== 'file') {
-      // AIDEV-NOTE: Current scope is file → folder only; ignore folder moves for now.
-      return;
-    }
-
-    if (dest.kind !== 'folder') return;
-
-    const oldParentNodeId = String(node.parentNodeId);
-    if (oldParentNodeId === newParentNodeId) {
-      // AIDEV-NOTE: Reordering within the same parent is out-of-scope for this thunk.
-      return;
-    }
+    const oldParentNodeId = String((node as any).parentNodeId);
+    const oldLevel = (node as any).level as number | undefined;
 
     log.thunkStart({
       thunk : 'queryTree/moveSavedQueryFileThunk',
@@ -350,6 +383,30 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
       parents: [oldParentNodeId, newParentNodeId]
     }));
 
+    // AIDEV-NOTE: Backend is authoritative; on failure we rollback the optimistic move so UI
+    // remains consistent with invariants (duplicate names, permission, depth, etc).
+    const rollback = (emitError: boolean, reason?: unknown) => {
+      try {
+        dispatch(moveNode({ nodeId, oldParentNodeId: newParentNodeId, newParentNodeId: oldParentNodeId }));
+        dispatch(resortChildren({ parentId: oldParentNodeId }));
+        dispatch(resortChildren({ parentId: newParentNodeId }));
+        dispatch(upsertNode({
+          ...(node as any),
+          parentNodeId : oldParentNodeId,
+          level        : oldLevel
+        } as TreeNode));
+        dispatch(registerInvalidations({ parents: [oldParentNodeId, newParentNodeId] }));
+      } catch {}
+
+      if (emitError && reason) {
+        dispatch(updateError({
+          actionType  : 'queryTree/moveSavedQueryFileThunk',
+          message     : 'Failed to move query.',
+          meta        : { reason }
+        }));
+      }
+    };
+
     try {
       const res = await moveQueryTreeNodeAction({ nodeId, newParentNodeId });
 
@@ -368,6 +425,7 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
           actionType: 'queryTree/moveSavedQueryFileThunk',
           error     : res.error
         })));
+        rollback(false);
       }
     } catch (error) {
       log.thunkException({
@@ -381,11 +439,7 @@ export const moveSavedQueryFileThunk = createAsyncThunk<void, MoveSavedQueryFile
         }
       });
 
-      dispatch(updateError({
-        actionType  : 'queryTree/moveSavedQueryFileThunk',
-        message     : 'Failed to move query.',
-        meta        : { error }
-      }));
+      rollback(true, error);
     }
   }
 );
