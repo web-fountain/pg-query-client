@@ -1,12 +1,14 @@
 'use client';
 
+import type { TreeApi }       from '../types';
+
 import { useEffect }          from 'react';
 import { useReduxDispatch }   from '@Redux/storeHooks';
 import { clearInvalidations } from '@Redux/records/queryTree';
 
 
 type Args = {
-  tree: unknown;
+  tree: TreeApi<unknown>;
   pendingInvalidations: unknown;
 };
 
@@ -31,16 +33,16 @@ function useQueryTreeInvalidations({ tree, pendingInvalidations }: Args) {
     // Process item invalidations (label changes)
     for (const nodeId of itemsToProcess) {
       try {
-        const item = (tree as any).getItemInstance(nodeId);
-        (item as any)?.invalidateItemData?.();
+        const item = tree.getItemInstance?.(nodeId);
+        item?.invalidateItemData?.();
       } catch {}
     }
 
     // Process parent invalidations (sort order changes)
     for (const parentId of parentsToProcess) {
       try {
-        const item = (tree as any).getItemInstance(parentId);
-        (item as any)?.invalidateChildrenIds?.();
+        const item = tree.getItemInstance?.(parentId);
+        item?.invalidateChildrenIds?.();
       } catch {}
     }
 

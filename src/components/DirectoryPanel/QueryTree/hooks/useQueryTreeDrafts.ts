@@ -2,6 +2,7 @@
 
 import type { TreeNode }                  from '@Redux/records/queryTree/types';
 import type { UUIDv7 }                    from '@Types/primitives';
+import type { TreeApi }                   from '../types';
 
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -43,7 +44,7 @@ export type DraftFileState = {
 };
 
 type Args = {
-  tree                      : unknown;
+  tree                      : TreeApi<TreeNode>;
   rootId                    : string;
   isTreeFocused             : boolean;
   queryTreeRef              : React.RefObject<any>;
@@ -123,7 +124,7 @@ function useQueryTreeDrafts({
 
     // AIDEV-NOTE: In this headless-tree version, `focusedItem` can lag behind selection and
     // is not reliably settable via config updates, so we intentionally do NOT use it for placement.
-    const state         = (tree as any).getState?.() as any;
+    const state         = (tree.getState?.() as any) || {};
     const selectedItems = (state?.selectedItems || []) as string[];
 
     const pickSelectedId = () => {
@@ -182,11 +183,11 @@ function useQueryTreeDrafts({
     if (!parentId) return;
 
     try {
-      const parentItem = (tree as any).getItemInstance(parentId);
-      (parentItem as any)?.invalidateChildrenIds?.();
+      const parentItem = tree.getItemInstance?.(parentId);
+      parentItem?.invalidateChildrenIds?.();
     } catch {}
 
-    try { (tree as any).loadChildrenIds?.(parentId); } catch {}
+    try { tree.loadChildrenIds?.(parentId); } catch {}
   }, [draftFolder?.nodeId, draftFolder?.parentId, draftFile?.nodeId, draftFile?.parentId, tree]);
 
   const onEditingNameChange = useCallback((nodeId: string, next: string) => {

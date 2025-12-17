@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { TreeApi }                            from '../types';
 
 
 type Args = {
-  tree                        : unknown;
+  tree                        : TreeApi<unknown>;
   rootId                      : string;
   scopeId                     : string;
   persistedExpandedFolders    : string[] | null;
@@ -29,7 +30,7 @@ function useQueryTreeExpansion({
     expansionRestoreCompleteRef.current = false;
   }
 
-  const expandedItems = ((tree as any)?.getState?.()?.expandedItems || []) as string[];
+  const expandedItems = (tree.getState?.()?.expandedItems || []) as string[];
   const expandedFolderIds = useMemo(() => {
     // AIDEV-NOTE: Preserve order and let the persistence hook normalize/sort. This avoids
     // double-sorting on every expand/collapse interaction.
@@ -46,7 +47,7 @@ function useQueryTreeExpansion({
     // AIDEV-NOTE: persistedExpandedFolders is already normalized by the hook.
     const targetFolders         = persistedExpandedFolders.filter((id) => id !== rootId);
     const targetExpandedItems   = [rootId, ...targetFolders];
-    const currentExpandedItems  = (((tree as any)?.getState?.()?.expandedItems || []) as string[]);
+    const currentExpandedItems  = (tree.getState?.()?.expandedItems || []) as string[];
 
     // AIDEV-NOTE: Compare as sets to avoid unnecessary work due to ordering differences.
     const currentSet  = new Set(currentExpandedItems);
@@ -63,7 +64,7 @@ function useQueryTreeExpansion({
     }
 
     try {
-      (tree as any).setConfig((prev: any) => ({
+      tree.setConfig?.((prev: any) => ({
         ...prev,
         state: {
           ...(prev.state || {}),
@@ -129,7 +130,7 @@ function useQueryTreeExpansion({
 
       const readExpandedIds = () => {
         try {
-          const cur = ((tree as any)?.getState?.()?.expandedItems || []) as any;
+          const cur = (tree.getState?.()?.expandedItems || []) as any;
           return Array.isArray(cur) ? cur.map((x) => String(x)) : [];
         } catch {
           return [];
@@ -157,7 +158,7 @@ function useQueryTreeExpansion({
       // AIDEV-NOTE: Use getItemInstance for reliable item lookup by ID (doesn't depend on rendered items).
       let didExpandByItem = false;
       try {
-        const it = (tree as any).getItemInstance?.(id);
+        const it = tree.getItemInstance?.(id);
         if (it) {
           const isFolder = !!it?.isFolder?.();
           const isExpanded = it?.isExpanded?.();
@@ -180,12 +181,12 @@ function useQueryTreeExpansion({
           const next = Array.from(new Set([...curArr, String(rootId), id]));
 
           // AIDEV-NOTE: Prefer the library's state setter if present (mirrors setSelectedItems behavior).
-          if (typeof (tree as any).setExpandedItems === 'function') {
+          if (typeof tree.setExpandedItems === 'function') {
             debug('ensureFolderExpanded:setExpandedItems', { folderNodeId: id, nextCount: next.length });
-            (tree as any).setExpandedItems(next);
+            tree.setExpandedItems(next);
           } else if (!curArr.includes(id)) {
             debug('ensureFolderExpanded:setConfig-expandedItems', { folderNodeId: id, nextCount: next.length });
-            (tree as any).setConfig((prev: any) => {
+            tree.setConfig?.((prev: any) => {
               const prevState = prev.state || {};
               return {
                 ...(prev as any),
@@ -201,14 +202,14 @@ function useQueryTreeExpansion({
 
       // AIDEV-NOTE: Some headless-tree paths only load children when expand() is called.
       // Ensure children load when we toggle expandedItems via config.
-      try { (tree as any).loadChildrenIds?.(id); } catch {}
+      try { tree.loadChildrenIds?.(id); } catch {}
 
       const finish = () => {
         try {
           const curArr = readExpandedIds();
           let itemExpanded: boolean | null = null;
           try {
-            const it = (tree as any).getItemInstance?.(id);
+            const it = tree.getItemInstance?.(id);
             itemExpanded = it?.isExpanded?.() ?? null;
           } catch {}
           debug('ensureFolderExpanded:done', { folderNodeId: id, didExpandByItem, expandedStateAfter: curArr.includes(id), itemExpanded, expandedItems: curArr });

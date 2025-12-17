@@ -2,6 +2,7 @@
 
 import type { TreeNode }                  from '@Redux/records/queryTree/types';
 import type { UUIDv7 }                    from '@Types/primitives';
+import type { TreeApi }                   from '../types';
 
 import { useTree }                        from '@headless-tree/react';
 import {
@@ -36,7 +37,7 @@ type Args = {
   dnd           : DndConfig;
 };
 
-function useHeadlessTree({ rootId, indent, queryTreeRef, dnd }: Args) {
+function useHeadlessTree({ rootId, indent, queryTreeRef, dnd }: Args): TreeApi<TreeNode> {
   const dispatch = useReduxDispatch();
 
   const tree = useTree<TreeNode>({
@@ -79,7 +80,7 @@ function useHeadlessTree({ rootId, indent, queryTreeRef, dnd }: Args) {
     onDrop: dnd.onDrop
   });
 
-  return tree;
+  return tree as unknown as TreeApi<TreeNode>;
 }
 
 

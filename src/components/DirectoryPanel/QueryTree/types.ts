@@ -35,6 +35,46 @@ export interface TreeItemApi<TData> {
   getProps()    : TreeItemDomProps;
 }
 
+// AIDEV-NOTE: Subset of the Headless Tree *instance* API used by QueryTree logic hooks.
+// This is intentionally structural (not tied to @headless-tree internal types) so we can
+// keep hook boundaries type-safe while still being resilient to minor library upgrades.
+export type TreeState = {
+  expandedItems? : string[];
+  selectedItems? : string[];
+  focusedItem?   : string;
+};
+
+export type TreeContainerProps = {
+  style?     : React.CSSProperties;
+  className? : string;
+  onFocus?   : (e: React.FocusEvent) => void;
+  onBlur?    : (e: React.FocusEvent) => void;
+  ref?       : unknown;
+  [key: string]: unknown;
+};
+
+export type TreeItemInstanceApi<TData> = TreeItemApi<TData> & {
+  invalidateItemData?      : () => void;
+  invalidateChildrenIds?   : () => void;
+  updateCachedChildrenIds? : (ids: string[]) => void;
+  getTree?                 : () => TreeApi<TData>;
+};
+
+export type TreeApi<TData> = {
+  getState?          : () => TreeState;
+  getItems?          : () => Array<TreeItemInstanceApi<TData>>;
+  getItemInstance?   : (id: string) => TreeItemInstanceApi<TData> | null | undefined;
+  loadChildrenIds?   : (id: string) => void;
+  getContainerProps? : (label: string) => TreeContainerProps;
+  setSelectedItems?  : (ids: string[]) => void;
+  setExpandedItems?  : (ids: string[]) => void;
+  collapseAll?       : () => void;
+  // AIDEV-NOTE: Headless Tree supports a config updater function. We keep this permissive because
+  // the config shape is library-defined and can evolve across versions.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setConfig?         : (updater: (prev: any) => any) => void;
+};
+
 // AIDEV-NOTE: UI action handler types, separated for reusability across Toolbar/Row and hooks.
 export type OnRename        = (id: string) => void | Promise<void>;
 export type OnDropMove      = (dragId: string, dropTargetId: string, isTargetFolder: boolean) => void | Promise<void>;

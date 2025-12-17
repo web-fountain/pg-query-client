@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 
 
 type Args = {
@@ -39,7 +39,7 @@ function useQueryTreeBackgroundGestures({
     };
   }, []);
 
-  const onClickCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
+  const onClickCapture = useEffectEvent((e: React.MouseEvent<HTMLElement>) => {
     // AIDEV-NOTE: Background click within the section clears selection.
     // Ignore row clicks and toolbar clicks.
     const section = sectionRef.current;
@@ -59,9 +59,9 @@ function useQueryTreeBackgroundGestures({
       clearSelectionToRoot();
       clickTimeoutRef.current = null;
     }, 150);
-  }, [clearSelectionToRoot, sectionRef]);
+  });
 
-  const onDoubleClickCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
+  const onDoubleClickCapture = useEffectEvent((e: React.MouseEvent<HTMLElement>) => {
     // AIDEV-NOTE: Background dblclick within the section creates a new *file* draft at the root
     // after the last folder boundary (folder-first sort).
     // Ignore row dblclicks and toolbar dblclicks.
@@ -104,15 +104,7 @@ function useQueryTreeBackgroundGestures({
 
       createRootFileDraft();
     }, 0);
-  }, [
-    createRootFileDraft,
-    draftFileRef,
-    draftFolderRef,
-    clearSelectionToRoot,
-    scrollSelectedRowIntoView,
-    sectionRef,
-    selectTreeItem
-  ]);
+  });
 
   return { onClickCapture, onDoubleClickCapture };
 }

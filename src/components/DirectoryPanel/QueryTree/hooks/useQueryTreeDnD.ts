@@ -1,7 +1,10 @@
 'use client';
 
 import type { TreeNode }                  from '@Redux/records/queryTree/types';
-import { useCallback, useEffect, useRef } from 'react';
+import {
+  useCallback, useEffect, useEffectEvent,
+  useRef
+}                                         from 'react';
 
 import { useReduxDispatch }               from '@Redux/storeHooks';
 import { getQueryTreeNodeChildrenThunk }  from '@Redux/records/queryTree/thunks';
@@ -20,7 +23,7 @@ import { logClientJson }                  from '@Observability/client';
 type Args = {
   rootId                : string;
   label                 : string;
-  queryTreeRef          : React.MutableRefObject<any>;
+  queryTreeRef          : React.RefObject<any>;
   pendingInvalidations  : unknown;
   onDropMove            : (dragId: string, dropTargetId: string) => void | Promise<void>;
 };
@@ -73,43 +76,43 @@ function useQueryTreeDnD({ rootId, label, queryTreeRef, pendingInvalidations, on
   }, []);
 
   // AIDEV-NOTE: Clear per-drag caches on drag end/drop to avoid memory growth across sessions.
+  const clear = useEffectEvent(() => {
+    activeDragIdRef.current                 = null;
+    activeFolderDragIdRef.current           = null;
+    prefetchQueueRef.current                = [];
+    prefetchLastTsRef.current               = 0;
+    folderSubtreeKnownMaxLevelRef.current   = 0;
+    folderSubtreeRootLevelRef.current       = 0;
+    folderSubtreeExploreQueueRef.current    = [];
+    folderSubtreePrefetchBudgetRef.current  = 0;
+
+    prefetchedFoldersRef.current.clear();
+    inFlightPrefetchRef.current.clear();
+    prefetchedChildrenFileKeysRef.current.clear();
+    cachedChildrenFileKeysRef.current.clear();
+    prefetchedChildrenFolderLabelsRef.current.clear();
+    cachedChildrenFolderLabelsRef.current.clear();
+    prefetchedChildrenFolderChildIdsRef.current.clear();
+    prefetchedChildrenMaxLevelRef.current.clear();
+    loggedConstraintKeysRef.current.clear();
+    folderSubtreeKnownFoldersRef.current.clear();
+    folderSubtreeExploredFoldersRef.current.clear();
+    folderSubtreeMissingChildrenRef.current.clear();
+
+    if (prefetchTimerRef.current != null) {
+      try { window.clearTimeout(prefetchTimerRef.current); } catch {}
+      prefetchTimerRef.current = null;
+    }
+  });
+
   useEffect(() => {
-    const clear = () => {
-      activeDragIdRef.current                 = null;
-      activeFolderDragIdRef.current           = null;
-      prefetchQueueRef.current                = [];
-      prefetchLastTsRef.current               = 0;
-      folderSubtreeKnownMaxLevelRef.current   = 0;
-      folderSubtreeRootLevelRef.current       = 0;
-      folderSubtreeExploreQueueRef.current    = [];
-      folderSubtreePrefetchBudgetRef.current  = 0;
-
-      prefetchedFoldersRef.current.clear();
-      inFlightPrefetchRef.current.clear();
-      prefetchedChildrenFileKeysRef.current.clear();
-      cachedChildrenFileKeysRef.current.clear();
-      prefetchedChildrenFolderLabelsRef.current.clear();
-      cachedChildrenFolderLabelsRef.current.clear();
-      prefetchedChildrenFolderChildIdsRef.current.clear();
-      prefetchedChildrenMaxLevelRef.current.clear();
-      loggedConstraintKeysRef.current.clear();
-      folderSubtreeKnownFoldersRef.current.clear();
-      folderSubtreeExploredFoldersRef.current.clear();
-      folderSubtreeMissingChildrenRef.current.clear();
-
-      if (prefetchTimerRef.current != null) {
-        try { window.clearTimeout(prefetchTimerRef.current); } catch {}
-        prefetchTimerRef.current = null;
-      }
-    };
-
     window.addEventListener('dragend', clear);
     window.addEventListener('drop', clear);
     return () => {
       window.removeEventListener('dragend', clear);
       window.removeEventListener('drop', clear);
     };
-  }, []);
+  }, [clear]);
 
   // AIDEV-NOTE: If the Redux tree reports structural/label invalidations, drop any prefetch caches.
   // This keeps duplicate checks conservative when data has changed underneath us.

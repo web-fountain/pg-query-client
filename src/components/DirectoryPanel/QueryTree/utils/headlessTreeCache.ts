@@ -1,8 +1,7 @@
 import type { TreeNode } from '@Redux/records/queryTree/types';
+import type { TreeApi }  from '../types';
 
-type OptionalTree = {
-  getItemInstance?: (id: string) => unknown;
-};
+type OptionalTree = TreeApi<TreeNode>;
 
 function toNodeIdList(children: TreeNode[] | null | undefined): string[] {
   if (!Array.isArray(children) || children.length === 0) return [];
@@ -35,8 +34,8 @@ export function updateChildrenIdsCache(tree: OptionalTree, parentId: string, chi
   const pid = String(parentId || '');
   if (!pid) return;
   try {
-    const parentItem = (tree as any)?.getItemInstance?.(pid);
-    (parentItem as any)?.updateCachedChildrenIds?.(childrenIds);
+    const parentItem = tree.getItemInstance?.(pid);
+    parentItem?.updateCachedChildrenIds?.(childrenIds);
   } catch {}
 }
 

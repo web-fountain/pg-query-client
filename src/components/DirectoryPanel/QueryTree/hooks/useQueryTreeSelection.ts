@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
+import type { TreeApi }        from '../types';
 
 
 type Args = {
-  tree              : unknown;
+  tree              : TreeApi<unknown>;
   rootId            : string;
   markTreeFocused?  : () => void;
   setIsTreeFocused? : (v: boolean | ((prev: boolean) => boolean)) => void;
@@ -22,13 +23,13 @@ function useQueryTreeSelection({ tree, rootId, markTreeFocused, setIsTreeFocused
     const id = String(nodeId || '');
     if (!id) return;
     try {
-      if (typeof (tree as any).setSelectedItems === 'function') {
-        (tree as any).setSelectedItems([id]);
+      if (typeof tree.setSelectedItems === 'function') {
+        tree.setSelectedItems([id]);
       }
     } catch {}
 
     try {
-      (tree as any).setConfig((prev: any) => ({
+      tree.setConfig?.((prev: any) => ({
         ...prev,
         state: {
           ...(prev.state || {}),
@@ -61,11 +62,11 @@ function useQueryTreeSelection({ tree, rootId, markTreeFocused, setIsTreeFocused
         } catch {}
 
         try {
-          if (typeof (tree as any).setSelectedItems === 'function') {
-            (tree as any).setSelectedItems([rootId]);
+          if (typeof tree.setSelectedItems === 'function') {
+            tree.setSelectedItems([rootId]);
             // Best-effort: also reset focusedItem. Some headless-tree versions don't reliably accept focusedItem updates.
             try {
-              (tree as any).setConfig((prev: any) => {
+              tree.setConfig?.((prev: any) => {
                 const prevState = prev.state || {};
                 return {
                   ...prev,
@@ -77,7 +78,7 @@ function useQueryTreeSelection({ tree, rootId, markTreeFocused, setIsTreeFocused
               });
             } catch {}
           } else {
-            (tree as any).setConfig((prev: any) => {
+            tree.setConfig?.((prev: any) => {
               const prevState = prev.state || {};
               return {
                 ...prev,
@@ -97,8 +98,8 @@ function useQueryTreeSelection({ tree, rootId, markTreeFocused, setIsTreeFocused
         setIsTreeFocused?.(false);
       } catch {}
       try {
-        if (typeof (tree as any).setSelectedItems === 'function') {
-          (tree as any).setSelectedItems([rootId]);
+        if (typeof tree.setSelectedItems === 'function') {
+          tree.setSelectedItems([rootId]);
         }
       } catch {}
     }

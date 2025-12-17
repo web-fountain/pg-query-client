@@ -2,8 +2,12 @@
 
 import type { QueryTreeRecord, TreeNode } from '@Redux/records/queryTree/types';
 import type { UUIDv7 }                    from '@Types/primitives';
+import type { TreeItemInstanceApi }       from './types';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback, useLayoutEffect,
+  useRef, useState
+}                                         from 'react';
 import { usePathname }                    from 'next/navigation';
 import {
   useReduxSelector,
@@ -199,29 +203,37 @@ function QueriesTreeInner(
   });
 
   // AIDEV-NOTE: Row actions scoped to this section root
-  const actions = useItemActions(tree as any, rootId, {
+  const actions = useItemActions(tree, rootId, {
     onCreateFolderDraft: drafts.onCreateFolderDraft,
     onCreateFileDraft: drafts.onCreateFileDraft
   });
 
   // Compute rendering ranges and items outside JSX
-  const allItems = (tree as any).getItems?.() ?? [];
+  const allItems = tree.getItems?.() ?? [];
   // AIDEV-NOTE: Detect whether any folder (excluding the synthetic section root) is expanded.
-  const hasExpandedFolder = allItems.some((it: any) => {
-    try {
-      if (!it?.isFolder?.()) return false;
-      if (it?.getId?.() === rootId) return false;
-      return it?.isExpanded?.() === true;
-    } catch {
-      return false;
-    }
-  });
+  // Keep this aligned with the rendered-item list to avoid enabling "Collapse All" for not-yet-materialized expansions.
+  let hasExpandedFolder = false;
   // AIDEV-NOTE: Baseline diagnostic — disable custom virtualization, render all items
-  const renderItems = allItems.filter((it: any) => it?.getId?.() !== rootId);
+  const renderItems: Array<TreeItemInstanceApi<TreeNode>> = [];
+  for (const it of allItems) {
+    let id = '';
+    try { id = String(it?.getId?.() ?? ''); } catch {}
+    if (!id || id === String(rootId)) continue;
+    renderItems.push(it);
+    if (hasExpandedFolder) continue;
+    try {
+      if (it?.isFolder?.() && it?.isExpanded?.() === true) {
+        hasExpandedFolder = true;
+      }
+    } catch {}
+  }
 
   // AIDEV-NOTE: Toggle scrollbar gutter only when vertical scrollbar is present.
   // This ensures `scrollbar-gutter` is unset when no scrollbar is visible.
-  useEffect(() => {
+  // AIDEV-NOTE: Skip measurement/observers while the section is collapsed (no UX change; content is not visible).
+  // useLayoutEffect ensures the attribute is updated before paint when opening.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
     const el = scrollerRef.current;
     if (!el) return;
 
@@ -276,13 +288,14 @@ function QueriesTreeInner(
         disableCollapseAll={!hasExpandedFolder}
       />
       <TreeBody
-        tree={tree as any}
+        tree={tree}
         label={label}
         scrollerRef={scrollerRef}
         isTreeFocused={isTreeFocused}
         onTreeFocus={markTreeFocused}
       >
-        {renderItems.map((it: any) => {
+        {renderItems.map((it) => {
+          const itemId = String(it.getId?.() ?? '');
           const itemData = it.getItemData?.() as TreeNode | undefined;
           const mountId  = itemData?.mountId as UUIDv7 | undefined;
           const tabId    = mountId ? mountIdToTabIdMap.get(mountId) : undefined;
@@ -292,40 +305,48 @@ function QueriesTreeInner(
           const itemProps = it.getProps?.();
           const ariaSelected = itemProps?.['aria-selected'];
           const isSelectedByTree = ariaSelected === true || ariaSelected === 'true';
+          const rowIsTreeFocused = isSelectedByTree ? isTreeFocused : false;
 
           const draftFolderNodeId = draftFolder?.nodeId || null;
           const draftFileNodeId   = draftFile?.nodeId || null;
-          const isDraftFolder     = draftFolderNodeId != null && it.getId?.() === draftFolderNodeId;
-          const isDraftFile       = draftFileNodeId != null && it.getId?.() === draftFileNodeId;
+          const isDraftFolder     = draftFolderNodeId != null && itemId === String(draftFolderNodeId);
+          const isDraftFile       = draftFileNodeId != null && itemId === String(draftFileNodeId);
           const isDraft           = isDraftFolder || isDraftFile;
+
+          const editingName =
+            isDraftFolder ? (draftFolder?.name ?? '') : isDraftFile ? (draftFile?.name ?? '') : undefined;
+          const isEditingSubmitting =
+            isDraftFolder ? !!draftFolder?.isSubmitting : isDraftFile ? !!draftFile?.isSubmitting : undefined;
+
+          // AIDEV-NOTE: Only the draft row receives editing callbacks; this preserves Row memoization for all other rows.
+          const onEditingNameChange = isDraft
+            ? (next: string) => drafts.onEditingNameChange(itemId, next)
+            : undefined;
+          const onEditingCommit = isDraft
+            ? (finalName: string) => drafts.onEditingCommit(itemId, finalName)
+            : undefined;
+          const onEditingCancel = isDraft
+            ? () => drafts.onEditingCancel(itemId)
+            : undefined;
 
           return (
             <Row
-              key={it.getId()}
+              key={itemId}
               item={it}
               indent={indent}
               onRename={actions.handleRename}
               isTopLevel={false}
-              isTreeFocused={isTreeFocused}
+              isTreeFocused={rowIsTreeFocused}
               onTreeFocusFromRow={markTreeFocused}
               isActiveFromTab={isActiveFromTab}
               tabId={tabId}
               isSelectedByTree={isSelectedByTree}
               isEditing={isDraft}
-              editingName={isDraftFolder ? (draftFolder?.name ?? '') : isDraftFile ? (draftFile?.name ?? '') : undefined}
-              isEditingSubmitting={isDraftFolder ? !!draftFolder?.isSubmitting : isDraftFile ? !!draftFile?.isSubmitting : undefined}
-              onEditingNameChange={(next) => {
-                if (!isDraft) return;
-                drafts.onEditingNameChange(String(it.getId()), next);
-              }}
-              onEditingCommit={async (finalName) => {
-                if (!isDraft) return;
-                await drafts.onEditingCommit(String(it.getId()), finalName);
-              }}
-              onEditingCancel={async () => {
-                if (!isDraft) return;
-                await drafts.onEditingCancel(String(it.getId()));
-              }}
+              editingName={editingName}
+              isEditingSubmitting={isEditingSubmitting}
+              onEditingNameChange={onEditingNameChange}
+              onEditingCommit={onEditingCommit}
+              onEditingCancel={onEditingCancel}
             />
           );
         })}

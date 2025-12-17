@@ -1,11 +1,12 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import type { TreeApi }   from '../types';
 import styles             from '../styles.module.css';
 
 
 type Props = {
-  tree          : unknown;
+  tree          : TreeApi<unknown>;
   label         : string;
   scrollerRef   : React.RefObject<HTMLDivElement | null>;
   isTreeFocused : boolean;
@@ -15,7 +16,7 @@ type Props = {
 
 function TreeBody({ tree, label, scrollerRef, isTreeFocused, onTreeFocus, children }: Props) {
   // AIDEV-NOTE: Apply getContainerProps to the scroll host so the library observes scroll/size and binds roles/handlers.
-  const rawContainerProps = (tree as any).getContainerProps?.(`${label} Tree`) ?? {};
+  const rawContainerProps = tree.getContainerProps?.(`${label} Tree`) ?? {};
   const {
     style     : containerStyle,
     className : containerClassName,

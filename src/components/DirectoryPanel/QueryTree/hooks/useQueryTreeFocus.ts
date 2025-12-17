@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 
 
 type Result = {
@@ -24,25 +24,25 @@ function useQueryTreeFocus(): Result {
 
   // AIDEV-NOTE: Listen for mousedown outside the tree section to clear the focused state.
   // This is more robust than blur events which can fire unexpectedly during navigation.
+  const handleMouseDown = useEffectEvent((e: MouseEvent) => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const target = e.target as Node | null;
+    if (!target) return;
+
+    // Check if click is outside the tree section
+    if (!section.contains(target)) {
+      setIsTreeFocused(false);
+    }
+  });
+
   useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      const section = sectionRef.current;
-      if (!section) return;
-
-      const target = e.target as Node | null;
-      if (!target) return;
-
-      // Check if click is outside the tree section
-      if (!section.contains(target)) {
-        setIsTreeFocused(false);
-      }
-    };
-
     document.addEventListener('mousedown', handleMouseDown, true);
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true);
     };
-  }, []);
+  }, [handleMouseDown]);
 
   return { sectionRef, isTreeFocused, setIsTreeFocused, markTreeFocused };
 }
