@@ -113,7 +113,7 @@ function QueriesTree(props: { rootId: string; indent?: number; label?: string })
 }
 
 function QueriesTreeInner(
-  {
+{
     rootId,
     indent = 20,
     label = 'QUERIES',
@@ -143,7 +143,8 @@ function QueriesTreeInner(
 
   // AIDEV-NOTE: Ref ensures dataLoader always reads latest queryTree,
   // avoiding stale closure issues with useTree config.
-  const queryTreeRef = useRef(queryTree);
+  const queryTreeRef    = useRef(queryTree);
+  const clickTimeoutRef = useRef<number | null>(null);
   queryTreeRef.current = queryTree;
 
   // AIDEV-NOTE: Lift tab lookups to parent — single subscription for all rows
@@ -1032,6 +1033,7 @@ function QueriesTreeInner(
 
       const placement = getCreatePlacement('folder');
       const parentId  = placement.parentNodeId;
+      let fetchedChildren: TreeNode[] | null = null;
 
       // AIDEV-NOTE: If creating inside a folder, ensure it is expanded and its children
       // are present in Redux so we don't replace previously loaded children.
@@ -1039,8 +1041,22 @@ function QueriesTreeInner(
         try {
           const known = queryTreeRef.current?.childrenByParentId?.[parentId as any];
           if (known === undefined) {
-            await dispatch(getQueryTreeNodeChildrenThunk({ nodeId: parentId })).unwrap();
+            fetchedChildren = await dispatch(getQueryTreeNodeChildrenThunk({ nodeId: parentId })).unwrap();
+          } else {
+            // AIDEV-NOTE: Children already in Redux; use them as fetchedChildren baseline.
+            fetchedChildren = (known || []).map((id: string) => queryTreeRef.current?.nodes?.[id]).filter(Boolean) as TreeNode[];
           }
+        } catch {}
+
+        // AIDEV-NOTE: Prime HT's childrenIds cache BEFORE expanding so HT doesn't schedule a
+        // background load via setTimeout. The background load races with our draft insertion
+        // and can overwrite our cache update, causing the draft row to disappear.
+        try {
+          const parentItem = (tree as any).getItemInstance?.(String(parentId));
+          const primeIds = fetchedChildren
+            ? fetchedChildren.map((c) => String((c as any)?.nodeId ?? '')).filter(Boolean)
+            : [];
+          (parentItem as any)?.updateCachedChildrenIds?.(primeIds);
         } catch {}
 
         // AIDEV-NOTE: Expand after children are known so headless-tree can render the draft reliably.
@@ -1071,14 +1087,42 @@ function QueriesTreeInner(
       // AIDEV-NOTE: Draft insertion is synchronous; prefer direct actions over a thunk
       // to avoid extra pending/fulfilled actions and reduce render churn.
       dispatch(upsertNode(draftNode));
+      const insertIndex = (() => {
+        if (placement.placement === 'top') return 0;
+        if (fetchedChildren) {
+          // AIDEV-NOTE: If we just loaded children for a previously-unknown folder, compute the
+          // folder/file boundary deterministically from the fetched list.
+          let idx = 0;
+          for (; idx < fetchedChildren.length; idx++) {
+            const k = (fetchedChildren[idx] as any)?.kind;
+            if (k !== 'folder') break;
+          }
+          return idx;
+        }
+        return getInsertIndexForPlacement(parentId, 'after-last-folder');
+      })();
       dispatch(insertChildAtIndex({
         parentId,
         node: draftNode,
-        index: getInsertIndexForPlacement(
-          parentId,
-          placement.placement === 'top' ? 'top' : 'after-last-folder'
-        )
+        index: insertIndex
       }));
+      // AIDEV-NOTE: Headless-tree async loader caches childrenIds per parent. When a folder was
+      // expanded while empty, HT may cache `[]` and won't see Redux insertions automatically.
+      // Update the cache directly so the draft row renders immediately (no refetch needed).
+      try {
+        const baseIds = (() => {
+          if (fetchedChildren) return fetchedChildren.map((c) => String((c as any)?.nodeId ?? '')).filter(Boolean);
+          const ids = queryTreeRef.current?.childrenByParentId?.[String(parentId) as any] || [];
+          return Array.isArray(ids) ? ids.map((x) => String(x)).filter(Boolean) : [];
+        })();
+        const nextIds = baseIds.slice();
+        const idx = Math.max(0, Math.min(nextIds.length, Number.isFinite(insertIndex) ? insertIndex : nextIds.length));
+        if (!nextIds.includes(String(nodeId))) {
+          nextIds.splice(idx, 0, String(nodeId));
+        }
+        const parentItem = (tree as any).getItemInstance?.(String(parentId));
+        (parentItem as any)?.updateCachedChildrenIds?.(nextIds);
+      } catch {}
       // AIDEV-NOTE: For empty folders, some headless-tree configs won't “open” a folder until
       // it has a child. Re-attempt expansion after insertion so the draft is visible.
       if (parentId && parentId !== rootId) {
@@ -1147,7 +1191,21 @@ function QueriesTreeInner(
           const known = queryTreeRef.current?.childrenByParentId?.[parentId as any];
           if (known === undefined) {
             fetchedChildren = await dispatch(getQueryTreeNodeChildrenThunk({ nodeId: parentId })).unwrap();
+          } else {
+            // AIDEV-NOTE: Children already in Redux; use them as fetchedChildren baseline.
+            fetchedChildren = (known || []).map((id: string) => queryTreeRef.current?.nodes?.[id]).filter(Boolean) as TreeNode[];
           }
+        } catch {}
+
+        // AIDEV-NOTE: Prime HT's childrenIds cache BEFORE expanding so HT doesn't schedule a
+        // background load via setTimeout. The background load races with our draft insertion
+        // and can overwrite our cache update, causing the draft row to disappear.
+        try {
+          const parentItem = (tree as any).getItemInstance?.(String(parentId));
+          const primeIds = fetchedChildren
+            ? fetchedChildren.map((c) => String((c as any)?.nodeId ?? '')).filter(Boolean)
+            : [];
+          (parentItem as any)?.updateCachedChildrenIds?.(primeIds);
         } catch {}
 
         // AIDEV-NOTE: Expand after children are known so headless-tree can render the draft reliably.
@@ -1204,6 +1262,21 @@ function QueriesTreeInner(
         node: draftNode,
         index: insertIndex
       }));
+      // AIDEV-NOTE: Keep headless-tree childrenIds cache in sync so drafts render immediately.
+      try {
+        const baseIds = (() => {
+          if (fetchedChildren) return fetchedChildren.map((c) => String((c as any)?.nodeId ?? '')).filter(Boolean);
+          const ids = queryTreeRef.current?.childrenByParentId?.[String(parentId) as any] || [];
+          return Array.isArray(ids) ? ids.map((x) => String(x)).filter(Boolean) : [];
+        })();
+        const nextIds = baseIds.slice();
+        const idx = Math.max(0, Math.min(nextIds.length, Number.isFinite(insertIndex) ? insertIndex : nextIds.length));
+        if (!nextIds.includes(String(nodeId))) {
+          nextIds.splice(idx, 0, String(nodeId));
+        }
+        const parentItem = (tree as any).getItemInstance?.(String(parentId));
+        (parentItem as any)?.updateCachedChildrenIds?.(nextIds);
+      } catch {}
       // AIDEV-NOTE: For empty folders, some headless-tree configs won't “open” a folder until
       // it has a child. Re-attempt expansion after insertion so the draft is visible.
       if (parentId && parentId !== rootId) {
@@ -1669,24 +1742,44 @@ function QueriesTreeInner(
     }
   }, [tree, rootId]);
 
-  const handleTreeSectionMouseDownCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
+  const handleTreeSectionClickCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
     // AIDEV-NOTE: Background click within the section clears selection.
     // Ignore row clicks and toolbar clicks.
+    const section = sectionRef.current;
+    if (!section) return;
+
     const target = e.target as Element | null;
-    if (!target) return;
-    if (target.closest?.('[data-row="true"]')) return;
-    if (target.closest?.(`.${styles['header-tools']}`)) return;
-    clearTreeSelectionToRoot();
+    if (!target || section !== target) return;
+
+    // Clear any pending click
+    if (clickTimeoutRef.current !== null) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
+    // Delay the click action
+    clickTimeoutRef.current = window.setTimeout(() => {
+      clearTreeSelectionToRoot();
+      clickTimeoutRef.current = null;
+    }, 150);
   }, [clearTreeSelectionToRoot]);
 
   const handleTreeSectionDoubleClickCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
     // AIDEV-NOTE: Background dblclick within the section creates a new *file* draft at the root
     // after the last folder boundary (folder-first sort).
     // Ignore row dblclicks and toolbar dblclicks.
+
+    // Cancel pending single-click
+    if (clickTimeoutRef.current !== null) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
+    const section = sectionRef.current;
+    if (!section) return;
+
     const target = e.target as Element | null;
-    if (!target) return;
-    if (target.closest?.('[data-row="true"]')) return;
-    if (target.closest?.(`.${styles['header-tools']}`)) return;
+    if (!target || section !== target ) return;
 
     try {
       e.preventDefault();
@@ -1734,60 +1827,7 @@ function QueriesTreeInner(
 
       // Check if click is outside the tree section
       if (!section.contains(target)) {
-        // Check if click is within DirectoryPanel (stable attribute on panel root)
-        const targetElement   = target as Element;
-        const directoryPanel  = targetElement?.closest?.('[data-panel-side]');
-
-        if (directoryPanel) {
-          // Click is within DirectoryPanel but outside this tree section
-          // Clear focus state
-          setIsTreeFocused(false);
-
-          // Clear tree selection by updating state after event processing
-          // Use requestAnimationFrame to ensure the update happens after the click event
-          requestAnimationFrame(() => {
-            try {
-              const currentState    = tree.getState();
-              const currentSelected = currentState?.selectedItems || [];
-
-              // Clear selection if there are any selected items other than root
-              const nonRootSelected = currentSelected.filter((id: string) => id !== rootId);
-              if (nonRootSelected.length > 0 || (currentSelected.length > 0 && currentSelected.includes(rootId) && currentSelected.length > 1)) {
-                // Use setSelectedItems to clear selection (keep root selected to match initial state)
-                if (typeof (tree as any).setSelectedItems === 'function') {
-                  (tree as any).setSelectedItems([rootId]);
-
-                  // Also update focusedItem to root
-                  tree.setConfig((prev) => {
-                    const prevState = prev.state || {};
-                    return {
-                      ...prev,
-                      state: {
-                        ...prevState,
-                        focusedItem: rootId
-                      }
-                    };
-                  });
-                } else {
-                  // Fallback to setConfig if setSelectedItems is not available
-                  tree.setConfig((prev) => {
-                    const prevState = prev.state || {};
-                    return {
-                      ...prev,
-                      state: {
-                        ...prevState,
-                        selectedItems: [rootId],
-                        focusedItem: rootId
-                      }
-                    };
-                  });
-                }
-              }
-            } catch (error) {
-              // Ignore errors in selection clearing
-            }
-          });
-        }
+        setIsTreeFocused(false);
       }
     };
 
@@ -1795,7 +1835,7 @@ function QueriesTreeInner(
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true);
     };
-  }, [isTreeFocused, tree, rootId]);
+  }, [setIsTreeFocused]);
 
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
@@ -1859,8 +1899,9 @@ function QueriesTreeInner(
       aria-label={label}
       data-open={isOpen ? 'true' : 'false'}
       data-row-focused={isTreeFocused ? 'true' : 'false'}
-      onMouseDownCapture={handleTreeSectionMouseDownCapture}
+      // onMouseDownCapture={handleTreeSectionMouseDownCapture}
       onDoubleClickCapture={handleTreeSectionDoubleClickCapture}
+      onClickCapture={handleTreeSectionClickCapture}
     >
       {/* Header with toggle and per-section tools */}
       <div

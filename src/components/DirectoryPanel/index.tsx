@@ -23,6 +23,7 @@ function DirectoryPanel({ side = 'right', unsavedSlot, queriesSlot }: Props) {
 
   return (
     <div
+      id="directory-panel"
       className={styles['directory-panel']}
       data-collapsed={collapsed || undefined}
       data-panel-side={side}
@@ -37,10 +38,10 @@ function DirectoryPanel({ side = 'right', unsavedSlot, queriesSlot }: Props) {
       </div>
 
       <div className={styles['sections']} style={{ display: collapsed ? 'none' : 'flex' }} aria-hidden={collapsed}>
-        <div className={styles['section-wrapper']} data-expanded='true'>
+        <div className={styles['section-wrapper']}>
           {unsavedSlot ?? <UnsavedQueryTree rootId='unsaved-queries' label='Unsaved Queries' />}
         </div>
-        <div className={styles['section-wrapper']} data-expanded='true'>
+        <div className={styles['section-wrapper']}>
           {queriesSlot ?? <QueryTree rootId='queries' label='Queries' />}
         </div>
       </div>

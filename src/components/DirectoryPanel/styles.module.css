@@ -40,14 +40,19 @@
 
 /* AIDEV-NOTE: Sections stack vertically with content-driven height; [data-expanded] no longer enforces equal split. */
 .section-wrapper {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  display         : flex;
+  flex-direction  : column;
+  min-height      : 0;
+}
+.section-wrapper:last-child:has([data-open="true"]) {
+  flex        : 1;
+  min-height  : 0;
 }
 
 /* AIDEV-NOTE: Container for stacking all sections with natural height instead of forcing a 50/50 split. */
 .sections {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  display         : flex;
+  flex-direction  : column;
+  min-height      : 0;
+  flex            : 1;
 }

@@ -3,6 +3,7 @@
   flex-direction  : column;
   min-height      : 0;      /* allow child scroll areas to size */
   overflow        : hidden; /* keep window from scrolling; delegate to .scroller */
+  flex            : 1;
 }
 
 .list {
@@ -12,26 +13,30 @@
 
 .content {
   /* AIDEV-NOTE: Accordion-style body; default to collapsed and animate max-height + opacity + translate. */
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition:
+  overflow    : hidden;
+  max-height  : 0;
+  opacity     : 0;
+  transform   : translateY(-4px);
+  transition  :
     max-height var(--duration-250) var(--ease-standard),
     opacity var(--duration-200) var(--ease-standard),
     transform var(--duration-200) var(--ease-standard);
 }
 .tree[data-open="false"] .content {
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-4px);
-  pointer-events: none; /* AIDEV-NOTE: keep mounted but non-interactive when collapsed */
+  max-height      : 0;
+  opacity         : 0;
+  transform       : translateY(-4px);
+  pointer-events  : none; /* AIDEV-NOTE: keep mounted but non-interactive when collapsed */
 }
 .tree[data-open="true"] .content {
-  max-height: 40rem; /* AIDEV-NOTE: generous cap for typical lists; behaves like "auto" for animation. */
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+  /* AIDEV-NOTE: Let flex layout determine height; use 100vh as animation-friendly upper bound.
+     For truly unlimited lists, flex: 1 + min-height: 0 ensures proper sizing. */
+  max-height      : 100vh;
+  flex            : 1;
+  min-height      : 0;
+  opacity         : 1;
+  transform       : translateY(0);
+  pointer-events  : auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -69,9 +74,9 @@
   cursor          : pointer;
 }
 .header-label {
-  font-size   : var(--text-xs);
-  font-weight : 600;
-  letter-spacing: 0.02em;
+  font-size       : var(--text-xs);
+  font-weight     : 600;
+  letter-spacing  : 0.02em;
 }
 
 .scroller {
@@ -88,7 +93,7 @@
 
 /* AIDEV-NOTE: Apply gutter only when a scrollbar is present. */
 .scroller[data-has-scrollbar="true"] {
-  scrollbar-gutter    : stable;
+  scrollbar-gutter: stable;
 }
 
 /* AIDEV-NOTE: Collapsed state — show only the root row; do not force a 100% height scroller. */
@@ -96,27 +101,27 @@
 
 /* AIDEV-NOTE: Toolbar in header (right-aligned) */
 .header-tools {
-  display: inline-flex;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--duration-150) var(--ease-standard);
-  cursor: default; /* AIDEV-NOTE: toolbar itself shouldn't indicate header-level toggle */
-  z-index: 1; /* lift above header-left for interaction when visible */
+  display         : inline-flex;
+  align-items     : center;
+  opacity         : 0;
+  pointer-events  : none;
+  transition      : opacity var(--duration-150) var(--ease-standard);
+  cursor          : default; /* AIDEV-NOTE: toolbar itself shouldn't indicate header-level toggle */
+  z-index         : 1; /* lift above header-left for interaction when visible */
 }
 
 /* AIDEV-NOTE: Reveal tools when the expanded section is hovered or when a row in the tree has focus. */
 .tree[data-open="true"]:hover .header-tools,
 .tree[data-open="true"][data-row-focused="true"] .header-tools {
-  opacity: 1;
-  pointer-events: auto;
+  opacity         : 1;
+  pointer-events  : auto;
 }
 
 /* AIDEV-NOTE: Hover/focus fade-in for scrollbar visuals without changing thickness */
 .scroller::-webkit-scrollbar-thumb,
 .scroller::-webkit-scrollbar-track {
-  background-color: transparent;
-  transition: background-color var(--duration-150) var(--ease-standard);
+  background-color  : transparent;
+  transition        : background-color var(--duration-150) var(--ease-standard);
 }
 
 .scroller:hover::-webkit-scrollbar-thumb {
