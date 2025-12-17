@@ -1351,12 +1351,17 @@ function QueriesTreeInner(
 
   const getCreatePlacement = useCallback((createKind: 'folder' | 'file') => {
     // AIDEV-NOTE: Derive draft placement from headless-tree selection/focus state.
-    // Prefer selectedItems (matches visible highlight), fallback to focusedItem.
-    // AIDEV-NOTE: In this headless-tree version, `focusedItem` is not reliably settable
-    // via config updates, so it can lag behind selection after programmatic selects.
+    // Prefer selectedItems (matches visible highlight).
+    // AIDEV-NOTE: UX rule — if this tree section is not focused (no active highlight),
+    // treat toolbar create as "create at root" even if headless-tree still holds an old selection.
+    // This avoids surprising inserts into a previously-selected folder after the user clicks away.
+    if (!isTreeFocused) {
+      return { parentNodeId: String(rootId), placement: 'after-last-folder' as const };
+    }
+    // AIDEV-NOTE: In this headless-tree version, `focusedItem` can lag behind selection and
+    // is not reliably settable via config updates, so we intentionally do NOT use it for placement.
     const state = tree.getState?.() as any;
     const selectedItems = (state?.selectedItems || []) as string[];
-    const focusedItem = String(state?.focusedItem || '');
 
     const pickSelectedId = () => {
       // Prefer the most recent non-root selection if multiple exist.
@@ -1364,7 +1369,6 @@ function QueriesTreeInner(
         const id = String(selectedItems[i]);
         if (id && id !== String(rootId)) return id;
       }
-      if (focusedItem && focusedItem !== String(rootId)) return String(focusedItem);
       return '';
     };
 
@@ -1401,7 +1405,7 @@ function QueriesTreeInner(
     }
     // File inside folder + new folder => parent folder, first child (visually right below folder row).
     return { parentNodeId, placement: 'top' as const };
-  }, [tree, rootId]);
+  }, [tree, rootId, isTreeFocused]);
 
   const getInsertIndexForPlacement = useCallback((parentNodeId: string, placement: 'top' | 'after-last-folder') => {
     if (placement === 'top') return 0;
@@ -1602,6 +1606,118 @@ function QueriesTreeInner(
     } catch {}
   }, [dispatch, getInsertIndexForPlacement, rootId, selectTreeItem, setDraftFile]);
 
+  const pendingClearSelectionRafRef = useRef<number | null>(null);
+
+  const clearTreeSelectionToRoot = useCallback(() => {
+    // AIDEV-NOTE: Clear selection to a "no visible selection" sentinel (root is not rendered as a row).
+    // Schedule after event processing so headless-tree doesn't overwrite during the same click.
+    try {
+      if (pendingClearSelectionRafRef.current != null) {
+        cancelAnimationFrame(pendingClearSelectionRafRef.current);
+      }
+    } catch {}
+
+    try {
+      pendingClearSelectionRafRef.current = requestAnimationFrame(() => {
+        pendingClearSelectionRafRef.current = null;
+
+        try {
+          setIsTreeFocused(false);
+        } catch {}
+
+        try {
+          if (typeof (tree as any).setSelectedItems === 'function') {
+            (tree as any).setSelectedItems([rootId]);
+            // Best-effort: also reset focusedItem. Some headless-tree versions don't reliably accept focusedItem updates.
+            try {
+              tree.setConfig((prev) => {
+                const prevState = prev.state || {};
+                return {
+                  ...prev,
+                  state: {
+                    ...prevState,
+                    focusedItem: rootId
+                  }
+                };
+              });
+            } catch {}
+          } else {
+            tree.setConfig((prev) => {
+              const prevState = prev.state || {};
+              return {
+                ...prev,
+                state: {
+                  ...prevState,
+                  selectedItems: [rootId],
+                  focusedItem: rootId
+                }
+              };
+            });
+          }
+        } catch {}
+      });
+    } catch {
+      // If RAF isn't available for some reason, do best-effort sync.
+      try {
+        setIsTreeFocused(false);
+      } catch {}
+      try {
+        if (typeof (tree as any).setSelectedItems === 'function') {
+          (tree as any).setSelectedItems([rootId]);
+        }
+      } catch {}
+    }
+  }, [tree, rootId]);
+
+  const handleTreeSectionMouseDownCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    // AIDEV-NOTE: Background click within the section clears selection.
+    // Ignore row clicks and toolbar clicks.
+    const target = e.target as Element | null;
+    if (!target) return;
+    if (target.closest?.('[data-row="true"]')) return;
+    if (target.closest?.(`.${styles['header-tools']}`)) return;
+    clearTreeSelectionToRoot();
+  }, [clearTreeSelectionToRoot]);
+
+  const handleTreeSectionDoubleClickCapture = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    // AIDEV-NOTE: Background dblclick within the section creates a new *file* draft at the root
+    // after the last folder boundary (folder-first sort).
+    // Ignore row dblclicks and toolbar dblclicks.
+    const target = e.target as Element | null;
+    if (!target) return;
+    if (target.closest?.('[data-row="true"]')) return;
+    if (target.closest?.(`.${styles['header-tools']}`)) return;
+
+    try {
+      e.preventDefault();
+      e.stopPropagation();
+    } catch {}
+
+    // If the dblclick's first click causes a blur that cancels a draft, defer creation
+    // to the next tick so we see the updated draft refs.
+    window.setTimeout(() => {
+      const existingFolderDraft = draftFolderRef.current;
+      const existingFileDraft   = draftFileRef.current;
+
+      if (existingFolderDraft?.nodeId) {
+        selectTreeItem(existingFolderDraft.nodeId);
+        return;
+      }
+      if (existingFileDraft?.nodeId) {
+        selectTreeItem(existingFileDraft.nodeId);
+        try {
+          requestAnimationFrame(() => {
+            const el = document.querySelector('[data-row="true"][aria-selected="true"]') as HTMLElement | null;
+            el?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+          });
+        } catch {}
+        return;
+      }
+
+      createRootFileDraft();
+    }, 0);
+  }, [createRootFileDraft, selectTreeItem]);
+
   // AIDEV-NOTE: Stable callback to avoid breaking Row memo
   const handleTreeFocusFromRow = useCallback(() => setIsTreeFocused(true), []);
 
@@ -1681,58 +1797,6 @@ function QueriesTreeInner(
     };
   }, [isTreeFocused, tree, rootId]);
 
-  // AIDEV-NOTE: When nothing is selected, dblclick outside the tree (but within DirectoryPanel)
-  // creates a new *file* draft at the root after the last folder boundary.
-  useEffect(() => {
-    const handleDoubleClick = (e: MouseEvent) => {
-      const section = sectionRef.current;
-      if (!section) return;
-
-      const target = e.target as Node | null;
-      if (!target) return;
-
-      if (section.contains(target)) return;
-
-      const targetElement = target as Element;
-      const directoryPanel = targetElement?.closest?.('[data-panel-side]');
-      if (!directoryPanel) return;
-
-      // AIDEV-NOTE: If a draft already exists, bring it into view instead of doing nothing.
-      // If the dblclick's first click causes a blur that cancels the draft, defer creation
-      // to the next tick so we see the updated draft refs.
-      try {
-        e.preventDefault();
-      } catch {}
-
-      window.setTimeout(() => {
-        const existingFolderDraft = draftFolderRef.current;
-        const existingFileDraft   = draftFileRef.current;
-
-        if (existingFolderDraft?.nodeId) {
-          selectTreeItem(existingFolderDraft.nodeId);
-          return;
-        }
-        if (existingFileDraft?.nodeId) {
-          selectTreeItem(existingFileDraft.nodeId);
-          try {
-            requestAnimationFrame(() => {
-              const el = document.querySelector('[data-row="true"][aria-selected="true"]') as HTMLElement | null;
-              el?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
-            });
-          } catch {}
-          return;
-        }
-
-        createRootFileDraft();
-      }, 0);
-    };
-
-    document.addEventListener('dblclick', handleDoubleClick, true);
-    return () => {
-      document.removeEventListener('dblclick', handleDoubleClick, true);
-    };
-  }, [tree, rootId, selectTreeItem, createRootFileDraft]);
-
   // Compute rendering ranges and items outside JSX
   const allItems = (tree as any).getItems?.() ?? [];
   // AIDEV-NOTE: Detect whether any folder (excluding the synthetic section root) is expanded.
@@ -1795,6 +1859,8 @@ function QueriesTreeInner(
       aria-label={label}
       data-open={isOpen ? 'true' : 'false'}
       data-row-focused={isTreeFocused ? 'true' : 'false'}
+      onMouseDownCapture={handleTreeSectionMouseDownCapture}
+      onDoubleClickCapture={handleTreeSectionDoubleClickCapture}
     >
       {/* Header with toggle and per-section tools */}
       <div
