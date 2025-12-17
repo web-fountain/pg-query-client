@@ -60,6 +60,11 @@ import {
   getItemName as adapterGetItemName,
   isItemFolder as adapterIsItemFolder
 }                                         from './adapters/treeItemAdapter';
+import {
+  computeChildrenIdsAfterInsert,
+  primeChildrenIdsCache,
+  updateChildrenIdsCache
+}                                         from './utils/headlessTreeCache';
 import { generateUUIDv7 }                 from '@Utils/generateId';
 
 import styles                             from './styles.module.css';
@@ -998,7 +1003,6 @@ function QueriesTreeInner(
       (parentItem as any)?.invalidateChildrenIds?.();
     } catch {}
 
-    try { (tree as any).loadChildrenWithData?.(parentId); } catch {}
     try { (tree as any).loadChildrenIds?.(parentId); } catch {}
   }, [draftFolder?.nodeId, draftFolder?.parentId, draftFile?.nodeId, draftFile?.parentId, tree]);
 
@@ -1051,13 +1055,7 @@ function QueriesTreeInner(
         // AIDEV-NOTE: Prime HT's childrenIds cache BEFORE expanding so HT doesn't schedule a
         // background load via setTimeout. The background load races with our draft insertion
         // and can overwrite our cache update, causing the draft row to disappear.
-        try {
-          const parentItem = (tree as any).getItemInstance?.(String(parentId));
-          const primeIds = fetchedChildren
-            ? fetchedChildren.map((c) => String((c as any)?.nodeId ?? '')).filter(Boolean)
-            : [];
-          (parentItem as any)?.updateCachedChildrenIds?.(primeIds);
-        } catch {}
+        primeChildrenIdsCache(tree as any, String(parentId), fetchedChildren);
 
         // AIDEV-NOTE: Expand after children are known so headless-tree can render the draft reliably.
         await ensureFolderExpanded(parentId);
@@ -1115,13 +1113,8 @@ function QueriesTreeInner(
           const ids = queryTreeRef.current?.childrenByParentId?.[String(parentId) as any] || [];
           return Array.isArray(ids) ? ids.map((x) => String(x)).filter(Boolean) : [];
         })();
-        const nextIds = baseIds.slice();
-        const idx = Math.max(0, Math.min(nextIds.length, Number.isFinite(insertIndex) ? insertIndex : nextIds.length));
-        if (!nextIds.includes(String(nodeId))) {
-          nextIds.splice(idx, 0, String(nodeId));
-        }
-        const parentItem = (tree as any).getItemInstance?.(String(parentId));
-        (parentItem as any)?.updateCachedChildrenIds?.(nextIds);
+        const nextIds = computeChildrenIdsAfterInsert(baseIds, String(nodeId), insertIndex);
+        updateChildrenIdsCache(tree as any, String(parentId), nextIds);
       } catch {}
       // AIDEV-NOTE: For empty folders, some headless-tree configs won't “open” a folder until
       // it has a child. Re-attempt expansion after insertion so the draft is visible.
@@ -1200,13 +1193,7 @@ function QueriesTreeInner(
         // AIDEV-NOTE: Prime HT's childrenIds cache BEFORE expanding so HT doesn't schedule a
         // background load via setTimeout. The background load races with our draft insertion
         // and can overwrite our cache update, causing the draft row to disappear.
-        try {
-          const parentItem = (tree as any).getItemInstance?.(String(parentId));
-          const primeIds = fetchedChildren
-            ? fetchedChildren.map((c) => String((c as any)?.nodeId ?? '')).filter(Boolean)
-            : [];
-          (parentItem as any)?.updateCachedChildrenIds?.(primeIds);
-        } catch {}
+        primeChildrenIdsCache(tree as any, String(parentId), fetchedChildren);
 
         // AIDEV-NOTE: Expand after children are known so headless-tree can render the draft reliably.
         await ensureFolderExpanded(parentId);
@@ -1269,13 +1256,8 @@ function QueriesTreeInner(
           const ids = queryTreeRef.current?.childrenByParentId?.[String(parentId) as any] || [];
           return Array.isArray(ids) ? ids.map((x) => String(x)).filter(Boolean) : [];
         })();
-        const nextIds = baseIds.slice();
-        const idx = Math.max(0, Math.min(nextIds.length, Number.isFinite(insertIndex) ? insertIndex : nextIds.length));
-        if (!nextIds.includes(String(nodeId))) {
-          nextIds.splice(idx, 0, String(nodeId));
-        }
-        const parentItem = (tree as any).getItemInstance?.(String(parentId));
-        (parentItem as any)?.updateCachedChildrenIds?.(nextIds);
+        const nextIds = computeChildrenIdsAfterInsert(baseIds, String(nodeId), insertIndex);
+        updateChildrenIdsCache(tree as any, String(parentId), nextIds);
       } catch {}
       // AIDEV-NOTE: For empty folders, some headless-tree configs won't “open” a folder until
       // it has a child. Re-attempt expansion after insertion so the draft is visible.
@@ -1585,7 +1567,6 @@ function QueriesTreeInner(
 
       // AIDEV-NOTE: Some headless-tree paths only load children when expand() is called.
       // Ensure children load when we toggle expandedItems via config.
-      try { (tree as any).loadChildrenWithData?.(id); } catch {}
       try { (tree as any).loadChildrenIds?.(id); } catch {}
 
       const finish = () => {
@@ -1617,24 +1598,6 @@ function QueriesTreeInner(
         }
       }
     });
-  }, [tree, rootId]);
-
-  const getMetaLevelForNodeId = useCallback((nodeId: string) => {
-    const id = String(nodeId || '');
-    if (!id) return 0;
-
-    try {
-      const inst = (tree as any).getItemInstance?.(id);
-      const meta = inst?.getItemMeta?.() ?? {};
-      const lvl = Number((meta as any).level);
-      if (Number.isFinite(lvl)) return lvl;
-    } catch {}
-
-    if (id === String(rootId)) return 0;
-    const n = queryTreeRef.current?.nodes?.[id as any] as any;
-    const abs = Number(n?.level ?? 0);
-    if (Number.isFinite(abs) && abs > 0) return Math.max(0, abs - 1);
-    return 0;
   }, [tree, rootId]);
 
   const createRootFileDraft = useCallback(() => {
@@ -1889,9 +1852,6 @@ function QueriesTreeInner(
     };
   }, [isOpen, allItems.length]);
 
-  // Detect expanded state of section: root item is index 0
-  const rootItem = allItems.find((it: any) => it?.getId?.() === rootId) || allItems[0];
-
   return (
     <section
       ref={sectionRef}
@@ -1899,7 +1859,6 @@ function QueriesTreeInner(
       aria-label={label}
       data-open={isOpen ? 'true' : 'false'}
       data-row-focused={isTreeFocused ? 'true' : 'false'}
-      // onMouseDownCapture={handleTreeSectionMouseDownCapture}
       onDoubleClickCapture={handleTreeSectionDoubleClickCapture}
       onClickCapture={handleTreeSectionClickCapture}
     >
@@ -2010,7 +1969,6 @@ function QueriesTreeInner(
                     item={it}
                     indent={indent}
                     onRename={actions.handleRename}
-                    onDropMove={actions.handleDropMove}
                     isTopLevel={false}
                     isTreeFocused={isTreeFocused}
                     onTreeFocusFromRow={handleTreeFocusFromRow}
@@ -2159,5 +2117,6 @@ function QueriesTreeInner(
     </section>
   );
 }
+
 
 export default QueriesTree;

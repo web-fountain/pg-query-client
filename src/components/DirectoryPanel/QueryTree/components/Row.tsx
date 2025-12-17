@@ -1,18 +1,21 @@
 'use client';
 
-import type { TreeNode }                                      from '@Redux/records/queryTree/types';
-import type { UUIDv7 }                                        from '@Types/primitives';
-import type { TreeItemApi, OnRename, OnDropMove }            from '../types';
+import type { TreeNode }                      from '@Redux/records/queryTree/types';
+import type { UUIDv7 }                        from '@Types/primitives';
+import type { TreeItemApi, OnRename }         from '../types';
 
-import { memo, useCallback, useEffect, useMemo, useRef }      from 'react';
-import { useRouter, useParams }                   from 'next/navigation';
+import {
+  memo, useCallback, useEffect, useMemo,
+  useRef
+}                                             from 'react';
+import { useRouter, useParams }               from 'next/navigation';
 
-import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
-import { setActiveTabThunk, openTabThunk }        from '@Redux/records/tabbar/thunks';
-import { logClientJson }                          from '@Observability/client';
-import Icon                                       from '@Components/Icons';
+import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
+import { setActiveTabThunk, openTabThunk }    from '@Redux/records/tabbar/thunks';
+import { logClientJson }                      from '@Observability/client';
+import Icon                                   from '@Components/Icons';
 
-import styles                                     from './Row.module.css';
+import styles                                 from './Row.module.css';
 
 
 // AIDEV-NOTE: Presentational row; spreads item props once, renders icon and name.
@@ -20,7 +23,6 @@ type RowProps = {
   item                : TreeItemApi<TreeNode>;
   indent              : number;
   onRename            : OnRename;
-  onDropMove          : OnDropMove;
   isTopLevel?         : boolean;
   isTreeFocused?      : boolean;
   isActiveFromTab?    : boolean;
@@ -39,7 +41,6 @@ function Row({
   item,
   indent,
   onRename,
-  onDropMove,
   isTopLevel = false,
   isTreeFocused,
   isActiveFromTab = false,

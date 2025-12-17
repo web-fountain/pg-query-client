@@ -29,10 +29,7 @@
   pointer-events  : none; /* AIDEV-NOTE: keep mounted but non-interactive when collapsed */
 }
 .tree[data-open="true"] .content {
-  /* AIDEV-NOTE: Let flex layout determine height; use 100vh as animation-friendly upper bound.
-     For truly unlimited lists, flex: 1 + min-height: 0 ensures proper sizing. */
-  max-height      : 100vh;
-  flex            : 1;
+  max-height      : 100%;
   min-height      : 0;
   opacity         : 1;
   transform       : translateY(0);
