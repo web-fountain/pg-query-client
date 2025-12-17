@@ -80,8 +80,9 @@ function Row({
   // AIDEV-NOTE: Focused vs. blurred semantics:
   // - Folders: focused when selected AND the tree section reports focus.
   // - Files  : focused when selected AND their tab is the active tab.
-  const useFocusedStyle = !isTopLevel && isActive && (isFolder ? !!isTreeFocused : isActiveFromTab);
+  const useFocusedStyle = !isTopLevel && isActive && !!isTreeFocused && (isFolder || isActiveFromTab);
   const useBlurredStyle = !isTopLevel && isActive && !useFocusedStyle;
+
 
   const mergedClassName = useMemo(() =>
     [
