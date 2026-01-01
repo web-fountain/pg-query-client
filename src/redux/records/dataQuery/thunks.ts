@@ -39,14 +39,29 @@ import { requestSqlEditorAutofocus }    from '@Redux/records/uiFocus';
 
 export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string }, { state: RootState }>(
   'dataQuery/createNewUnsavedDataQueryThunk',
-  async ({ dataQueryId, name }, { dispatch }) => {
+  async ({ dataQueryId, name }, { dispatch, getState }) => {
+    const state = getState();
+    const activeDataSourceId = state.dataSourceRecords?.activeDataSourceId || null;
+
     log.thunkStart({
       thunk : 'dataQuery/createNewUnsavedDataQueryThunk',
       input : {
         dataQueryId,
-        nameLen: typeof name === 'string' ? name.length : undefined
+        nameLen: typeof name === 'string' ? name.length : undefined,
+        hasActiveConnection: Boolean(activeDataSourceId)
       }
     });
+
+    if (!activeDataSourceId) {
+      // AIDEV-NOTE: Enforce "connect first" at the central thunk boundary so all entrypoints
+      // (intro, tabbar +, directory buttons) share the same rule and error messaging.
+      dispatch(updateError({
+        actionType  : 'dataQuery/createNewUnsavedDataQueryThunk',
+        message     : 'Connect a server first to create a new query.',
+        meta        : { code: 'missing-active-connection' }
+      }));
+      return;
+    }
 
     // AIDEV-NOTE: Creating a new unsaved query is an explicit "start typing" intent.
     // We request an editor autofocus; QueryWorkspace will honor it only when appropriate.

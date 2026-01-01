@@ -1,23 +1,28 @@
 'use server';
 
-import type { UUIDv7 }                      from '@Types/primitives';
-import type { DataQuery, DataQueryRecord }  from '@Redux/records/dataQuery/types';
-import type { TabbarRecord }                from '@Redux/records/tabbar/types';
-import type { QueryTreeRecord }             from '@Redux/records/queryTree/types';
-import type { UnsavedQueryTreeRecord }      from '@Redux/records/unsavedQueryTree/types';
-import type { ActionError }                 from '@Errors/types';
-import type { ActionResult }                from '../types';
-import type { WorkspaceBootstrap }          from './types';
+import type { UUIDv7 }                            from '@Types/primitives';
+import type { DataQuery, DataQueryRecord }        from '@Redux/records/dataQuery/types';
+import type { DataSourceMeta, DataSourceRecord }  from '@Redux/records/dataSource/types';
+import type { TabbarRecord }                      from '@Redux/records/tabbar/types';
+import type { QueryTreeRecord }                   from '@Redux/records/queryTree/types';
+import type { UnsavedQueryTreeRecord }            from '@Redux/records/unsavedQueryTree/types';
+import type { ActionError }                       from '@Errors/types';
+import type { ActionResult }                      from '../types';
+import type { WorkspaceBootstrap }                from './types';
 
-import { ERROR_CODES }                      from '@Errors/codes';
-import { withAction }                       from '@Observability/server/action';
-import { aggregateActionError, fail, ok }   from '@Errors/server/actionResult.server';
-import { listDataQueriesAction }            from '../queries';
+import { ERROR_CODES }                            from '@Errors/codes';
+import { withAction }                             from '@Observability/server/action';
+import { aggregateActionError, fail, ok }         from '@Errors/server/actionResult.server';
+import { listDataQueriesAction }                  from '../queries';
 import {
   buildInitialQueryTreeAction,
   buildInitialUnsavedQueryTreeAction
-}                                           from '../queryTree';
-import { listOpenTabsAction }               from '../tabs';
+}                                                 from '../queryTree';
+import { listOpenTabsAction }                     from '../tabs';
+import {
+  getActiveDataSourceAction,
+  listDataSourcesAction
+}                                                 from '@OpSpaceDataSourceActions';
 
 
 async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstrap>> {
@@ -28,11 +33,20 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
   return withAction(
     { action: 'bootstrap.workspace', op: 'read' },
     async ({ meta }) => {
-      const [tabsResult, queriesResult, queryTreeResult, unsavedTreeResult] = await Promise.all([
+      const [
+        tabsResult,
+        queriesResult,
+        queryTreeResult,
+        unsavedTreeResult,
+        dataSourcesResult,
+        activeDataSourceResult
+      ] = await Promise.all([
         listOpenTabsAction(),
         listDataQueriesAction(),
         buildInitialQueryTreeAction(),
-        buildInitialUnsavedQueryTreeAction()
+        buildInitialUnsavedQueryTreeAction(),
+        listDataSourcesAction(),
+        getActiveDataSourceAction()
       ]);
 
       if (!tabsResult.success || !queryTreeResult.success || !unsavedTreeResult.success || !queriesResult.success) {
@@ -80,11 +94,31 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
         }
       }
 
+      // AIDEV-NOTE: DbConnections bootstrap is non-fatal; if the backend does not yet support
+      // connections endpoints, we still want the OpSpace shell to render so the user can
+      // attempt to create a connection (or see a helpful error in the modal).
+      const dataSources: DataSourceMeta[] =
+        dataSourcesResult.success && Array.isArray(dataSourcesResult.data)
+          ? (dataSourcesResult.data as DataSourceMeta[])
+          : [];
+
+      const activeDataSourceId =
+        activeDataSourceResult.success
+          ? (activeDataSourceResult.data?.dataSourceId ?? null)
+          : null;
+
+      const dataSourceRecords: DataSourceRecord = {
+        dataSourceIds      : dataSources.map((ds) => ds.dataSourceId),
+        byId               : Object.fromEntries(dataSources.map((ds) => [ds.dataSourceId, ds])),
+        activeDataSourceId : activeDataSourceId
+      };
+
       return ok(meta, {
         tabs,
         dataQueryRecords,
         queryTree,
-        unsavedQueryTree
+        unsavedQueryTree,
+        dataSourceRecords
       });
     }
   );
@@ -92,4 +126,3 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
 
 
 export { bootstrapWorkspaceAction };
-export type { WorkspaceBootstrap };

@@ -7,6 +7,7 @@ import { connection }               from 'next/server';
 
 import StoreProvider                from '@Redux/StoreProvider';
 import { ChatProvider }             from '@OpSpaceProviders/ChatProvider';
+import { DataSourceProvider }       from '@OpSpaceProviders/DataSourceProvider';
 import { SQLRunnerProvider }        from '@OpSpaceProviders/SQLRunnerProvider';
 import { QueriesRouteProvider }     from './queries/_providers/QueriesRouteProvider';
 
@@ -48,6 +49,7 @@ async function LayoutWithData({ children, params }: { children: ReactNode, param
   }
 
   const preloadedState: Partial<RootState> = {
+    dataSourceRecords : bootstrap.data.dataSourceRecords,
     dataQueryRecords  : bootstrap.data.dataQueryRecords,
     tabs              : bootstrap.data.tabs,
     queryTree         : bootstrap.data.queryTree,
@@ -57,29 +59,31 @@ async function LayoutWithData({ children, params }: { children: ReactNode, param
   return (
     <StoreProvider key={opspaceId} preloadedState={preloadedState}>
       <QueriesRouteProvider opspaceId={opspaceId as Base64Url22}>
-        <SQLRunnerProvider>
-          <ChatProvider>
-            <OpSpacePreloadClient />
-            <Titlebar />
+        <DataSourceProvider>
+          <SQLRunnerProvider>
+            <ChatProvider>
+              <OpSpacePreloadClient />
+              <Titlebar />
 
-            <PanelLayout>
-              <LeftPanel>
-                <ChatPanel side="left" />
-              </LeftPanel>
+              <PanelLayout>
+                <LeftPanel>
+                  <ChatPanel side="left" />
+                </LeftPanel>
 
-              <MainPanel>
-                <Suspense>
-                  {children}
-                </Suspense>
-              </MainPanel>
+                <MainPanel>
+                  <Suspense>
+                    {children}
+                  </Suspense>
+                </MainPanel>
 
-              <RightPanel>
-                <DirectoryPanel side="right" />
-              </RightPanel>
-            </PanelLayout>
+                <RightPanel>
+                  <DirectoryPanel side="right" />
+                </RightPanel>
+              </PanelLayout>
 
-          </ChatProvider>
-        </SQLRunnerProvider>
+            </ChatProvider>
+          </SQLRunnerProvider>
+        </DataSourceProvider>
       </QueriesRouteProvider>
     </StoreProvider>
   );

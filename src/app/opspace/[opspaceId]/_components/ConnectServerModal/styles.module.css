@@ -1,0 +1,243 @@
+.overlay {
+  position        : fixed;
+  inset           : 0;
+  z-index         : var(--z-modal);
+  display         : grid;
+  place-items     : center;
+  padding         : 16px;
+  background      : rgba(23, 24, 32, 0.50);
+  backdrop-filter : blur(1.5px);
+}
+
+.modal {
+  width         : 100%;
+  max-width     : 43rem;
+  border        : var(--border-1) solid var(--border-secondary);
+  border-radius : var(--radius-4);
+  background    : var(--surface-modal);
+  box-shadow    : 0 0 40px 0 #16161b;
+  padding       : 16px;
+}
+
+.header {
+  position      : relative;
+  padding-block : 4px 12px;
+  text-align    : center;
+}
+.header::after {
+  content     : '';
+  position    : absolute;
+  left        : 50%;
+  bottom      : 0;
+  width       : 22rem;
+  max-width   : 100%;
+  height      : 2px;
+  transform   : translateX(-50%);
+  background  : var(--color-primary);
+  opacity     : 0.8;
+}
+
+.title {
+  margin          : 0;
+  font-size       : 1.5rem;
+  font-weight     : 600;
+  letter-spacing  : 0.01em;
+}
+
+.subtitle {
+  margin-top  : 6px;
+  font-size   : 0.875rem;
+  color       : var(--text-secondary);
+}
+
+.body {
+  display         : flex;
+  flex-direction  : column;
+  gap             : 12px;
+  padding-top     : 16px;
+}
+
+.form-error {
+  border        : var(--border-1) solid rgba(229, 72, 77, 0.7);
+  background    : rgba(229, 72, 77, 0.08);
+  padding       : 10px 12px;
+  border-radius : var(--radius-8);
+  color         : var(--text-primary);
+}
+
+.field {
+  display         : flex;
+  flex-direction  : column;
+  gap             : 6px;
+}
+
+.label {
+  font-size : 0.875rem;
+  color     : var(--text-secondary);
+}
+
+.field-error {
+  font-size : 0.8125rem;
+  color     : #e5484d;
+}
+
+/* AIDEV-NOTE: Input styling for dimmed/active mode states */
+.input {
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.input-dimmed {
+  opacity           : 0.5;
+  background-color  : var(--surface-disabled);
+  cursor            : default;
+}
+
+.input-dimmed:focus {
+  outline: none;
+}
+
+.input-error {
+  border-color: #e5484d;
+}
+
+.mode-hint {
+  font-size   : 0.75rem;
+  color       : var(--text-secondary);
+  font-style  : italic;
+}
+
+/* AIDEV-NOTE: Visual separator between connection string and manual params */
+.separator {
+  display       : flex;
+  align-items   : center;
+  gap           : 12px;
+  margin-block  : 4px;
+}
+
+.separator::before,
+.separator::after {
+  content     : '';
+  flex        : 1;
+  height      : 1px;
+  background  : var(--border-secondary);
+}
+
+.separator-text {
+  font-size       : 0.75rem;
+  color           : var(--text-secondary);
+  text-transform  : uppercase;
+  letter-spacing  : 0.05em;
+}
+
+.row-2 {
+  display               : grid;
+  grid-template-columns : 1fr 180px;
+  gap                   : 12px;
+}
+
+.persist-row {
+  display     : inline-flex;
+  align-items : center;
+  gap         : 10px;
+  color       : var(--text-secondary);
+  user-select : none;
+}
+
+.persist-checkbox {
+  width         : 16px;
+  height        : 16px;
+  padding       : 0;
+  min-height    : auto;
+  border-radius : 4px;
+  border        : var(--border-1) solid var(--border-secondary);
+  background    : var(--surface-input);
+}
+
+.persist-label {
+  font-size: 0.875rem;
+}
+
+.persist-help {
+  font-size : 0.8125rem;
+  color     : var(--text-secondary);
+}
+
+.test-ok {
+  border        : var(--border-1) solid rgba(46, 204, 113, 0.45);
+  background    : rgba(46, 204, 113, 0.08);
+  padding       : 10px 12px;
+  border-radius : var(--radius-8);
+  font-size     : 0.875rem;
+}
+
+.test-bad {
+  border        : var(--border-1) solid rgba(229, 72, 77, 0.55);
+  background    : rgba(229, 72, 77, 0.08);
+  padding       : 10px 12px;
+  border-radius : var(--radius-8);
+  font-size     : 0.875rem;
+}
+
+.footer {
+  display     : flex;
+  align-items : center;
+  gap         : 12px;
+  padding-top : 16px;
+}
+
+.footer-spacer {
+  flex: 1;
+}
+
+.clear-button {
+  background  : transparent;
+  border      : var(--border-1) solid var(--border-secondary);
+  color       : var(--text-secondary);
+  font-size   : 0.8125rem;
+}
+.clear-button:hover {
+  background  : var(--surface-hover);
+  color       : var(--text-primary);
+}
+.clear-button:disabled {
+  opacity : 0.5;
+  cursor  : not-allowed;
+}
+
+.test-button {
+  background  : transparent;
+  border      : var(--border-1) solid var(--color-primary);
+  color       : var(--color-primary);
+}
+.test-button:hover {
+  background: rgba(81, 137, 203, 0.12);
+}
+.test-button:disabled {
+  background    : transparent;
+  border-color  : var(--border-secondary);
+  color         : var(--text-disabled);
+}
+
+.connect-button {
+  background  : var(--button-primary);
+  border      : var(--border-1) solid transparent;
+}
+
+.cancel-button {
+  background  : transparent;
+  border      : var(--border-1) solid var(--border-secondary);
+  color       : var(--text-secondary);
+}
+.cancel-button:hover {
+  background: var(--surface-hover);
+}
+
+@media (min-width: 48rem) {
+  .overlay {
+    padding: 24px;
+  }
+
+  .modal {
+    padding: 24px;
+  }
+}

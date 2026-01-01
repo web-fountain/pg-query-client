@@ -1,0 +1,147 @@
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  row-gap: 16px;
+  width: 100%;
+  max-width: 56rem;
+}
+
+.logo {
+  width: 78px;
+  height: 88px;
+  object-fit: contain;
+}
+
+.header {
+  text-align: center;
+}
+
+.headline {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.subhead {
+  margin-top: 6px;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.data-source-list {
+  width: 100%;
+}
+
+.empty {
+  border: var(--border-1) solid var(--border-secondary);
+  border-radius: var(--radius-12);
+  padding: 16px;
+  background: var(--surface-1);
+  text-align: center;
+}
+
+.empty-title {
+  font-weight: 600;
+}
+
+.empty-subhead {
+  margin-top: 6px;
+  color: var(--text-secondary);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: var(--border-1) solid var(--border-secondary);
+  border-radius: var(--radius-12);
+  background: var(--surface-1);
+}
+
+.item[data-active="true"] {
+  border-color: color-mix(in oklch, var(--color-primary) 55%, var(--border-secondary));
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 40%, transparent);
+}
+
+.item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.item-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.item-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: var(--border-1) solid var(--border-secondary);
+  background: var(--surface-selected);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.dot {
+  opacity: 0.7;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.create-button {
+  font-weight: 600;
+}
+
+.cta {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.connect-button {
+  font-weight: 600;
+}
+
+@media (min-width: 48rem) {
+  .intro {
+    row-gap: 20px;
+  }
+
+  .item {
+    padding: 14px 16px;
+  }
+}

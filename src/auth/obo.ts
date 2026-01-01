@@ -57,8 +57,8 @@ export async function getBackendAccessTokenOnBehalfOf(req: OboRequest): Promise<
     jti: jti,
     scope: Array.isArray(req.scope) ? req.scope.join(' ') : (req.scope || undefined),
     // Multitenancy context (still validate against path on backend)
-    tenant_id: tenantPublicId,
-    opspace_id: opspacePublicId,
+    tenantId: tenantPublicId,
+    opspaceId: opspacePublicId,
     // Actor (UI server) acting on behalf of user
     act: { sub: DEV_AZP }
   };

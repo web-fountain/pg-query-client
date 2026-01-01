@@ -24,6 +24,7 @@ import {
 import {
   selectUnsavedQueryTree, selectNextUntitledName
 }                                               from '@Redux/records/unsavedQueryTree';
+import { selectActiveDataSourceId }             from '@Redux/records/dataSource';
 import { selectActiveTabId, selectTabIds }      from '@Redux/records/tabbar';
 import { createNewUnsavedDataQueryThunk }       from '@Redux/records/dataQuery/thunks';
 import { closeAllUnsavedTabsThunk }             from '@Redux/records/tabbar/thunks';
@@ -54,17 +55,18 @@ function UnsavedQueriesTreeInner(
   { rootId, indent = 20, label = 'UNSAVED QUERIES', unsavedQueryTree, isOpen, setIsOpen }:
   { rootId: string; indent?: number; label: string; unsavedQueryTree: UnsavedQueryTreeRecord; isOpen: boolean; setIsOpen: (v: boolean | ((prev: boolean) => boolean)) => void; }
 ) {
-  const tabIds           = useReduxSelector(selectTabIds);
-  const activeTabId      = useReduxSelector(selectActiveTabId);
-  const nextUntitledName = useReduxSelector(selectNextUntitledName);
-  const pathname         = usePathname();
-  const dispatch         = useReduxDispatch();
-  const { opspaceId }    = useParams<{ opspaceId: string }>()!;
-  const router           = useRouter();
+  const tabIds              = useReduxSelector(selectTabIds);
+  const activeTabId         = useReduxSelector(selectActiveTabId);
+  const nextUntitledName    = useReduxSelector(selectNextUntitledName);
+  const activeDataSourceId  = useReduxSelector(selectActiveDataSourceId);
+  const pathname            = usePathname();
+  const dispatch            = useReduxDispatch();
+  const { opspaceId }       = useParams<{ opspaceId: string }>()!;
+  const router              = useRouter();
   const [
     isCreatePending,
     startCreateTransition
-  ]                     = useTransition();
+  ]                         = useTransition();
   // AIDEV-NOTE: Only treat unsaved rows as "active from tabbar" when the QueryWorkspace route is mounted.
   // On the opspace landing page (/opspace/{id}) we always want a click to navigate.
   const isOnQueriesRoute = (pathname || '').split('/').filter(Boolean).includes('queries');
@@ -324,6 +326,8 @@ function UnsavedQueriesTreeInner(
             onCloseAll={handleCloseAll}
             disableCloseAll={renderItems.length === 0}
             isCreatePending={isCreatePending}
+            disableCreateFile={!activeDataSourceId}
+            disableCreateReason="Connect a server to create a new query"
           />
         </div>
       </div>

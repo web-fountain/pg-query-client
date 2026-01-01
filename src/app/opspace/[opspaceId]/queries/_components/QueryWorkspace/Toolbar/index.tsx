@@ -16,11 +16,13 @@ import {
   selectDataQueryRecord, updateDataQueryName,
   updateDataQueryText
 }                                             from '@Redux/records/dataQuery';
+import { selectActiveDataSourceId }           from '@Redux/records/dataSource';
 import { saveDataQueryThunk }                 from '@Redux/records/dataQuery/thunks';
 import { useDebouncedCallback }               from '@Hooks/useDebounce';
 import Icon                                   from '@Components/Icons';
 import { useSqlRunner }                       from '../../../../_providers/SQLRunnerProvider';
 import { useQueriesRoute }                    from '../../../_providers/QueriesRouteProvider';
+import ConnectionIndicator                    from './ConnectionIndicator';
 
 import styles                                 from './styles.module.css';
 
@@ -35,6 +37,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   const { isRunning }           = useSqlRunner();
   const { navigateToSaved }     = useQueriesRoute();
   const record                  = useReduxSelector(selectDataQueryRecord, dataQueryId);
+  const activeDataSourceId      = useReduxSelector(selectActiveDataSourceId);
   const dispatch                = useReduxDispatch();
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [
@@ -53,6 +56,7 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   recordRef.current             = record;
 
   const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
+  const canRun                  = !!activeDataSourceId && !isRunning;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
     // AIDEV-NOTE: Debounced Redux commit for name edits; clear pending flag once it runs.
@@ -188,15 +192,17 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
           <span className={styles['spacer']} />
           <button
             className={styles['run-button']}
-            title="Run"
-            aria-label="Run"
+            title={activeDataSourceId ? 'Run' : 'Connect a server to run queries'}
+            aria-label={activeDataSourceId ? 'Run' : 'Connect a server to run queries'}
             onClick={onRun}
-            disabled={isRunning}
+            disabled={!canRun}
           >
             <Icon name="play" />
           </button>
         </div>
       </div>
+
+      <ConnectionIndicator />
     </div>
   );
 }

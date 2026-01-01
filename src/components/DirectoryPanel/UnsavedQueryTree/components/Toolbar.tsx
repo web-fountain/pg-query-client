@@ -6,13 +6,20 @@ import styles                             from './Toolbar.module.css';
 
 
 type ToolbarProps = {
-  onCreateFile: OnCreateFile;
-  onCloseAll: OnCloseAll;
-  disableCloseAll?: boolean;
-  isCreatePending?: boolean;
+  onCreateFile          : OnCreateFile;
+  onCloseAll            : OnCloseAll;
+  disableCloseAll?      : boolean;
+  isCreatePending?      : boolean;
+  disableCreateFile?    : boolean;
+  disableCreateReason?  : string;
 };
 
-function Toolbar({ onCreateFile, onCloseAll, disableCloseAll, isCreatePending }: ToolbarProps) {
+function Toolbar({ onCreateFile, onCloseAll, disableCloseAll, isCreatePending, disableCreateFile, disableCreateReason }: ToolbarProps) {
+  const createDisabled = !!isCreatePending || !!disableCreateFile;
+  const createTitle = createDisabled
+    ? (disableCreateReason || 'Connect a server to create a new query')
+    : 'New Untitled Query';
+
   return (
     <header className={styles['toolbar']}>
       <div className={styles['tools']}>
@@ -21,8 +28,9 @@ function Toolbar({ onCreateFile, onCloseAll, disableCloseAll, isCreatePending }:
           className={styles['tool']}
           aria-label="New Untitled Query"
           onClick={onCreateFile}
-          title="New Untitled Query"
-          disabled={!!isCreatePending}
+          title={createTitle}
+          disabled={createDisabled}
+          aria-disabled={createDisabled}
           aria-busy={!!isCreatePending}
         >
           <Icon name="file-plus" aria-hidden="true" />

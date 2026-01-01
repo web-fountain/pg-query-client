@@ -1,6 +1,7 @@
 import { configureStore, combineReducers }  from '@reduxjs/toolkit';
 
 import routeErrorsMiddleware   from './middleware/routeErrorsMiddleware';
+import dataSourceReducer       from './records/dataSource';
 import dataQueryReducer        from './records/dataQuery';
 import errorsReducer           from './records/errors';
 import queryFolderReducer      from './records/queryFolder';
@@ -12,6 +13,7 @@ import uiFocusReducer          from './records/uiFocus';
 
 // AIDEV-NOTE: Combine reducers to guide TS inference and avoid object-vs-function reducer confusion
 const rootReducer = combineReducers({
+  dataSourceRecords   : dataSourceReducer,
   dataQueryRecords    : dataQueryReducer,
   errors              : errorsReducer,
   queryFolderRecords  : queryFolderReducer,
