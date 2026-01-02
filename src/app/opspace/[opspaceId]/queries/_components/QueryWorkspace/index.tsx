@@ -229,7 +229,6 @@ function QueryWorkspace() {
                 <Suspense fallback={<div className={styles['tabpanel']}>Loading editor…</div>}>
                   <SQLEditor
                     editorRef={editorRef}
-                    dataQueryId={activeDataQueryId ? (activeDataQueryId as UUIDv7) : null}
                     value={(activeDataQueryRecord?.current?.queryText || '') as string}
                     suppressDispatch={isHydratingText}
                   />

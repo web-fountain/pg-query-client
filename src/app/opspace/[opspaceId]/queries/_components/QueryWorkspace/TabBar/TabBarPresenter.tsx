@@ -15,30 +15,32 @@ import styles                 from './styles.module.css';
 
 
 type PresenterProps = {
-  tabs            : Tab[];
-  activeTabId     : string;
-  focusedTabIndex : number;
-  onAddTab        : () => void;
-  onCloseTab      : (tabId: UUIDv7) => void | Promise<void>;
-  onKeyDown       : (e: React.KeyboardEvent<HTMLDivElement>) => void;
-  onPointerDown   : (tab: Tab) => void;
-  onReorderTabs   : (tabIds: UUIDv7[]) => void;
-  onTabClick      : (tab: Tab) => void;
+  tabs                  : Tab[];
+  activeTabId           : string;
+  focusedTabIndex       : number;
+  onAddTab              : () => void;
+  disableAddTab?        : boolean;
+  addTabDisabledReason? : string;
+  onCloseTab            : (tabId: UUIDv7) => void | Promise<void>;
+  onKeyDown             : (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  onPointerDown         : (tab: Tab) => void;
+  onReorderTabs         : (tabIds: UUIDv7[]) => void;
+  onTabClick            : (tab: Tab) => void;
 };
 
 type TabButtonProps = {
-  index       : number;
-  isDragging  : boolean;
-  isFocusable : boolean;
-  selected    : boolean;
-  tab         : Tab;
-  beginDrag   : (tabId: UUIDv7, clientX: number) => void;
-  endDrag     : () => void;
-  onCloseTab  : (tabId: UUIDv7) => void | Promise<void>;
-  onPointerDownActivate?: (tab: Tab) => void;
-  onTabClick  : (tab: Tab) => void;
-  setRef      : (index: number, el: HTMLButtonElement | null) => void;
-  updateDrag  : (clientX: number) => void;
+  index                   : number;
+  isDragging              : boolean;
+  isFocusable             : boolean;
+  selected                : boolean;
+  tab                     : Tab;
+  beginDrag               : (tabId: UUIDv7, clientX: number) => void;
+  endDrag                 : () => void;
+  onCloseTab              : (tabId: UUIDv7) => void | Promise<void>;
+  onPointerDownActivate?  : (tab: Tab) => void;
+  onTabClick              : (tab: Tab) => void;
+  setRef                  : (index: number, el: HTMLButtonElement | null) => void;
+  updateDrag              : (clientX: number) => void;
 };
 
 // AIDEV-NOTE: Persist horizontal scroll offset across remounts.
@@ -164,6 +166,8 @@ function TabBarPresenter({
   onPointerDown,
   onKeyDown,
   onAddTab,
+  disableAddTab,
+  addTabDisabledReason,
   onCloseTab,
   onReorderTabs
 }: PresenterProps) {
@@ -394,8 +398,10 @@ function TabBarPresenter({
       <button
         className={styles['tab-add']}
         aria-label="New tab"
-        title="New tab"
+        title={disableAddTab ? (addTabDisabledReason || 'Connect a server to create a new query') : 'New tab'}
         onClick={onAddTab}
+        disabled={!!disableAddTab}
+        aria-disabled={!!disableAddTab}
       >
         <Icon name="plus" />
       </button>

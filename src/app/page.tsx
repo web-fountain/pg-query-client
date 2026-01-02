@@ -1,5 +1,3 @@
-'use server';
-
 import OpenOpSpaceLinkClient from '@/app/_components/OpenOpSpaceLinkClient';
 
 

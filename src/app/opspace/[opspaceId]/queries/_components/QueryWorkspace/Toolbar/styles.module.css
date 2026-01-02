@@ -1,110 +1,255 @@
 .toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-4);
-  padding-block: var(--space-3);
-  padding-inline: var(--space-2);
-  border-bottom: var(--border-1) solid var(--border-primary);
-  background: var(--tabs-surface);
+  display         : flex;
+  align-items     : center;
+  justify-content : flex-start;
+  gap             : var(--space-4);
+  padding-block   : var(--space-3);
+  padding-inline  : var(--space-2);
+  border-bottom   : var(--border-1) solid var(--border-primary);
+  background      : var(--tabs-surface);
 }
 
 .name-group {
-  display: flex;
-  align-items: center;
-  font-size: var(--text-xs);
+  display     : flex;
+  align-items : center;
+  font-size   : var(--text-xs);
 }
 
 .name-input {
-  min-width: 180px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border: var(--border-1) solid var(--border-primary);
-  border-inline-end: none;
-  border-radius: var(--radius-4) 0 0 var(--radius-4);
-  background: var(--surface-canvas);
-  color: var(--text-primary);
+  min-width         : 180px;
+  height            : 32px;
+  min-height        : 32px;
+  padding           : 0 var(--space-3);
+  border            : var(--border-1) solid var(--border-primary);
+  border-inline-end : none;
+  border-radius     : var(--radius-4) 0 0 var(--radius-4);
+  background        : var(--surface-canvas);
+  color             : var(--text-primary);
 }
 .name-input-invalid {
   /* AIDEV-NOTE: Error state for invalid query name input */
-  border-color: #e5484d !important;
-  border-inline-end: var(--border-1) solid #e5484d !important;
-  background-color: rgba(229, 72, 77, 0.1);
-  box-shadow: 0 0 0 1px #e5484d;
+  border-color      : #e5484d !important;
+  border-inline-end : var(--border-1) solid #e5484d !important;
+  background-color  : rgba(229, 72, 77, 0.1);
+  box-shadow        : 0 0 0 1px #e5484d;
 }
 .name-input:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -1px;
+  outline         : var(--focus-ring);
+  outline-offset  : -1px;
 }
 .name-input-invalid:focus-visible {
   outline: none;
 }
 
 .actions {
-  display: flex;
-  align-items: center;
+  display     : flex;
+  align-items : center;
+}
+
+.connection-root {
+  margin-left: auto;
+}
+
+.connection-trigger {
+  display       : inline-flex;
+  align-items   : center;
+  gap           : var(--space-2);
+  height        : 32px;
+  padding       : 0 10px;
+  border-radius : var(--radius-8);
+  border        : var(--border-1) solid var(--border-secondary);
+  background    : var(--surface-control);
+  color         : var(--text-primary);
+  max-width     : 340px;
+}
+.connection-trigger:hover {
+  background: var(--surface-hover);
+}
+.connection-trigger:focus-visible {
+  outline         : var(--focus-ring);
+  outline-offset  : 2px;
+}
+
+.connection-icon {
+  display : inline-flex;
+  color   : var(--icon-fill);
+}
+
+.connection-text {
+  display         : flex;
+  flex-direction  : column;
+  gap             : 0;
+  min-width       : 0;
+  text-align      : left;
+}
+
+.connection-title {
+  font-size     : 0.875rem;
+  font-weight   : 600;
+  line-height   : 1.1;
+  overflow      : hidden;
+  text-overflow : ellipsis;
+  white-space   : nowrap;
+}
+
+.connection-subtitle {
+  font-size     : 0.75rem;
+  color         : var(--text-secondary);
+  line-height   : 1.1;
+  overflow      : hidden;
+  text-overflow : ellipsis;
+  white-space   : nowrap;
+}
+
+.connection-chevron {
+  display : inline-flex;
+  color   : var(--icon-fill);
+}
+
+.connection-popover {
+  z-index       : var(--z-modal);
+  width         : 360px;
+  max-width     : calc(100vw - 24px);
+  border        : var(--border-1) solid var(--border-secondary);
+  border-radius : var(--radius-12);
+  background    : var(--surface-1);
+  box-shadow    : var(--shadow-2);
+  padding       : 8px;
+}
+
+.connection-options {
+  margin          : 0;
+  padding         : 0;
+  list-style      : none;
+  display         : flex;
+  flex-direction  : column;
+  gap             : 4px;
+}
+
+.connection-option {
+  width         : 100%;
+  text-align    : left;
+  padding       : 10px 10px;
+  border-radius : var(--radius-8);
+  border        : none;
+  background    : transparent;
+  color         : var(--text-primary);
+  cursor        : pointer;
+}
+.connection-option:hover {
+  background: var(--surface-hover);
+}
+.connection-option[data-selected="true"] {
+  background: var(--surface-selected);
+}
+
+.connection-option-title {
+  font-size   : 0.875rem;
+  font-weight : 600;
+}
+
+.connection-option-subtitle {
+  margin-top  : 2px;
+  font-size   : 0.75rem;
+  color       : var(--text-secondary);
+}
+
+.connection-divider {
+  height      : 1px;
+  background  : var(--border-secondary);
+  margin      : 4px 0;
+}
+
+.connection-footer {
+  display         : flex;
+  justify-content : flex-end;
+  padding-top     : 4px;
+}
+
+.connection-connect {
+  background  : transparent;
+  border      : var(--border-1) solid var(--color-primary);
+  color       : var(--color-primary);
+  font-weight : 600;
+}
+.connection-connect:hover {
+  background: rgba(81, 137, 203, 0.12);
+}
+
+.connection-empty {
+  display         : flex;
+  flex-direction  : column;
+  gap             : 8px;
+  padding         : 10px;
+}
+
+.connection-empty-title {
+  font-weight: 600;
+}
+
+.connection-empty-subtitle {
+  font-size : 0.875rem;
+  color     : var(--text-secondary);
 }
 
 .save-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 0;
-  border-block: var(--border-1) solid var(--button-border-primary);
-  background-color: var(--toolbar-button-bg);
-  color: var(--button-primary);
-  cursor: pointer;
+  display           : inline-flex;
+  align-items       : center;
+  justify-content   : center;
+  width             : 32px;
+  height            : 32px;
+  padding           : 0;
+  border-radius     : 0;
+  border-block      : var(--border-1) solid var(--button-border-primary);
+  background-color  : var(--toolbar-button-bg);
+  color             : var(--button-primary);
+  cursor            : pointer;
 }
 
 .save-button:hover {
   background-color: var(--toolbar-button-hover-bg);
 }
 .save-button:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
+  outline         : var(--focus-ring);
+  outline-offset  : -2px;
 }
 .save-button:disabled {
-  background-color: var(--toolbar-button-disabled-bg);
-  color: var(--shadow-color-2);
-  cursor: default;
+  background-color  : var(--toolbar-button-disabled-bg);
+  color             : var(--shadow-color-2);
+  cursor            : default;
 }
 
 .spacer {
-
-  width: 1px;
-  height: 100%;
-  background-color: var(--border-secondary);
+  width             : 1px;
+  height            : 100%;
+  background-color  : var(--border-secondary);
 }
 
 .run-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-block: var(--border-1) solid var(--button-border-primary);
-  border-radius: 0 var(--radius-4) var(--radius-4) 0;
-  background-color: var(--toolbar-button-bg);
-  color: var(--button-primary);
-  cursor: pointer;
+  display           : inline-flex;
+  align-items       : center;
+  justify-content   : center;
+  width             : 32px;
+  height            : 32px;
+  padding           : 0;
+  border-block      : var(--border-1) solid var(--button-border-primary);
+  border-radius     : 0 var(--radius-4) var(--radius-4) 0;
+  background-color  : var(--toolbar-button-bg);
+  color             : var(--button-primary);
+  cursor            : pointer;
 }
 
 .run-button:hover {
   background-color: var(--toolbar-button-hover-bg);
 }
 .run-button:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
+  outline         : var(--focus-ring);
+  outline-offset  : -2px;
 }
 /* .run-button:disabled {
-  background: var(--button-disabled);
-  color: var(--button-text-disabled);
-  cursor: default;
+  background  : var(--button-disabled);
+  color       : var(--button-text-disabled);
+  cursor      : default;
 } */
 .run-button:active {
   background-color: var(--color-primary-muted);
