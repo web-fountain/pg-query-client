@@ -8,26 +8,26 @@ export type DbSslMode =
   | 'verify-full';
 
 export type DataSourceKind =
+  | 'pglite'
   | 'postgres';
 
-// AIDEV-NOTE: Safe, non-secret connection metadata suitable for client storage and display.
-// Do not include passwords, full URIs with embedded creds, or TLS private keys here.
+export type DataSourceStatus =
+  | 'active'
+  | 'disabled';
+
 export type DataSourceMeta = {
-  kind            : DataSourceKind;
-  dataSourceId    : UUIDv7;
-  serverGroupName : string;
-  host            : string;
-  port            : number;
-  username        : string;
-  database        : string;
-  sslMode         : DbSslMode;
-  createdAt?      : string;
+  dataSourceId            : UUIDv7;
+  dataSourceCredentialId  : UUIDv7;
+  name                    : string;
+  kind                    : DataSourceKind;
+  status                  : DataSourceStatus;
+  label                   : string | null;
 };
 
 export type DataSourceRecord = {
-  dataSourceIds       : UUIDv7[];
-  byId                : Record<string, DataSourceMeta>;
-  activeDataSourceId  : UUIDv7 | null;
+  dataSourceIds   : UUIDv7[];
+  byId            : Record<string, DataSourceMeta>;
+  byCredentialId  : Record<string, DataSourceMeta>;
 };
 
 // AIDEV-NOTE: Draft payload used for "test" / "create" flows. This may include secrets

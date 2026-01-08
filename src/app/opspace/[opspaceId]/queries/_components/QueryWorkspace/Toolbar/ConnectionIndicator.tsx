@@ -2,7 +2,7 @@
 
 import type { DataSourceMeta }                  from '@Redux/records/dataSource/types';
 
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useState }          from 'react';
 import {
   FloatingPortal, autoUpdate, flip, offset,
   useClick, useDismiss, useFloating,
@@ -11,37 +11,49 @@ import {
 
 import { useDataSourceUI }                      from '@OpSpaceProviders/DataSourceProvider';
 import { setActiveDataSourceAction }            from '@OpSpaceDataSourceActions';
-import { useReduxDispatch, useReduxSelector }   from '@Redux/storeHooks';
-import {
-  selectActiveDataSourceId,
-  selectActiveDataSourceMeta,
-  selectDataSourceList,
-  setActiveDataSourceId
-}                                               from '@Redux/records/dataSource';
+import { useReduxSelector }                     from '@Redux/storeHooks';
+import { selectDataSourceList }                 from '@Redux/records/dataSource';
+import { selectActiveTabDataSource }            from '@Redux/records/tabbar';
 import Icon                                     from '@Components/Icons';
 
 import styles                                   from './styles.module.css';
 
+// '019b9aab-906d-794b-a916-9106e5c83698': {
+//         dataSourceId: '019b9aab-906d-794b-a916-9106e5c83698',
+//         dataSourceCredentialId: '019b9aab-9070-7210-8b21-6f988f7a832b',
+//         name: 'Local DB',
+//         kind: 'pglite',
+//         status: 'active',
+//         label: 'pglite://default_local_db'
+//       }
+//     },
+function formatDataSourceKind(kind: DataSourceMeta['kind']): string {
+  return kind === 'pglite' ? 'PGlite' : 'Postgres';
+}
 
-function formatConnectionLabel(ds: DataSourceMeta): string {
-  const host  = ds.host || '';
-  const port  = typeof ds.port === 'number' ? String(ds.port) : '';
-  const db    = ds.database || '';
-  const user  = ds.username || '';
+function formatDataSourceTitle(ds: DataSourceMeta): string {
+  return ds.label || ds.name;
+}
 
-  const parts = [];
-  if (ds.serverGroupName) parts.push(ds.serverGroupName);
-  if (user && host) parts.push(`${user}@${host}${port ? `:${port}` : ''}`);
-  if (db) parts.push(db);
-  return parts.join(' · ') || 'Connection';
+function formatDataSourceSubtitle(ds: DataSourceMeta): string {
+  const parts: string[] = [];
+  parts.push(formatDataSourceKind(ds.kind));
+  if (ds.label) parts.push(ds.name);
+  if (ds.status === 'disabled') parts.push('Disabled');
+  return parts.join(' · ');
+}
+
+function formatDataSourceTooltip(ds: DataSourceMeta): string {
+  const title = formatDataSourceTitle(ds);
+  const sub = formatDataSourceSubtitle(ds);
+  // return sub ? `${title} — ${sub}` : title;
+  return sub;
 }
 
 function ConnectionIndicator() {
   const { openConnectServerModal }  = useDataSourceUI();
   const dataSourceList              = useReduxSelector(selectDataSourceList);
-  const activeId                    = useReduxSelector(selectActiveDataSourceId);
-  const activeMeta                  = useReduxSelector(selectActiveDataSourceMeta);
-  const dispatch                    = useReduxDispatch();
+  const currentSelectedDataSource   = useReduxSelector(selectActiveTabDataSource);
   const [open, setOpen]             = useState<boolean>(false);
 
   const { refs, floatingStyles, context } = useFloating({
@@ -61,24 +73,18 @@ function ConnectionIndicator() {
   const role    = useRole(context, { role: 'listbox' });
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
 
-  const triggerLabel = useMemo(() => {
-    if (!activeMeta) return 'No server connected';
-    return activeMeta.serverGroupName || 'Connected';
-  }, [activeMeta]);
+  const triggerLabel = formatDataSourceSubtitle(currentSelectedDataSource!);
+  const triggerSubLabel    = formatDataSourceTitle(currentSelectedDataSource!);
+  const triggerTitle    = formatDataSourceTooltip(currentSelectedDataSource!);
 
-  const triggerSubLabel = useMemo(() => {
-    if (!activeMeta) return 'Connect a server to run queries';
-    const host  = activeMeta.host || '';
-    const port  = typeof activeMeta.port === 'number' ? String(activeMeta.port) : '';
-    const db    = activeMeta.database || '';
-    return `${host}${port ? `:${port}` : ''}${db ? ` · ${db}` : ''}`;
-  }, [activeMeta]);
-
-  const handleSelect = useCallback((dataSourceId: DataSourceMeta['dataSourceId']) => {
-    dispatch(setActiveDataSourceId({ dataSourceId }));
+  const handleSelect = useCallback((ds: DataSourceMeta) => {
     setOpen(false);
-    void setActiveDataSourceAction(dataSourceId).catch(() => {});
-  }, [dispatch]);
+    if (ds.dataSourceCredentialId === currentSelectedDataSource!.dataSourceCredentialId) return;
+
+    // AIDEV-TODO: Also update the active tab's `dataSourceCredentialId` (per-tab connection)
+    // when the tab connection switch thunk is implemented.
+    void setActiveDataSourceAction(ds.dataSourceId).catch(() => {});
+  }, [currentSelectedDataSource!.dataSourceCredentialId]);
 
   return (
     <div className={styles['connection-root']}>
@@ -88,7 +94,7 @@ function ConnectionIndicator() {
         ref={refs.setReference}
         aria-haspopup="listbox"
         aria-expanded={open}
-        title={activeMeta ? formatConnectionLabel(activeMeta) : 'Connect a server'}
+        title={triggerTitle}
         {...getReferenceProps()}
       >
         <span className={styles['connection-icon']} aria-hidden="true">
@@ -111,10 +117,31 @@ function ConnectionIndicator() {
             className={styles['connection-popover']}
             {...getFloatingProps()}
           >
-            {dataSourceList.length === 0 ? (
-              <div className={styles['connection-empty']}>
-                <div className={styles['connection-empty-title']}>No connections</div>
-                <div className={styles['connection-empty-subtitle']}>Connect a server to start querying.</div>
+            <ul role="listbox" className={styles['connection-options']} aria-label="Data sources">
+              {dataSourceList.map((ds) => {
+                const selected = ds.dataSourceCredentialId === currentSelectedDataSource!.dataSourceCredentialId;
+                const disabled = ds.status === 'disabled';
+                return (
+                  <li key={ds.dataSourceId} role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      className={styles['connection-option']}
+                      data-selected={selected || undefined}
+                      aria-selected={selected || undefined}
+                      disabled={disabled}
+                      onClick={() => handleSelect(ds)}
+                    >
+                      <div className={styles['connection-option-title']}>{formatDataSourceTitle(ds)}</div>
+                      <div className={styles['connection-option-subtitle']}>
+                        {formatDataSourceSubtitle(ds)}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+              <li className={styles['connection-divider']} aria-hidden="true" />
+              <li className={styles['connection-footer']} role="none">
                 <button
                   type="button"
                   className={styles['connection-connect']}
@@ -123,46 +150,10 @@ function ConnectionIndicator() {
                     openConnectServerModal();
                   }}
                 >
-                  Connect a server
+                  Connect a data source
                 </button>
-              </div>
-            ) : (
-              <ul role="listbox" className={styles['connection-options']} aria-label="Connections">
-                {dataSourceList.map((ds) => {
-                  const selected = ds.dataSourceId === activeId;
-                  return (
-                    <li key={ds.dataSourceId} role="none">
-                      <button
-                        type="button"
-                        role="option"
-                        className={styles['connection-option']}
-                        data-selected={selected || undefined}
-                        aria-selected={selected || undefined}
-                        onClick={() => handleSelect(ds.dataSourceId)}
-                      >
-                        <div className={styles['connection-option-title']}>{ds.serverGroupName}</div>
-                        <div className={styles['connection-option-subtitle']}>
-                          {ds.username}@{ds.host}:{ds.port} · {ds.database} · TLS: {ds.sslMode}
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-                <li className={styles['connection-divider']} aria-hidden="true" />
-                <li className={styles['connection-footer']} role="none">
-                  <button
-                    type="button"
-                    className={styles['connection-connect']}
-                    onClick={() => {
-                      setOpen(false);
-                      openConnectServerModal();
-                    }}
-                  >
-                    Connect a server
-                  </button>
-                </li>
-              </ul>
-            )}
+              </li>
+            </ul>
           </div>
         </FloatingPortal>
       )}

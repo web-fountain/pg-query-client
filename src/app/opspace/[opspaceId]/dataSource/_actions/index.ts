@@ -99,6 +99,7 @@ async function listDataSourcesCached(ctx: HeadersContext): Promise<ListDataSourc
     return { ok: false, status: res.status, reason: 'backend-ok-false' };
   }
 
+  console.log('listDataSourcesCached', res.data.data);
   return { ok: true, data: res.data.data };
 }
 
@@ -107,17 +108,16 @@ export async function listDataSourcesAction(): Promise<ActionResult<DataSourceMe
     { action: 'dataSource.list', op: 'read' },
     async ({ ctx, meta }) => {
       const data = await listDataSourcesCached(ctx);
-      console.log('listDataSourcesAction', data);
       if (!data.ok) {
         if (data.reason === 'backend-ok-false') {
           return fail(meta, backendFailedActionError(meta, {
-            message: 'Failed to list connections.',
+            message: 'Failed to list data sources.',
             request: { path: '/data-sources', method: 'GET', scope: ['data-sources:read'], logLabel: 'listDataSourcesAction' }
           }));
         }
         return fail(meta, actionErrorFromBackendFetch(meta, {
           status          : data.status,
-          fallbackMessage : 'Failed to list connections.',
+          fallbackMessage : 'Failed to list data sources.',
           request         : { path: '/data-sources', method: 'GET', scope: ['data-sources:read'], logLabel: 'listDataSourcesAction' }
         }));
       }

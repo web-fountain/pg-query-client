@@ -1,18 +1,16 @@
 'use client';
 
+import type { DataSourceMeta }                from '@Redux/records/dataSource/types';
 import type { UUIDv7 }                        from '@Types/primitives';
 
-import { useCallback, useTransition }         from 'react';
+import {
+  Fragment, useCallback, useTransition
+}                                             from 'react';
 import { useParams, useRouter }               from 'next/navigation';
 
 import { useDataSourceUI }                    from '@OpSpaceProviders/DataSourceProvider';
-import { setActiveDataSourceAction }          from '@OpSpaceDataSourceActions';
 import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
-import {
-  selectActiveDataSourceId,
-  selectDataSourceList,
-  setActiveDataSourceId
-}                                             from '@Redux/records/dataSource';
+import { selectDataSourceList }               from '@Redux/records/dataSource';
 import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
 import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
 import { generateUUIDv7 }                     from '@Utils/generateId';
@@ -21,6 +19,10 @@ import opspaceStyles                          from '../../../styles.module.css';
 import styles                                 from './styles.module.css';
 
 
+function formatDataSourceKind(kind: DataSourceMeta['kind']): string {
+  return kind === 'pglite' ? 'PGlite' : 'Postgres';
+}
+
 function OpSpaceIntro() {
   const { opspaceId }                 = useParams<{ opspaceId: string }>()!;
   const router                        = useRouter();
@@ -28,7 +30,6 @@ function OpSpaceIntro() {
   const { openConnectServerModal }    = useDataSourceUI();
 
   const dataSourceList                = useReduxSelector(selectDataSourceList);
-  const activeDataSourceId            = useReduxSelector(selectActiveDataSourceId);
   const nextUntitledName              = useReduxSelector(selectNextUntitledName);
   const [isPending, startTransition]  = useTransition();
 
@@ -36,16 +37,12 @@ function OpSpaceIntro() {
     openConnectServerModal();
   }, [openConnectServerModal]);
 
-  const handleCreateForConnection = useCallback((dataSourceId: UUIDv7) => {
+  const handleCreateForConnection = useCallback((dataSourceCredentialId: UUIDv7) => {
     if (isPending) return;
 
     startTransition(() => {
-      // AIDEV-NOTE: Selecting a connection implicitly sets it active for the workspace.
-      dispatch(setActiveDataSourceId({ dataSourceId }));
-      void setActiveDataSourceAction(dataSourceId).catch(() => {});
-
       const dataQueryId = generateUUIDv7();
-      dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName }));
+      dispatch(createNewUnsavedDataQueryThunk({ dataQueryId, name: nextUntitledName, dataSourceCredentialId }));
       router.replace(`/opspace/${opspaceId}/queries/new`);
     });
   }, [dispatch, isPending, nextUntitledName, opspaceId, router, startTransition]);
@@ -59,24 +56,26 @@ function OpSpaceIntro() {
           alt="PostgreSQL logo (SVG)"
         />
         <div className={styles['header']}>
-          <div className={styles['headline']}>Connect a server</div>
+          <div className={styles['headline']}>Choose a data source</div>
           <div className={styles['subhead']}>
-            Choose a saved connection or connect a new Postgres server to start querying.
+            Choose a saved data source or connect a new one to start querying.
           </div>
         </div>
 
         <div className={styles['data-source-list']}>
           {dataSourceList.length === 0 ? (
             <div className={styles['empty']}>
-              <div className={styles['empty-title']}>No connections yet</div>
+              <div className={styles['empty-title']}>No data sources yet</div>
               <div className={styles['empty-subhead']}>
-                Connect a server to create and run queries in this workspace.
+                Connect a data source to create and run queries in this workspace.
               </div>
             </div>
           ) : (
             <ul className={styles['list']} aria-label="Data sources">
               {dataSourceList.map((ds) => {
-                const isActive = ds.dataSourceId === activeDataSourceId;
+                const isActive = ds.status === 'active';
+                const isDisabled = !isActive;
+                const title = ds.kind === 'pglite' ? `PGlite · ${ds.name}` : `Postgres · ${ds.name}`;
                 return (
                   <li
                     key={ds.dataSourceId}
@@ -85,17 +84,19 @@ function OpSpaceIntro() {
                   >
                     <div className={styles['item-main']}>
                       <div className={styles['item-title']}>
-                        <span className={styles['item-name']}>{ds.serverGroupName}</span>
+                        <span className={styles['item-name']}>{title}</span>
                         {isActive && (
-                          <span className={styles['badge']} aria-label="Active connection">Active</span>
+                          <span className={styles['badge']} aria-label="Selected data source">Selected</span>
+                        )}
+                        {isDisabled && (
+                          <span className={styles['badge']} aria-label="Disabled data source">Disabled</span>
                         )}
                       </div>
                       <div className={styles['item-meta']}>
-                        <span>{ds.username}@{ds.host}:{ds.port}</span>
-                        <span className={styles['dot']} aria-hidden="true">•</span>
-                        <span>{ds.database}</span>
-                        <span className={styles['dot']} aria-hidden="true">•</span>
-                        <span>TLS: {ds.sslMode}</span>
+                        {/* AIDEV-NOTE: Show IndexDB connections as 'idx://' instead of 'pglite://' in list for clarity */}
+                        <span>
+                          {ds.label?.replace(/^pglite:\/\//, 'idx://pgqc_')}
+                        </span>
                       </div>
                     </div>
 
@@ -103,8 +104,8 @@ function OpSpaceIntro() {
                       <button
                         type="button"
                         className={styles['create-button']}
-                        onClick={() => handleCreateForConnection(ds.dataSourceId)}
-                        disabled={isPending}
+                        onClick={() => handleCreateForConnection(ds.dataSourceCredentialId)}
+                        disabled={isPending || isDisabled}
                         aria-busy={isPending}
                       >
                         {isPending ? 'Opening…' : 'Create New Query'}
