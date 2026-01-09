@@ -16,10 +16,11 @@ import {
   selectDataQueryRecord, updateDataQueryName,
   updateDataQueryText
 }                                             from '@Redux/records/dataQuery';
-import { selectActiveDataSourceId }           from '@Redux/records/dataSource';
+import { selectIsDataQueryRunning }           from '@Redux/records/dataQueryExecution';
 import { saveDataQueryThunk }                 from '@Redux/records/dataQuery/thunks';
 import { useDebouncedCallback }               from '@Hooks/useDebounce';
 import Icon                                   from '@Components/Icons';
+
 import { useSqlRunner }                       from '../../../../_providers/SQLRunnerProvider';
 import { useQueriesRoute }                    from '../../../_providers/QueriesRouteProvider';
 import ConnectionIndicator                    from './ConnectionIndicator';
@@ -34,10 +35,10 @@ type Props = {
 };
 
 function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
-  const { isRunning }           = useSqlRunner();
+  const { cancel }              = useSqlRunner();
   const { navigateToSaved }     = useQueriesRoute();
   const record                  = useReduxSelector(selectDataQueryRecord, dataQueryId);
-  const activeDataSourceId      = useReduxSelector(selectActiveDataSourceId);
+  const isRunning               = useReduxSelector(selectIsDataQueryRunning, dataQueryId);
   const dispatch                = useReduxDispatch();
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [
@@ -56,7 +57,8 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
   recordRef.current             = record;
 
   const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
-  const canRun                  = !!activeDataSourceId && !isRunning;
+  const canRun                  = !isRunning;
+  const isCancelMode            = isRunning;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
     // AIDEV-NOTE: Debounced Redux commit for name edits; clear pending flag once it runs.
@@ -192,12 +194,20 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
           <span className={styles['spacer']} />
           <button
             className={styles['run-button']}
-            title={activeDataSourceId ? 'Run' : 'Connect a server to run queries'}
-            aria-label={activeDataSourceId ? 'Run' : 'Connect a server to run queries'}
-            onClick={onRun}
-            disabled={!canRun}
+            title={
+              isCancelMode
+                ? 'Cancel'
+                : 'Run'
+            }
+            aria-label={
+              isCancelMode
+                ? 'Cancel'
+                : 'Run'
+            }
+            onClick={isCancelMode ? () => cancel(dataQueryId) : onRun}
+            disabled={isCancelMode ? false : !canRun}
           >
-            <Icon name="play" />
+            <Icon name={isCancelMode ? 'square' : 'play'} />
           </button>
         </div>
       </div>

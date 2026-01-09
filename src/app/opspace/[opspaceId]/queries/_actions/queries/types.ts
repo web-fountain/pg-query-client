@@ -8,14 +8,15 @@ import type { Tab }                   from '@Types/tabs';
 
 // AIDEV-NOTE: Backend API response shapes for query server actions.
 export type CreateNewUnsavedDataQueryPayload = {
-  dataQueryId: UUIDv7;
-  name?: string;
+  dataQueryId            : UUIDv7;
+  dataSourceCredentialId : UUIDv7;
+  name?                  : string;
 };
 
 export type UpdateDataQueryPayload = {
-  dataQueryId: UUIDv7;
-  name?: string;
-  queryText?: string;
+  dataQueryId : UUIDv7;
+  name?       : string;
+  queryText?  : string;
 };
 
 export type ListDataQueriesApiResponse =
@@ -23,16 +24,11 @@ export type ListDataQueriesApiResponse =
   | { ok: true; data: DataQuery[] };
 
 export type CreateUnsavedDataQueryResult = {
-  dataQueryId: UUIDv7;
-  name: string;
-  ext: Extension;
-  tab: {
-    groupId: number;
-    tabId: UUIDv7;
-    mountId: UUIDv7;
-    position: number;
-  };
-  tree: UnsavedQueryTreeNode;
+  dataQueryId : UUIDv7;
+  name        : string;
+  ext         : Extension;
+  tab         : Tab;
+  tree        : UnsavedQueryTreeNode;
 };
 
 export type CreateUnsavedDataQueryApiResponse =
@@ -40,8 +36,8 @@ export type CreateUnsavedDataQueryApiResponse =
   | { ok: true; data: CreateUnsavedDataQueryResult };
 
 export type UpdateDataQueryResult = {
-  dataQueryId: UUIDv7;
-  nodeId?: UUIDv7;
+  dataQueryId : UUIDv7;
+  nodeId?     : UUIDv7;
 };
 
 export type UpdateDataQueryApiResponse =
@@ -59,11 +55,11 @@ export type CreateSavedDataQueryPayload = {
 };
 
 export type CreateSavedDataQueryResult = {
-  dataQueryId : string;
+  dataQueryId : UUIDv7;
   name        : string;
   ext         : string;
-  tab: Tab;
-  tree: QueryTreeNode;
+  tab         : Tab;
+  tree        : QueryTreeNode;
 };
 
 export type CreateSavedDataQueryApiResponse =

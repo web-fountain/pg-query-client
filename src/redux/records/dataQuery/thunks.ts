@@ -15,6 +15,9 @@ import {
   setLastActiveUnsavedTabId
 }                                       from '@Redux/records/tabbar';
 import {
+  selectLastSelectedDataSourceCredentialId
+}                                       from '@Redux/records/dataSource/index';
+import {
   addUnsavedTreeNodeFromFetch,
   removeUnsavedTreeNodeByTabId
 }                                       from '@Redux/records/unsavedQueryTree';
@@ -37,38 +40,35 @@ import {
 import { requestSqlEditorAutofocus }    from '@Redux/records/uiFocus';
 
 
-export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string }, { state: RootState }>(
+export const createNewUnsavedDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv7; name: string; dataSourceCredentialId?: UUIDv7 }, { state: RootState }>(
   'dataQuery/createNewUnsavedDataQueryThunk',
-  async ({ dataQueryId, name }, { dispatch, getState }) => {
+  async ({ dataQueryId, name, dataSourceCredentialId }, { dispatch, getState }) => {
     const state = getState();
-    const activeDataSourceId = state.dataSourceRecords?.activeDataSourceId || null;
+    const selectedDataSourceCredentialId = dataSourceCredentialId ?? selectLastSelectedDataSourceCredentialId(state);
+
+    if (!selectedDataSourceCredentialId) {
+      dispatch(updateError({
+        actionType : 'dataQuery/createNewUnsavedDataQueryThunk',
+        message    : 'No data source available to create a new query.'
+      }));
+      return;
+    }
 
     log.thunkStart({
       thunk : 'dataQuery/createNewUnsavedDataQueryThunk',
       input : {
         dataQueryId,
         nameLen: typeof name === 'string' ? name.length : undefined,
-        hasActiveConnection: Boolean(activeDataSourceId)
+        dataSourceCredentialId: selectedDataSourceCredentialId
       }
     });
-
-    if (!activeDataSourceId) {
-      // AIDEV-NOTE: Enforce "connect first" at the central thunk boundary so all entrypoints
-      // (intro, tabbar +, directory buttons) share the same rule and error messaging.
-      dispatch(updateError({
-        actionType  : 'dataQuery/createNewUnsavedDataQueryThunk',
-        message     : 'Connect a server first to create a new query.',
-        meta        : { code: 'missing-active-connection' }
-      }));
-      return;
-    }
 
     // AIDEV-NOTE: Creating a new unsaved query is an explicit "start typing" intent.
     // We request an editor autofocus; QueryWorkspace will honor it only when appropriate.
     dispatch(requestSqlEditorAutofocus());
     dispatch(createNewUnsavedDataQuery({ dataQueryId, name, ext: 'sql' }));
 
-    const payload = { dataQueryId };
+    const payload = { dataQueryId, dataSourceCredentialId: selectedDataSourceCredentialId };
     try {
       const res = await createNewUnsavedDataQueryAction(payload);
       log.thunkResult({

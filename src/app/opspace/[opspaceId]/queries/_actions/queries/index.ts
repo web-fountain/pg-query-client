@@ -96,20 +96,21 @@ export async function listDataQueriesAction(): Promise<ActionResult<DataQuery[]>
 }
 
 export async function createNewUnsavedDataQueryAction(payload: CreateNewUnsavedDataQueryPayload): Promise<ActionResult<CreateUnsavedDataQueryResult>> {
-  const { dataQueryId, name } = payload;
+  const { dataQueryId, name, dataSourceCredentialId } = payload;
   return withAction(
     {
       action : 'queries.createUnsaved',
       op     : 'write',
       input  : {
         dataQueryId,
+        dataSourceCredentialId,
         nameLen: typeof name === 'string' ? name.length : undefined
       }
     },
     async ({ ctx, meta }) => {
       const body = name
-        ? { dataQueryId, name }
-        : { dataQueryId };
+        ? { dataQueryId, dataSourceCredentialId, name }
+        : { dataQueryId, dataSourceCredentialId };
 
       const res = await backendFetchJSON<CreateUnsavedDataQueryApiResponse>({
         path    : `/queries/unsaved`,

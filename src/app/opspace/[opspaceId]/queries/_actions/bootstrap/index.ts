@@ -10,19 +10,17 @@ import type { ActionError }                       from '@Errors/types';
 import type { ActionResult }                      from '../types';
 import type { WorkspaceBootstrap }                from './types';
 
-import { ERROR_CODES }                            from '@Errors/codes';
+import { listDataSourcesAction }                  from '@OpSpaceDataSourceActions';
 import { withAction }                             from '@Observability/server/action';
+import { ERROR_CODES }                            from '@Errors/codes';
 import { aggregateActionError, fail, ok }         from '@Errors/server/actionResult.server';
+
 import { listDataQueriesAction }                  from '../queries';
 import {
   buildInitialQueryTreeAction,
   buildInitialUnsavedQueryTreeAction
 }                                                 from '../queryTree';
 import { listOpenTabsAction }                     from '../tabs';
-import {
-  getActiveDataSourceAction,
-  listDataSourcesAction
-}                                                 from '@OpSpaceDataSourceActions';
 
 
 async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstrap>> {
@@ -38,23 +36,22 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
         queriesResult,
         queryTreeResult,
         unsavedTreeResult,
-        dataSourcesResult,
-        activeDataSourceResult
+        dataSourcesResult
       ] = await Promise.all([
         listOpenTabsAction(),
         listDataQueriesAction(),
         buildInitialQueryTreeAction(),
         buildInitialUnsavedQueryTreeAction(),
-        listDataSourcesAction(),
-        getActiveDataSourceAction()
+        listDataSourcesAction()
       ]);
 
-      if (!tabsResult.success || !queryTreeResult.success || !unsavedTreeResult.success || !queriesResult.success) {
+      if (!tabsResult.success || !queryTreeResult.success || !unsavedTreeResult.success || !queriesResult.success || !dataSourcesResult.success) {
         const causes: ActionError[] = [];
         if (!tabsResult.success)        causes.push(tabsResult.error);
         if (!queriesResult.success)     causes.push(queriesResult.error);
         if (!queryTreeResult.success)   causes.push(queryTreeResult.error);
         if (!unsavedTreeResult.success) causes.push(unsavedTreeResult.error);
+        if (!dataSourcesResult.success) causes.push(dataSourcesResult.error);
 
         const primaryCode =
           causes.find(c => c.code === ERROR_CODES.context.missingContext)?.code ||
@@ -69,10 +66,11 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
         }));
       }
 
-      const tabs             = tabsResult.data        as TabbarRecord;
-      const queryTree        = queryTreeResult.data   as unknown as QueryTreeRecord;
-      const unsavedQueryTree = unsavedTreeResult.data as unknown as UnsavedQueryTreeRecord;
-      const queries          = queriesResult.data     as DataQuery[] | undefined;
+      const tabs              = tabsResult.data        as TabbarRecord;
+      const queryTree         = queryTreeResult.data   as unknown as QueryTreeRecord;
+      const unsavedQueryTree  = unsavedTreeResult.data as unknown as UnsavedQueryTreeRecord;
+      const queries           = queriesResult.data     as DataQuery[] | undefined;
+      const dataSourceRecords = dataSourcesResult.data as unknown as DataSourceRecord;
 
       // AIDEV-NOTE: Backend listDataQueries now returns only DataQueries for
       // open tabs (saved + unsaved). Build the DataQueryRecord directly from
@@ -93,25 +91,6 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
           };
         }
       }
-
-      // AIDEV-NOTE: DbConnections bootstrap is non-fatal; if the backend does not yet support
-      // connections endpoints, we still want the OpSpace shell to render so the user can
-      // attempt to create a connection (or see a helpful error in the modal).
-      const dataSources: DataSourceMeta[] =
-        dataSourcesResult.success && Array.isArray(dataSourcesResult.data)
-          ? (dataSourcesResult.data as DataSourceMeta[])
-          : [];
-
-      const activeDataSourceId =
-        activeDataSourceResult.success
-          ? (activeDataSourceResult.data?.dataSourceId ?? null)
-          : null;
-
-      const dataSourceRecords: DataSourceRecord = {
-        dataSourceIds      : dataSources.map((ds) => ds.dataSourceId),
-        byId               : Object.fromEntries(dataSources.map((ds) => [ds.dataSourceId, ds])),
-        activeDataSourceId : activeDataSourceId
-      };
 
       return ok(meta, {
         tabs,

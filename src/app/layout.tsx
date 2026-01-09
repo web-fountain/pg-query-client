@@ -1,6 +1,7 @@
 import type { Metadata }                from 'next';
 import { interVariable, interDisplay }  from '@Lib/fonts';
 import OpSpaceLayoutProvider            from '@Components/layout/OpSpaceProvider';
+import CsrfBootstrapClient              from './_components/CsrfBootstrapClient';
 import DevJwtBootstrapClient            from './_components/DevJwtBootstrapClient';
 import AuditBootstrapClient             from './_components/AuditBootstrapClient';
 
@@ -97,6 +98,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
       </head>
 
       <body>
+        <CsrfBootstrapClient />
         <AuditBootstrapClient />
         {process.env.NODE_ENV !== 'production' ? <DevJwtBootstrapClient /> : null}
         <OpSpaceLayoutProvider>

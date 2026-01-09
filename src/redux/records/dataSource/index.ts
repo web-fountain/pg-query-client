@@ -18,16 +18,12 @@ export type { DataSourceMeta, DataSourceRecord } from './types';
 // Actions
 export const setDataSourcesFromBootstrap = createAction<{
   dataSources        : DataSourceMeta[];
-  activeDataSourceId : UUIDv7 | null;
 }>('dataSourceRecords/setDataSourcesFromBootstrap');
 
 export const upsertDataSourceFromFetch = createAction<{ dataSource: DataSourceMeta }>(
   'dataSourceRecords/upsertDataSourceFromFetch'
 );
 
-export const setActiveDataSourceId = createAction<{ dataSourceId: UUIDv7 | null }>(
-  'dataSourceRecords/setActiveDataSourceId'
-);
 
 // Selectors
 export const selectDataSourceRecords = createSelector.withTypes<RootState>()(
@@ -42,45 +38,81 @@ export const selectDataSourceList = createSelector.withTypes<RootState>()(
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
-export const selectActiveDataSourceId = createSelector.withTypes<RootState>()(
-  [(state) => state.dataSourceRecords.activeDataSourceId],
-  (activeDataSourceId) => activeDataSourceId,
+export const selectDataSourceByCredentialId = createSelector.withTypes<RootState>()(
+  [
+    (state) => state.dataSourceRecords.byCredentialId,
+    (_state: RootState, credentialId: UUIDv7 | null) => credentialId
+  ],
+  (byCredentialId, credentialId): DataSourceMeta | null => {
+    if (!credentialId) return null;
+    return byCredentialId[credentialId] ?? null;
+  },
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
-export const selectActiveDataSourceMeta = createSelector.withTypes<RootState>()(
-  [(state) => state.dataSourceRecords],
-  (dataSourceRecords) => {
-    const id = dataSourceRecords.activeDataSourceId;
-    if (!id) return null;
-    return dataSourceRecords.byId[id] || null;
+// O(1)
+export const selectActiveTabDataSourceCredentialId = createSelector.withTypes<RootState>()(
+  [
+    (state) => state.tabs.activeTabId,
+    (state) => state.tabs.entities
+  ],
+  (activeTabId, entities): UUIDv7 | null => {
+    if (!activeTabId) return null;
+    return entities[activeTabId]?.dataSourceCredentialId ?? null;
   },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+
+// O(n), but only when dataSourceRecords changes; no array allocations
+export const selectPgliteDataSourceCredentialId = createSelector.withTypes<RootState>()(
+  [
+    (state) => state.dataSourceRecords.dataSourceIds,
+    (state) => state.dataSourceRecords.byId
+  ],
+  (ids, byId): UUIDv7 | null => {
+    for (let i = 0; i < ids.length; i++) {
+      const ds = byId[ids[i]];
+      if (ds && ds.kind === 'pglite') return ds.dataSourceCredentialId;
+    }
+    return null;
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+
+// O(1)
+export const selectLastSelectedDataSourceCredentialId = createSelector.withTypes<RootState>()(
+  [
+    selectActiveTabDataSourceCredentialId,
+    selectPgliteDataSourceCredentialId
+  ],
+  (fromTab, fromPglite): UUIDv7 | null => fromTab ?? fromPglite,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
 
 // Reducer
 const initialState: DataSourceRecord = {
-  dataSourceIds       : [],
-  byId                : {},
-  activeDataSourceId  : null
+  dataSourceIds   : [],
+  byId            : {},
+  byCredentialId  : {}
 };
 
 export default createReducer(initialState, (builder) => {
   builder
     .addCase(setDataSourcesFromBootstrap,
-      function(state: DataSourceRecord, action: PayloadAction<{ dataSources: DataSourceMeta[]; activeDataSourceId: UUIDv7 | null }>) {
-        const { dataSources, activeDataSourceId } = action.payload;
-        state.dataSourceIds = [];
-        state.byId = {};
+      function(state: DataSourceRecord, action: PayloadAction<{ dataSources: DataSourceMeta[] }>) {
+        const { dataSources } = action.payload;
+
+        state.dataSourceIds  = [];
+        state.byId           = {};
+        state.byCredentialId = {};
 
         for (const ds of (dataSources || [])) {
           if (!ds?.dataSourceId) continue;
           state.dataSourceIds.push(ds.dataSourceId);
           state.byId[ds.dataSourceId] = ds;
+          state.byCredentialId[ds.dataSourceCredentialId] = ds;
         }
-
-        state.activeDataSourceId = activeDataSourceId;
       }
     )
     .addCase(upsertDataSourceFromFetch,
@@ -92,11 +124,7 @@ export default createReducer(initialState, (builder) => {
           state.dataSourceIds.push(ds.dataSourceId);
         }
         state.byId[ds.dataSourceId] = ds;
+        state.byCredentialId[ds.dataSourceCredentialId] = ds;
       }
     )
-    .addCase(setActiveDataSourceId,
-      function(state: DataSourceRecord, action: PayloadAction<{ dataSourceId: UUIDv7 | null }>) {
-        state.activeDataSourceId = action.payload.dataSourceId;
-      }
-    );
 });

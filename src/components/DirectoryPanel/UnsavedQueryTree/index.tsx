@@ -24,7 +24,6 @@ import {
 import {
   selectUnsavedQueryTree, selectNextUntitledName
 }                                               from '@Redux/records/unsavedQueryTree';
-import { selectActiveDataSourceId }             from '@Redux/records/dataSource';
 import { selectActiveTabId, selectTabIds }      from '@Redux/records/tabbar';
 import { createNewUnsavedDataQueryThunk }       from '@Redux/records/dataQuery/thunks';
 import { closeAllUnsavedTabsThunk }             from '@Redux/records/tabbar/thunks';
@@ -58,7 +57,6 @@ function UnsavedQueriesTreeInner(
   const tabIds              = useReduxSelector(selectTabIds);
   const activeTabId         = useReduxSelector(selectActiveTabId);
   const nextUntitledName    = useReduxSelector(selectNextUntitledName);
-  const activeDataSourceId  = useReduxSelector(selectActiveDataSourceId);
   const pathname            = usePathname();
   const dispatch            = useReduxDispatch();
   const { opspaceId }       = useParams<{ opspaceId: string }>()!;
@@ -326,7 +324,6 @@ function UnsavedQueriesTreeInner(
             onCloseAll={handleCloseAll}
             disableCloseAll={renderItems.length === 0}
             isCreatePending={isCreatePending}
-            disableCreateFile={!activeDataSourceId}
             disableCreateReason="Connect a server to create a new query"
           />
         </div>

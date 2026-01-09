@@ -99,7 +99,6 @@ async function listDataSourcesCached(ctx: HeadersContext): Promise<ListDataSourc
     return { ok: false, status: res.status, reason: 'backend-ok-false' };
   }
 
-  console.log('listDataSourcesCached', res.data.data);
   return { ok: true, data: res.data.data };
 }
 

@@ -70,7 +70,32 @@ export const selectLastActiveUnsavedTabId = createSelector.withTypes<RootState>(
   last => last,
   { devModeChecks: { identityFunctionCheck: 'never' } }
 );
+export const selectTabDataSourceCredentialId = createSelector.withTypes<RootState>()(
+  [
+    (state: RootState) => state.tabs.entities,
+    (state: RootState) => state.tabs.activeTabId
+  ],
+  (entities, activeTabId) => {
+    if (!activeTabId) return null;
+    // AIDEV-NOTE: entities[activeTabId] is the active tab record.
+    return entities[activeTabId]?.dataSourceCredentialId ?? null;
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+export const selectActiveTabDataSource = createSelector.withTypes<RootState>()(
+  [
+    (state: RootState) => state.tabs,
+    (state: RootState) => state.dataSourceRecords
+  ],
+  (tabs, dataSourceRecords) => {
+    const { activeTabId, entities } = tabs;
+    if (!activeTabId) return null;
 
+    const activeTab = entities[activeTabId];
+    return dataSourceRecords.byCredentialId[activeTab?.dataSourceCredentialId];
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
 
 // Reducer
 const initialState: TabbarRecord = {

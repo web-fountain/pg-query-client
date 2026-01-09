@@ -14,8 +14,8 @@ type ToolbarProps = {
   disableCreateReason?  : string;
 };
 
-function Toolbar({ onCreateFile, onCloseAll, disableCloseAll, isCreatePending, disableCreateFile, disableCreateReason }: ToolbarProps) {
-  const createDisabled = !!isCreatePending || !!disableCreateFile;
+function Toolbar({ onCreateFile, onCloseAll, disableCloseAll, isCreatePending, disableCreateReason }: ToolbarProps) {
+  const createDisabled = !!isCreatePending;
   const createTitle = createDisabled
     ? (disableCreateReason || 'Connect a server to create a new query')
     : 'New Untitled Query';

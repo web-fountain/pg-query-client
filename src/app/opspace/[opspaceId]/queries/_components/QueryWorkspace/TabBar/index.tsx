@@ -17,7 +17,6 @@ import {
   selectTabIds,
   setActiveTab
 }                                             from '@Redux/records/tabbar';
-import { selectActiveDataSourceId }           from '@Redux/records/dataSource';
 import { closeTabThunk, reorderTabsThunk }    from '@Redux/records/tabbar/thunks';
 import { selectDataQueries }                  from '@Redux/records/dataQuery';
 import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
@@ -48,7 +47,6 @@ function TabBar() {
   const dataQueryRecords              = useReduxSelector(selectDataQueries);
   const unsavedQueryTree              = useReduxSelector(selectUnsavedQueryTree);
   const nextUntitledName              = useReduxSelector(selectNextUntitledName) as string;
-  const activeDataSourceId            = useReduxSelector(selectActiveDataSourceId);
   const dispatch                      = useReduxDispatch();
 
   const activateTab                   = useActivateTab();
@@ -155,7 +153,6 @@ function TabBar() {
 
   const handleAddTab = useEffectEvent(async () => {
     if (isAddingRef.current) return;
-    if (!activeDataSourceId) return;
 
     isAddingRef.current = true;
 
@@ -224,7 +221,6 @@ function TabBar() {
       onPointerDown={handleTabPointerDown}
       onKeyDown={handleTablistKeyDown}
       onAddTab={handleAddTab}
-      disableAddTab={!activeDataSourceId}
       addTabDisabledReason="Connect a server to create a new query"
       onCloseTab={handleTabClose}
       onReorderTabs={handleReorderTabs}

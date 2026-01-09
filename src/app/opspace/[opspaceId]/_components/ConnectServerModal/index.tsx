@@ -5,34 +5,31 @@ import type {
   ClipboardEvent,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent    as ReactMouseEvent
-}                                   from 'react';
+}                                     from 'react';
 import type {
   DataSourceDraft,
   DataSourceKind,
   DbSslMode
-}                                   from '@Redux/records/dataSource/types';
-import type { FieldError }          from '@Errors/fieldError';
+}                                     from '@Redux/records/dataSource/types';
+import type { FieldError }            from '@Errors/fieldError';
 
 import {
   useCallback, useEffect,
   useMemo, useRef,
   useState
-}                                   from 'react';
-import { FloatingPortal }           from '@floating-ui/react';
+}                                     from 'react';
+import { FloatingPortal }             from '@floating-ui/react';
 
-import { useReduxDispatch }         from '@Redux/storeHooks';
-import {
-  setActiveDataSourceId,
-  upsertDataSourceFromFetch
-}                                   from '@Redux/records/dataSource';
-import { validateDataSourceDraft }  from '@Redux/records/dataSource/validation';
+import { useReduxDispatch }           from '@Redux/storeHooks';
+import { upsertDataSourceFromFetch }  from '@Redux/records/dataSource';
+import { validateDataSourceDraft }    from '@Redux/records/dataSource/validation';
 import {
   createDataSourceAction,
   setActiveDataSourceAction,
   testDataSourceAction
-}                                   from '@OpSpaceDataSourceActions';
+}                                     from '@OpSpaceDataSourceActions';
 
-import styles                       from './styles.module.css';
+import styles                         from './styles.module.css';
 
 
 type Props = {
@@ -559,7 +556,6 @@ function ConnectServerModal({ open, onClose }: Props) {
 
       const dataSource = res.data;
       dispatch(upsertDataSourceFromFetch({ dataSource }));
-      dispatch(setActiveDataSourceId({ dataSourceId: dataSource.dataSourceId }));
 
       // AIDEV-NOTE: Best-effort server-side "active" pointer sync; do not block UX on failure.
       try { await setActiveDataSourceAction(dataSource.dataSourceId); } catch {}

@@ -166,7 +166,6 @@ function TabBarPresenter({
   onPointerDown,
   onKeyDown,
   onAddTab,
-  disableAddTab,
   addTabDisabledReason,
   onCloseTab,
   onReorderTabs
@@ -398,10 +397,8 @@ function TabBarPresenter({
       <button
         className={styles['tab-add']}
         aria-label="New tab"
-        title={disableAddTab ? (addTabDisabledReason || 'Connect a server to create a new query') : 'New tab'}
+        title={addTabDisabledReason || 'Connect a server to create a new query'}
         onClick={onAddTab}
-        disabled={!!disableAddTab}
-        aria-disabled={!!disableAddTab}
       >
         <Icon name="plus" />
       </button>

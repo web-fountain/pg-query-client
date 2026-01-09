@@ -2,10 +2,11 @@ import type { UUIDv7 } from '@Types/primitives';
 
 
 type Tab = {
-  groupId   : number;
-  tabId     : UUIDv7;
-  mountId   : UUIDv7;
-  position  : number;
+  groupId                : number;
+  tabId                  : UUIDv7;
+  mountId                : UUIDv7;
+  position               : number;
+  dataSourceCredentialId : UUIDv7;
 };
 
 type Tabbar = {
