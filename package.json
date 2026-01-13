@@ -8,7 +8,7 @@
   },
   "packageManager": "pnpm@10.26.1",
   "devDependencies": {
-    "@types/node": "25.0.6",
+    "@types/node": "25.0.8",
     "@types/react": "19.2.8",
     "@types/react-dom": "19.2.3",
     "autoprefixer": "10.4.23",
@@ -24,16 +24,16 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@ai-sdk/openai": "3.0.8",
-    "@ai-sdk/react": "3.0.30",
-    "@ai-sdk/rsc": "2.0.28",
+    "@ai-sdk/openai": "3.0.9",
+    "@ai-sdk/react": "3.0.35",
+    "@ai-sdk/rsc": "2.0.33",
     "@codemirror/commands": "6.10.1",
     "@codemirror/lang-json": "6.0.2",
     "@codemirror/lang-sql": "6.10.0",
     "@codemirror/language": "6.12.1",
     "@codemirror/lint": "6.9.2",
     "@codemirror/state": "6.5.3",
-    "@codemirror/view": "6.39.9",
+    "@codemirror/view": "6.39.10",
     "@floating-ui/react": "0.27.16",
     "@headless-tree/core": "1.6.2",
     "@headless-tree/react": "1.6.2",
@@ -43,7 +43,7 @@
     "@replit/codemirror-vim": "6.3.0",
     "@uiw/codemirror-themes": "4.25.4",
     "@uiw/react-codemirror": "4.25.4",
-    "ai": "6.0.28",
+    "ai": "6.0.33",
     "ajv": "8.17.1",
     "ajv-errors": "3.0.0",
     "ajv-formats": "3.0.1",
@@ -62,7 +62,6 @@
     "build": "NEXT_TELEMETRY_DISABLED=1 && pnpm noTel && next build",
     "build:start": "next start",
     "noTel": "next telemetry disable",
-    "lint": "next lint",
     "repack": "del -f .next node_modules package-lock.json pnpm-lock.yaml && pnpm install",
     "start": "next dev --turbopack"
   }
