@@ -288,7 +288,8 @@ export const createSavedQueryFileThunk = createAsyncThunk<TreeNode | null, Creat
           groupId  : tab.groupId,
           tabId    : tab.tabId as UUIDv7,
           mountId  : tab.mountId as UUIDv7,
-          position : tab.position
+          position : tab.position,
+          dataSourceCredentialId : tab.dataSourceCredentialId as UUIDv7
         }
       }));
     }

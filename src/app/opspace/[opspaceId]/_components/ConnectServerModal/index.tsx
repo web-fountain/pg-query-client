@@ -5,31 +5,36 @@ import type {
   ClipboardEvent,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent    as ReactMouseEvent
-}                                     from 'react';
+}                                       from 'react';
+import type { PostgresDataSourceDraft } from '@Redux/records/dataSource/types';
+import type { FieldError }              from '@Errors/fieldError';
+import type { UUIDv7 }                  from '@Types/primitives';
 import type {
-  DataSourceDraft,
-  DataSourceKind,
-  DbSslMode
-}                                     from '@Redux/records/dataSource/types';
-import type { FieldError }            from '@Errors/fieldError';
+  DataSource,
+  DbSslMode,
+  PostgresDataSourceTestPayload
+}                                       from '@Types/dataSource';
 
 import {
   useCallback, useEffect,
   useMemo, useRef,
   useState
-}                                     from 'react';
-import { FloatingPortal }             from '@floating-ui/react';
+}                                       from 'react';
+import { FloatingPortal }               from '@floating-ui/react';
 
-import { useReduxDispatch }           from '@Redux/storeHooks';
-import { upsertDataSourceFromFetch }  from '@Redux/records/dataSource';
-import { validateDataSourceDraft }    from '@Redux/records/dataSource/validation';
+import { useReduxDispatch }             from '@Redux/storeHooks';
+import { upsertDataSourceFromFetch }    from '@Redux/records/dataSource';
+import {
+  validateDataSourceDraftForCreate,
+  validateDataSourceDraftForTest
+}                                       from '@Redux/records/dataSource/validation';
 import {
   createDataSourceAction,
-  setActiveDataSourceAction,
   testDataSourceAction
-}                                     from '@OpSpaceDataSourceActions';
+}                                       from '@OpSpaceDataSourceActions';
+import { generateUUIDv7 }               from '@Utils/generateId';
 
-import styles                         from './styles.module.css';
+import styles                           from './styles.module.css';
 
 
 type Props = {
@@ -39,8 +44,7 @@ type Props = {
 
 type FieldErrorMap = Partial<Record<
   | 'kind'
-  | 'serverGroupName'
-  | 'dataSourceUri'
+  | 'name'
   | 'host'
   | 'port'
   | 'username'
@@ -64,7 +68,7 @@ type ParsedUri = {
   database? : string;
 };
 
-const DATA_SOURCE_KIND: DataSourceKind = 'postgres';
+const DATA_SOURCE_KIND = 'postgres' as const;
 
 const SSL_MODE_OPTIONS: Array<{ value: DbSslMode; label: string }> = [
   { value: 'disable'    , label: 'disable'     },
@@ -204,8 +208,7 @@ function mapFieldErrors(fields: FieldError[] | undefined): { fieldErrors: FieldE
 
     if (
       key === 'kind'
-      || key === 'serverGroupName'
-      || key === 'dataSourceUri'
+      || key === 'name'
       || key === 'host'
       || key === 'port'
       || key === 'username'
@@ -242,12 +245,14 @@ function ConnectServerModal({ open, onClose }: Props) {
   const panelRef      = useRef<HTMLDivElement | null>(null);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [serverGroupName, setServerGroupName] = useState<string>('');
+  const [dataSourceId, setDataSourceId] = useState<UUIDv7>(() => generateUUIDv7());
+  const [name, setName] = useState<string>('');
 
   // AIDEV-NOTE: rawConnectionUri stores the actual URI (with real password) for submission.
   // displayConnectionUri stores what we show in the input (with masked password).
   const [rawConnectionUri    , setRawConnectionUri]     = useState<string>('');
   const [displayConnectionUri, setDisplayConnectionUri] = useState<string>('');
+  const [uriParseError       , setUriParseError]        = useState<string | null>(null);
 
   const [host         , setHost]          = useState<string>('');
   const [port         , setPort]          = useState<string>('');
@@ -269,6 +274,27 @@ function ConnectServerModal({ open, onClose }: Props) {
 
   const canSubmit = !isTesting && !isConnecting;
   const isTestOk = testStatus === 'success';
+
+  // AIDEV-NOTE: In URI mode we surface connection issues under the URI field (connectionUriError),
+  // and suppress per-field errors on the dimmed manual inputs to reduce noise.
+  const showParamFieldErrors = inputMode !== 'uri';
+
+  const connectionUriError = useMemo(() => {
+    if (uriParseError) return uriParseError;
+    if (inputMode !== 'uri') return null;
+    const missingOrInvalid: string[] = [];
+    if (fieldErrors.host) missingOrInvalid.push('host');
+    if (fieldErrors.port) missingOrInvalid.push('port');
+    if (fieldErrors.username) missingOrInvalid.push('username');
+    if (fieldErrors.password) missingOrInvalid.push('password');
+    if (fieldErrors.database) missingOrInvalid.push('database');
+
+    if (missingOrInvalid.length === 0) return null;
+    if (missingOrInvalid.length === 1) {
+      return `Connection string is missing or invalid: ${missingOrInvalid[0]}.`;
+    }
+    return `Connection string is missing or invalid: ${missingOrInvalid.join(', ')}.`;
+  }, [fieldErrors, inputMode, uriParseError]);
 
   // AIDEV-NOTE: Compute preview URI when in params mode
   const previewUri = useMemo(() => {
@@ -293,12 +319,15 @@ function ConnectServerModal({ open, onClose }: Props) {
     setPassword('');
     setRawConnectionUri('');
     setDisplayConnectionUri('');
+    setUriParseError(null);
   }, []);
 
   const resetForm = useCallback(() => {
-    setServerGroupName('');
+    setDataSourceId(generateUUIDv7());
+    setName('');
     setRawConnectionUri('');
     setDisplayConnectionUri('');
+    setUriParseError(null);
     setHost('');
     setPort('');
     setUsername('');
@@ -318,6 +347,7 @@ function ConnectServerModal({ open, onClose }: Props) {
     if (!value.trim()) {
       setRawConnectionUri('');
       setDisplayConnectionUri('');
+      setUriParseError(null);
       if (!hasParamsContent) {
         setInputMode('none');
       }
@@ -331,12 +361,21 @@ function ConnectServerModal({ open, onClose }: Props) {
     // Parse and populate fields
     const parsed = parsePostgresUri(value);
     if (parsed) {
-      if (parsed.host)     setHost(parsed.host);
-      if (parsed.port)     setPort(String(parsed.port));
-      if (parsed.username) setUsername(parsed.username);
-      if (parsed.password) setPassword(parsed.password);
-      if (parsed.database) setDatabase(parsed.database);
+      setUriParseError(null);
+      setHost(parsed.host ?? '');
+      setPort(typeof parsed.port === 'number' ? String(parsed.port) : '');
+      setUsername(parsed.username ?? '');
+      setPassword(parsed.password ?? '');
+      setDatabase(parsed.database ?? '');
+      return;
     }
+
+    setUriParseError('Connection string must be a valid postgres:// or postgresql:// URI');
+    setHost('');
+    setPort('');
+    setUsername('');
+    setPassword('');
+    setDatabase('');
   }, [hasParamsContent]);
 
   // AIDEV-NOTE: Handle paste event specifically to capture full URI before masking
@@ -354,12 +393,21 @@ function ConnectServerModal({ open, onClose }: Props) {
     // Parse and populate fields
     const parsed = parsePostgresUri(pastedText);
     if (parsed) {
-      if (parsed.host)    setHost(parsed.host);
-      if (parsed.port)     setPort(String(parsed.port));
-      if (parsed.username) setUsername(parsed.username);
-      if (parsed.password) setPassword(parsed.password);
-      if (parsed.database) setDatabase(parsed.database);
+      setUriParseError(null);
+      setHost(parsed.host ?? '');
+      setPort(typeof parsed.port === 'number' ? String(parsed.port) : '');
+      setUsername(parsed.username ?? '');
+      setPassword(parsed.password ?? '');
+      setDatabase(parsed.database ?? '');
+      return;
     }
+
+    setUriParseError('Connection string must be a valid postgres:// or postgresql:// URI');
+    setHost('');
+    setPort('');
+    setUsername('');
+    setPassword('');
+    setDatabase('');
   }, []);
 
   // AIDEV-NOTE: Handle individual param changes - switch to params mode
@@ -374,12 +422,31 @@ function ConnectServerModal({ open, onClose }: Props) {
       setInputMode('params');
       setRawConnectionUri('');
       setDisplayConnectionUri('');
+      setUriParseError(null);
     }
   }, [inputMode]);
 
-  const buildBaseDraft = useCallback((): DataSourceDraft => {
-    // AIDEV-NOTE: In URI mode, use the raw URI. In params mode, use individual fields.
-    const uri = inputMode === 'uri' ? normalizeString(rawConnectionUri) : undefined;
+  const buildDraft = useCallback((): PostgresDataSourceDraft => {
+    const draft: PostgresDataSourceDraft = {
+      dataSourceId  : dataSourceId,
+      kind          : DATA_SOURCE_KIND,
+      name          : name,
+      sslMode       : sslMode,
+      persistSecret : persistSecret
+    };
+
+    if (inputMode === 'uri') {
+      const parsed = parsePostgresUri(rawConnectionUri);
+      if (parsed) {
+        if (parsed.host) draft.host = parsed.host;
+        if (typeof parsed.port === 'number') draft.port = parsed.port;
+        if (parsed.username) draft.username = parsed.username;
+        if (parsed.password) draft.password = parsed.password;
+        if (parsed.database) draft.database = parsed.database;
+      }
+      return draft;
+    }
+
     const hostVal = normalizeString(host);
     const userVal = normalizeString(username);
     const passVal = normalizeString(password);
@@ -388,20 +455,10 @@ function ConnectServerModal({ open, onClose }: Props) {
     const portNum = (() => {
       const raw = (port || '').trim();
       if (!raw) return undefined;
-      const n = Number(raw);
-      if (!Number.isFinite(n)) return undefined;
-      return Math.trunc(n);
+      if (!/^[0-9]{1,5}$/.test(raw)) return Number.NaN;
+      const n = Number.parseInt(raw, 10);
+      return Number.isFinite(n) ? n : Number.NaN;
     })();
-
-    const draft: DataSourceDraft = {
-      kind            : DATA_SOURCE_KIND,
-      serverGroupName : normalizeString(serverGroupName) || '',
-      sslMode         : sslMode
-    };
-
-    if (uri) {
-      draft.dataSourceUri = uri;
-    }
 
     if (hostVal) draft.host = hostVal;
     if (typeof portNum === 'number') draft.port = portNum;
@@ -410,34 +467,39 @@ function ConnectServerModal({ open, onClose }: Props) {
     if (dbVal)   draft.database = dbVal;
 
     return draft;
-  }, [inputMode, rawConnectionUri, database, host, password, port, serverGroupName, sslMode, username]);
+  }, [dataSourceId, database, host, inputMode, name, password, persistSecret, port, rawConnectionUri, sslMode, username]);
 
-  const buildTestDraft = useCallback((): DataSourceDraft => {
-    const d = buildBaseDraft();
-    // AIDEV-NOTE: Do not send persistSecret to /test; keep the payload minimal and compatible.
-    delete (d as Record<string, unknown>)['persistSecret'];
-    return d;
-  }, [buildBaseDraft]);
+  const applyValidationErrors = useCallback((errors: FieldError[] | undefined) => {
+    const mapped = mapFieldErrors(errors);
+    setFieldErrors(mapped.fieldErrors);
+    setFormError(mapped.formError);
+  }, []);
 
-  const buildCreateDraft = useCallback((): DataSourceDraft => {
-    const d = buildBaseDraft();
-    d.persistSecret = persistSecret;
-    return d;
-  }, [buildBaseDraft, persistSecret]);
-
-  const validateDraft = useCallback((draft: DataSourceDraft): boolean => {
-    const res = validateDataSourceDraft(draft);
+  const validateForTest = useCallback((): PostgresDataSourceTestPayload | null => {
+    if (inputMode === 'uri' && uriParseError) return null;
+    const draft = buildDraft();
+    const res = validateDataSourceDraftForTest(draft);
     if (res.ok) {
       setFieldErrors({});
       setFormError(null);
-      return true;
+      return res.data;
     }
+    applyValidationErrors(res.errors);
+    return null;
+  }, [applyValidationErrors, buildDraft, inputMode, uriParseError]);
 
-    const mapped = mapFieldErrors(res.errors);
-    setFieldErrors(mapped.fieldErrors);
-    setFormError(mapped.formError);
-    return false;
-  }, []);
+  const validateForCreate = useCallback((): DataSource | null => {
+    if (inputMode === 'uri' && uriParseError) return null;
+    const draft = buildDraft();
+    const res = validateDataSourceDraftForCreate(draft);
+    if (res.ok) {
+      setFieldErrors({});
+      setFormError(null);
+      return res.data;
+    }
+    applyValidationErrors(res.errors);
+    return null;
+  }, [applyValidationErrors, buildDraft, inputMode, uriParseError]);
 
   const focusFirst = useCallback(() => {
     const el = firstInputRef.current;
@@ -505,14 +567,14 @@ function ConnectServerModal({ open, onClose }: Props) {
     setIsTesting(true);
     setTestStatus('idle');
 
-    const draft = buildTestDraft();
-    if (!validateDraft(draft)) {
+    const payload = validateForTest();
+    if (!payload) {
       setIsTesting(false);
       return;
     }
 
     try {
-      const res = await testDataSourceAction(draft);
+      const res = await testDataSourceAction(payload);
       if (!res.success) {
         const mapped = mapFieldErrors(res.error.fields);
         setFieldErrors(mapped.fieldErrors);
@@ -531,22 +593,22 @@ function ConnectServerModal({ open, onClose }: Props) {
     } finally {
       setIsTesting(false);
     }
-  }, [buildTestDraft, canSubmit, clearFeedback, validateDraft]);
+  }, [canSubmit, clearFeedback, validateForTest]);
 
-  const runConnect = useCallback(async () => {
+  const createDataSource = useCallback(async () => {
     if (!canSubmit) return;
 
     clearFeedback();
     setIsConnecting(true);
 
-    const draft = buildCreateDraft();
-    if (!validateDraft(draft)) {
+    const payload = validateForCreate();
+    if (!payload) {
       setIsConnecting(false);
       return;
     }
 
     try {
-      const res = await createDataSourceAction(draft);
+      const res = await createDataSourceAction(payload);
       if (!res.success) {
         const mapped = mapFieldErrors(res.error.fields);
         setFieldErrors(mapped.fieldErrors);
@@ -557,9 +619,6 @@ function ConnectServerModal({ open, onClose }: Props) {
       const dataSource = res.data;
       dispatch(upsertDataSourceFromFetch({ dataSource }));
 
-      // AIDEV-NOTE: Best-effort server-side "active" pointer sync; do not block UX on failure.
-      try { await setActiveDataSourceAction(dataSource.dataSourceId); } catch {}
-
       wipeSecrets();
       onClose();
     } catch {
@@ -567,7 +626,7 @@ function ConnectServerModal({ open, onClose }: Props) {
     } finally {
       setIsConnecting(false);
     }
-  }, [buildCreateDraft, canSubmit, clearFeedback, dispatch, onClose, validateDraft, wipeSecrets]);
+  }, [canSubmit, clearFeedback, dispatch, onClose, validateForCreate, wipeSecrets]);
 
   const modeLabel = useMemo(() => {
     if (inputMode === 'uri') return 'Using connection string';
@@ -577,11 +636,11 @@ function ConnectServerModal({ open, onClose }: Props) {
 
   // AIDEV-NOTE: Compute CSS classes for dimmed state
   const uriInputClassName = useMemo(() => {
-    const base = fieldErrors.dataSourceUri
+    const base = connectionUriError
       ? `${styles['input']} ${styles['input-error']}`
       : styles['input'];
     return inputMode === 'params' ? `${base} ${styles['input-dimmed']}` : base;
-  }, [fieldErrors.dataSourceUri, inputMode]);
+  }, [connectionUriError, inputMode]);
 
   const paramsFieldClassName = useCallback((hasError: boolean) => {
     const base = hasError
@@ -599,13 +658,13 @@ function ConnectServerModal({ open, onClose }: Props) {
           className={styles['modal']}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="connect-server-title"
+          aria-labelledby="connect-postgres-title"
           onKeyDown={handleKeyDown}
           ref={panelRef}
         >
           <div tabIndex={0} data-focus-guard="true" onFocus={focusLast} aria-hidden="true" />
           <header className={styles['header']}>
-            <h2 id="connect-server-title" className={styles['title']}>Connect Server</h2>
+            <h2 id="connect-postgres-title" className={styles['title']}>Database Connection</h2>
             <div className={styles['subtitle']}>{modeLabel}</div>
           </header>
 
@@ -617,16 +676,16 @@ function ConnectServerModal({ open, onClose }: Props) {
             )}
 
             <div className={styles['field']}>
-              <label className={styles['label']} htmlFor="db-server-group-name">Server group name</label>
+              <label className={styles['label']} htmlFor="connection-name">Connection name</label>
               <input
-                id="db-server-group-name"
+                id="connection-name"
                 ref={firstInputRef}
-                value={serverGroupName}
-                onChange={(e) => setServerGroupName(e.target.value)}
-                placeholder="Type server group name"
-                aria-invalid={fieldErrors.serverGroupName ? true : undefined}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. book store database"
+                aria-invalid={fieldErrors.name ? true : undefined}
               />
-              {fieldErrors.serverGroupName && <div className={styles['field-error']}>{fieldErrors.serverGroupName}</div>}
+              {fieldErrors.name && <div className={styles['field-error']}>{fieldErrors.name}</div>}
             </div>
 
             <div className={styles['field']}>
@@ -638,13 +697,13 @@ function ConnectServerModal({ open, onClose }: Props) {
                 onChange={handleConnectionUriChange}
                 onPaste={handleConnectionUriPaste}
                 placeholder="postgresql://user:password@host:5432/db"
-                aria-invalid={fieldErrors.dataSourceUri ? true : undefined}
+                aria-invalid={connectionUriError ? true : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
                 readOnly={inputMode === 'params'}
               />
-              {fieldErrors.dataSourceUri && <div className={styles['field-error']}>{fieldErrors.dataSourceUri}</div>}
+              {connectionUriError && <div className={styles['field-error']}>{connectionUriError}</div>}
               {inputMode === 'params' && (
                 <div className={styles['mode-hint']}>Typing in fields below. Clear fields to use connection string.</div>
               )}
@@ -659,30 +718,30 @@ function ConnectServerModal({ open, onClose }: Props) {
                 <label className={styles['label']} htmlFor="db-host">Host</label>
                 <input
                   id="db-host"
-                  className={paramsFieldClassName(!!fieldErrors.host)}
+                  className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.host)}
                   value={host}
                   onChange={(e) => handleParamChange(setHost, e.target.value)}
                   placeholder="127.0.0.1"
-                  aria-invalid={fieldErrors.host ? true : undefined}
+                  aria-invalid={showParamFieldErrors ? (fieldErrors.host ? true : undefined) : undefined}
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                {fieldErrors.host && <div className={styles['field-error']}>{fieldErrors.host}</div>}
+                {showParamFieldErrors && fieldErrors.host && <div className={styles['field-error']}>{fieldErrors.host}</div>}
               </div>
 
               <div className={styles['field']}>
                 <label className={styles['label']} htmlFor="db-port">Port</label>
                 <input
                   id="db-port"
-                  className={paramsFieldClassName(!!fieldErrors.port)}
+                  className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.port)}
                   value={port}
                   onChange={(e) => handleParamChange(setPort, e.target.value)}
                   placeholder="5432"
                   inputMode="numeric"
-                  aria-invalid={fieldErrors.port ? true : undefined}
+                  aria-invalid={showParamFieldErrors ? (fieldErrors.port ? true : undefined) : undefined}
                 />
-                {fieldErrors.port && <div className={styles['field-error']}>{fieldErrors.port}</div>}
+                {showParamFieldErrors && fieldErrors.port && <div className={styles['field-error']}>{fieldErrors.port}</div>}
               </div>
             </div>
 
@@ -690,28 +749,28 @@ function ConnectServerModal({ open, onClose }: Props) {
               <label className={styles['label']} htmlFor="db-username">User</label>
               <input
                 id="db-username"
-                className={paramsFieldClassName(!!fieldErrors.username)}
+                className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.username)}
                 value={username}
                 onChange={(e) => handleParamChange(setUsername, e.target.value)}
                 placeholder="postgres"
-                aria-invalid={fieldErrors.username ? true : undefined}
+                aria-invalid={showParamFieldErrors ? (fieldErrors.username ? true : undefined) : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
-              {fieldErrors.username && <div className={styles['field-error']}>{fieldErrors.username}</div>}
+              {showParamFieldErrors && fieldErrors.username && <div className={styles['field-error']}>{fieldErrors.username}</div>}
             </div>
 
             <div className={styles['field']}>
               <label className={styles['label']} htmlFor="db-password">Password</label>
               <input
                 id="db-password"
-                className={paramsFieldClassName(!!fieldErrors.password)}
+                className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.password)}
                 type="password"
                 value={password}
                 onChange={(e) => handleParamChange(setPassword, e.target.value)}
                 placeholder="Enter password"
-                aria-invalid={fieldErrors.password ? true : undefined}
+                aria-invalid={showParamFieldErrors ? (fieldErrors.password ? true : undefined) : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
@@ -728,23 +787,23 @@ function ConnectServerModal({ open, onClose }: Props) {
               <div className={styles['persist-help']}>
                 Store encrypted on the backend so you can reconnect later.
               </div>
-              {fieldErrors.password && <div className={styles['field-error']}>{fieldErrors.password}</div>}
+              {showParamFieldErrors && fieldErrors.password && <div className={styles['field-error']}>{fieldErrors.password}</div>}
             </div>
 
             <div className={styles['field']}>
               <label className={styles['label']} htmlFor="db-name">Database name</label>
               <input
                 id="db-name"
-                className={paramsFieldClassName(!!fieldErrors.database)}
+                className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.database)}
                 value={database}
                 onChange={(e) => handleParamChange(setDatabase, e.target.value)}
                 placeholder="postgres"
-                aria-invalid={fieldErrors.database ? true : undefined}
+                aria-invalid={showParamFieldErrors ? (fieldErrors.database ? true : undefined) : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
-              {fieldErrors.database && <div className={styles['field-error']}>{fieldErrors.database}</div>}
+              {showParamFieldErrors && fieldErrors.database && <div className={styles['field-error']}>{fieldErrors.database}</div>}
             </div>
 
             <div className={styles['field']}>
@@ -797,7 +856,7 @@ function ConnectServerModal({ open, onClose }: Props) {
             <button
               type="button"
               className={styles['connect-button']}
-              onClick={runConnect}
+              onClick={createDataSource}
               disabled={!canSubmit}
               aria-busy={isConnecting}
             >

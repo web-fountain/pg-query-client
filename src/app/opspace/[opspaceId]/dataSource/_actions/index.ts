@@ -1,59 +1,100 @@
 'use server';
 
-import type { HeadersContext }                  from '@Utils/backendFetch';
-import type { ActionMeta }                      from '@Errors/types';
-import type { ActionResult }                    from '@Errors/types';
-import type { FieldError }                      from '@Errors/fieldError';
-import type { UUIDv7 }                          from '@Types/primitives';
-import type { DataSourceDraft, DataSourceMeta } from '@Redux/records/dataSource/types';
+import type { HeadersContext }            from '@Utils/backendFetch';
+import type { ActionMeta }                from '@Errors/types';
+import type { ActionResult }              from '@Errors/types';
+import type { FieldError }                from '@Errors/fieldError';
+import type { DataSourceMeta }            from '@Redux/records/dataSource/types';
+import type {
+  DataSource,
+  PostgresDataSourceTestPayload
+}                                         from '@Types/dataSource';
 import type {
   CreateDataSourceApiResponse,
-DataSourceTestResult,
-  GetActiveDataSourceApiResponse,
+  DataSourceTestResult,
   ListDataSourceApiResponse,
   TestDataSourceApiResponse
-}                                               from './types';
+}                                         from './types';
 
-import { cacheLife, cacheTag, updateTag }       from 'next/cache';
-import { withAction }                           from '@Observability/server/action';
-import { validateDataSourceDraft }              from '@Redux/records/dataSource/validation';
+import { cacheLife, cacheTag, updateTag } from 'next/cache';
+import { withAction }                     from '@Observability/server/action';
+import {
+  validateDataSourceCreatePayload,
+  validatePostgresDataSourceTestPayload
+}                                         from '@Redux/records/dataSource/validation';
 import {
   actionErrorFromBackendFetch,
   backendFailedActionError,
   fail,
   ok
-}                                               from '@Errors/server/actionResult.server';
-import { ERROR_CODES }                          from '@Errors/codes';
-import { backendFetchJSON }                     from '@Utils/backendFetch';
-import {
-  dataSourcesActiveTag,
-  dataSourcesListTag
-}                                               from './tags';
+}                                         from '@Errors/server/actionResult.server';
+import { ERROR_CODES }                    from '@Errors/codes';
+import { backendFetchJSON }               from '@Utils/backendFetch';
+import { dataSourcesListTag }             from './tags';
 
 
-type InputSummary = {
-  serverGroupNameLen? : number;
-  sslMode?            : string;
-  persistSecret?      : boolean;
-  hasUri?             : boolean;
-  uriLen?             : number;
-  hostLen?            : number;
-  userLen?            : number;
-  passwordLen?        : number;
-  dbLen?              : number;
+type TestInputSummary = {
+  nameLen?      : number;
+  sslMode?      : string;
+  hostLen?      : number;
+  port?         : number;
+  userLen?      : number;
+  passwordLen?  : number;
+  dbLen?        : number;
 };
 
-function summarizeDraftInput(draft: DataSourceDraft): InputSummary {
+function summarizeTestInput(payload: PostgresDataSourceTestPayload): TestInputSummary {
   return {
-    serverGroupNameLen : typeof draft.serverGroupName === 'string' ? draft.serverGroupName.length : undefined,
-    sslMode            : typeof draft.sslMode === 'string' ? draft.sslMode : undefined,
-    persistSecret      : typeof draft.persistSecret === 'boolean' ? draft.persistSecret : undefined,
-    hasUri             : typeof draft.dataSourceUri === 'string' && draft.dataSourceUri.length > 0,
-    uriLen             : typeof draft.dataSourceUri === 'string' ? draft.dataSourceUri.length : undefined,
-    hostLen            : typeof draft.host === 'string' ? draft.host.length : undefined,
-    userLen            : typeof draft.username === 'string' ? draft.username.length : undefined,
-    passwordLen        : typeof draft.password === 'string' ? draft.password.length : undefined,
-    dbLen              : typeof draft.database === 'string' ? draft.database.length : undefined
+    nameLen     : typeof payload.name     === 'string' ? payload.name.length     : undefined,
+    sslMode     : typeof payload.sslMode  === 'string' ? payload.sslMode         : undefined,
+    hostLen     : typeof payload.host     === 'string' ? payload.host.length     : undefined,
+    port        : typeof payload.port     === 'number' ? payload.port            : undefined,
+    userLen     : typeof payload.username === 'string' ? payload.username.length : undefined,
+    passwordLen : typeof payload.password === 'string' ? payload.password.length : undefined,
+    dbLen       : typeof payload.database === 'string' ? payload.database.length : undefined
+  };
+}
+
+type CreateInputSummary = {
+  kind?           : string;
+  nameLen?        : number;
+  descriptionLen? : number;
+  targetLabelLen? : number;
+  sslMode?        : string;
+  persistSecret?  : boolean;
+  hostLen?        : number;
+  port?           : number;
+  userLen?        : number;
+  passwordLen?    : number;
+  dbLen?          : number;
+  locationLen?    : number;
+};
+
+function summarizeCreateInput(payload: DataSource): CreateInputSummary {
+  if (payload.kind === 'postgres') {
+    return {
+      kind            : payload.kind,
+      nameLen         : typeof payload.name          === 'string'  ? payload.name.length        : undefined,
+      descriptionLen  : typeof payload.description   === 'string'  ? payload.description.length : undefined,
+      targetLabelLen  : typeof payload.targetLabel   === 'string'  ? payload.targetLabel.length : undefined,
+      sslMode         : typeof payload.sslMode       === 'string'  ? payload.sslMode            : undefined,
+      persistSecret   : typeof payload.persistSecret === 'boolean' ? payload.persistSecret      : undefined,
+      hostLen         : typeof payload.host          === 'string'  ? payload.host.length        : undefined,
+      port            : typeof payload.port          === 'number'  ? payload.port               : undefined,
+      userLen         : typeof payload.username      === 'string'  ? payload.username.length    : undefined,
+      passwordLen     : typeof payload.password      === 'string'  ? payload.password.length    : undefined,
+      dbLen           : typeof payload.database      === 'string'  ? payload.database.length    : undefined
+    };
+  }
+
+  return {
+    kind            : payload.kind,
+    nameLen         : typeof payload.name        === 'string' ? payload.name.length        : undefined,
+    descriptionLen  : typeof payload.description === 'string' ? payload.description.length : undefined,
+    targetLabelLen  : typeof payload.targetLabel === 'string' ? payload.targetLabel.length : undefined,
+    locationLen     : typeof payload.location    === 'string' ? payload.location.length    : undefined,
+    dbLen           : typeof payload.database    === 'string' ? payload.database.length    : undefined,
+    userLen         : typeof payload.username    === 'string' ? payload.username.length    : undefined
   };
 }
 
@@ -126,65 +167,8 @@ export async function listDataSourcesAction(): Promise<ActionResult<DataSourceMe
   );
 }
 
-// Cached active connection per HeadersContext.
-type GetActiveCachedResult =
-  | { ok: true; data: { dataSourceId: UUIDv7 | null } }
-  | { ok: false; status: number; reason: 'fetch-failed' | 'backend-ok-false' };
-
-async function getActiveDataSourceCached(ctx: HeadersContext): Promise<GetActiveCachedResult> {
-  'use cache';
-
-  cacheLife({
-    revalidate: 15,
-    expire    : 120
-  });
-  cacheTag(dataSourcesActiveTag(ctx.opspacePublicId));
-
-  const res = await backendFetchJSON<GetActiveDataSourceApiResponse>({
-    path      : '/data-sources/active',
-    method    : 'GET',
-    scope     : ['data-sources:read'],
-    logLabel  : 'getActiveDataSourceAction',
-    context   : ctx
-  });
-
-  if (!res.ok) {
-    return { ok: false, status: res.status, reason: 'fetch-failed' };
-  }
-
-  if (!res.data?.ok) {
-    return { ok: false, status: res.status, reason: 'backend-ok-false' };
-  }
-
-  return { ok: true, data: res.data.data };
-}
-
-export async function getActiveDataSourceAction(): Promise<ActionResult<{ dataSourceId: UUIDv7 | null }>> {
-  return withAction(
-    { action: 'dataSource.getActive', op: 'read' },
-    async ({ ctx, meta }) => {
-      const data = await getActiveDataSourceCached(ctx);
-      if (!data.ok) {
-        if (data.reason === 'backend-ok-false') {
-          return fail(meta, backendFailedActionError(meta, {
-            message: 'Failed to load active connection.',
-            request: { path: '/data-sources/active', method: 'GET', scope: ['data-sources:read'], logLabel: 'getActiveDataSourceAction' }
-          }));
-        }
-        return fail(meta, actionErrorFromBackendFetch(meta, {
-          status          : data.status,
-          fallbackMessage : 'Failed to load active connection.',
-          request         : { path: '/data-sources/active', method: 'GET', scope: ['data-sources:read'], logLabel: 'getActiveDataSourceAction' }
-        }));
-      }
-
-      return ok(meta, data.data);
-    }
-  );
-}
-
-export async function testDataSourceAction(payload: DataSourceDraft): Promise<ActionResult<DataSourceTestResult>> {
-  const summary = summarizeDraftInput(payload);
+export async function testDataSourceAction(payload: PostgresDataSourceTestPayload): Promise<ActionResult<DataSourceTestResult>> {
+  const summary = summarizeTestInput(payload);
   return withAction(
     {
       action : 'dataSource.test',
@@ -192,7 +176,7 @@ export async function testDataSourceAction(payload: DataSourceDraft): Promise<Ac
       input  : summary
     },
     async ({ ctx, meta }) => {
-      const validated = validateDataSourceDraft(payload);
+      const validated = validatePostgresDataSourceTestPayload(payload);
       if (!validated.ok) {
         return invalidInputResult(meta, validated.errors);
       }
@@ -227,8 +211,8 @@ export async function testDataSourceAction(payload: DataSourceDraft): Promise<Ac
   );
 }
 
-export async function createDataSourceAction(payload: DataSourceDraft): Promise<ActionResult<DataSourceMeta>> {
-  const summary = summarizeDraftInput(payload);
+export async function createDataSourceAction(payload: DataSource): Promise<ActionResult<DataSourceMeta>> {
+  const summary = summarizeCreateInput(payload);
   return withAction(
     {
       action : 'dataSource.create',
@@ -236,7 +220,7 @@ export async function createDataSourceAction(payload: DataSourceDraft): Promise<
       input  : summary
     },
     async ({ ctx, meta }) => {
-      const validated = validateDataSourceDraft(payload);
+      const validated = validateDataSourceCreatePayload(payload);
       if (!validated.ok) {
         return invalidInputResult(meta, validated.errors);
       }
@@ -266,45 +250,9 @@ export async function createDataSourceAction(payload: DataSourceDraft): Promise<
         }));
       }
 
-      // AIDEV-NOTE: Creating a connection mutates both the list and (often) the active pointer.
       try { updateTag(dataSourcesListTag(ctx.opspacePublicId)); } catch {}
-      try { updateTag(dataSourcesActiveTag(ctx.opspacePublicId)); } catch {}
 
       return ok(meta, res.data.data);
-    }
-  );
-}
-
-export async function setActiveDataSourceAction(dataSourceId: UUIDv7): Promise<ActionResult<void>> {
-  return withAction(
-    {
-      action : 'dataSource.setActive',
-      op     : 'write',
-      input  : { dataSourceId }
-    },
-    async ({ ctx, meta }) => {
-      const res = await backendFetchJSON({
-        path        : `/data-sources/${dataSourceId}/active`,
-        method      : 'POST',
-        contentType : null,
-        scope       : ['data-sources:write'],
-        logLabel    : 'setActiveDataSourceAction',
-        context     : ctx
-      });
-
-      if (!res.ok) {
-        return fail(meta, actionErrorFromBackendFetch(meta, {
-          status          : res.status,
-          error           : res.error,
-          fallbackMessage : 'Failed to set active connection.',
-          request         : { path: `/data-sources/${dataSourceId}/active`, method: 'POST', scope: ['data-sources:write'], logLabel: 'setActiveDataSourceAction' }
-        }));
-      }
-
-      // AIDEV-NOTE: Invalidate cached active pointer reads.
-      try { updateTag(dataSourcesActiveTag(ctx.opspacePublicId)); } catch {}
-
-      return ok(meta, undefined);
     }
   );
 }

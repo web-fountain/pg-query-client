@@ -2,17 +2,14 @@ import type {
   UpdateDataQuery,
   UpdateDataQueryName,
   UpdateDataQueryText
-} from './types';
-import Ajv              from 'ajv';
-import addErrors        from 'ajv-errors';
-import addFormats       from 'ajv-formats';
+}                           from './types';
+import type { FieldError }  from '@Errors/fieldError';
+
+import { createAjv }        from '@Utils/ajv/createAjv';
+import { toFieldErrors }    from '@Utils/ajv/toFieldErrors';
 
 // AJV instance for dataQuery validations; strict + allErrors for rich feedback.
-const ajv = new Ajv({ allErrors: true, strict: true });
-addFormats(ajv);
-addErrors(ajv);
-
-export type FieldError = { path: string; message: string };
+const ajv = createAjv();
 
 // Canonical UUIDv7 shape: xxxxxxxx-xxxx-7xxx-[89ab]xxx-xxxxxxxxxxxx (lowercase hex).
 const UUIDV7_PATTERN = '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
@@ -150,40 +147,19 @@ const validateDataQueryUpdateImpl = ajv.compile<UpdateDataQuery>(UpdateDataQuery
 function validateDataQueryName(payload: UpdateDataQueryName): { ok: true } | { ok: false; errors: FieldError[] } {
   const ok = validateDataQueryNameImpl(payload) as boolean;
   if (ok) return { ok: true };
-
-  const errors = (validateDataQueryNameImpl.errors || []).map(e => {
-    const missing = (e.params as Record<string, unknown> | undefined)?.['missingProperty'] as string | undefined;
-    const path = e.instancePath || (missing ? `/${missing}` : '');
-    return { path, message: e.message || 'Invalid value' };
-  });
-
-  return { ok: false, errors };
+  return { ok: false, errors: toFieldErrors(validateDataQueryNameImpl.errors) };
 }
 
 function validateDataQueryText(payload: UpdateDataQueryText): { ok: true } | { ok: false; errors: FieldError[] } {
   const ok = validateDataQueryTextImpl(payload) as boolean;
   if (ok) return { ok: true };
-
-  const errors = (validateDataQueryTextImpl.errors || []).map(e => {
-    const missing = (e.params as Record<string, unknown> | undefined)?.['missingProperty'] as string | undefined;
-    const path = e.instancePath || (missing ? `/${missing}` : '');
-    return { path, message: e.message || 'Invalid value' };
-  });
-
-  return { ok: false, errors };
+  return { ok: false, errors: toFieldErrors(validateDataQueryTextImpl.errors) };
 }
 
 function validateDataQueryUpdate(payload: UpdateDataQuery): { ok: true } | { ok: false; errors: FieldError[] } {
   const ok = validateDataQueryUpdateImpl(payload) as boolean;
   if (ok) return { ok: true };
-
-  const errors = (validateDataQueryUpdateImpl.errors || []).map(e => {
-    const missing = (e.params as Record<string, unknown> | undefined)?.['missingProperty'] as string | undefined;
-    const path = e.instancePath || (missing ? `/${missing}` : '');
-    return { path, message: e.message || 'Invalid value' };
-  });
-
-  return { ok: false, errors };
+  return { ok: false, errors: toFieldErrors(validateDataQueryUpdateImpl.errors) };
 }
 
 export {

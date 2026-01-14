@@ -63,59 +63,53 @@ function OpSpaceIntro() {
         </div>
 
         <div className={styles['data-source-list']}>
-          {dataSourceList.length === 0 ? (
-            <div className={styles['empty']}>
-              <div className={styles['empty-title']}>No data sources yet</div>
-              <div className={styles['empty-subhead']}>
-                Connect a data source to create and run queries in this workspace.
-              </div>
-            </div>
-          ) : (
-            <ul className={styles['list']} aria-label="Data sources">
-              {dataSourceList.map((ds) => {
-                const isActive = ds.status === 'active';
-                const isDisabled = !isActive;
-                const title = ds.kind === 'pglite' ? `PGlite · ${ds.name}` : `Postgres · ${ds.name}`;
-                return (
-                  <li
-                    key={ds.dataSourceId}
-                    className={styles['item']}
-                    data-active={isActive ? 'true' : undefined}
-                  >
-                    <div className={styles['item-main']}>
-                      <div className={styles['item-title']}>
-                        <span className={styles['item-name']}>{title}</span>
-                        {isActive && (
-                          <span className={styles['badge']} aria-label="Selected data source">Selected</span>
-                        )}
-                        {isDisabled && (
-                          <span className={styles['badge']} aria-label="Disabled data source">Disabled</span>
-                        )}
-                      </div>
-                      <div className={styles['item-meta']}>
-                        {/* AIDEV-NOTE: Show IndexDB connections as 'idx://' instead of 'pglite://' in list for clarity */}
-                        <span>
-                          {ds.label?.replace(/^pglite:\/\//, 'idx://pgqc_')}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className={styles['item-actions']}>
-                      <button
-                        type="button"
-                        className={styles['create-button']}
-                        onClick={() => handleCreateForConnection(ds.dataSourceCredentialId)}
-                        disabled={isPending || isDisabled}
-                        aria-busy={isPending}
+          {dataSourceList.length === 0
+            ? (
+                <div className={styles['empty']}>
+                  <div className={styles['empty-title']}>No data sources yet</div>
+                  <div className={styles['empty-subhead']}>
+                    Connect a data source to create and run queries in this workspace.
+                  </div>
+                </div>
+              )
+            : (
+                <ul className={styles['list']} aria-label="Data sources">
+                  {dataSourceList.map((ds) => {
+                    const title = `${formatDataSourceKind(ds.kind)} · ${ds.name}`;
+                    return (
+                      <li
+                        key={ds.dataSourceId}
+                        className={styles['item']}
                       >
-                        {isPending ? 'Opening…' : 'Create New Query'}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                        <div className={styles['item-main']}>
+                          <div className={styles['item-title']}>
+                            <span className={styles['item-name']}>{title}</span>
+                          </div>
+                          <div className={styles['item-meta']}>
+                            {/* AIDEV-NOTE: Show IndexDB connections as 'idx://' instead of 'pglite://' in list for clarity */}
+                            <span>
+                              {ds.label?.replace(/^pglite:\/\//, 'idx://pgqc_')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className={styles['item-actions']}>
+                          <button
+                            type="button"
+                            className={styles['create-button']}
+                            onClick={() => handleCreateForConnection(ds.dataSourceCredentialId)}
+                            disabled={isPending}
+                            aria-busy={isPending}
+                          >
+                            {isPending ? 'Opening…' : 'Create New Query'}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )
+            }
         </div>
 
         <div className={styles['cta']}>
