@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactNode }     from 'react';
 import {
   createContext,
   useCallback,
@@ -8,13 +8,13 @@ import {
   useMemo,
   useRef,
   useState
-}                         from 'react';
-import ConnectServerModal from '../_components/ConnectServerModal';
+}                             from 'react';
+import ConnectDataSourceModal from '../_components/ConnectDataSourceModal';
 
 
 type DataSourceUIContext = {
-  openConnectServerModal: () => void;
-  closeConnectServerModal: () => void;
+  openConnectDataSourceModal: () => void;
+  closeConnectDataSourceModal: () => void;
 };
 
 const DataSourceUICtx = createContext<DataSourceUIContext | null>(null);
@@ -23,7 +23,7 @@ function DataSourceProvider({ children }: { children: ReactNode }) {
   const [open, setOpen]   = useState<boolean>(false);
   const returnFocusToRef  = useRef<HTMLElement | null>(null);
 
-  const openConnectServerModal = useCallback(() => {
+  const openConnectDataSourceModal = useCallback(() => {
     try {
       const active = document.activeElement;
       returnFocusToRef.current = active instanceof HTMLElement ? active : null;
@@ -34,7 +34,7 @@ function DataSourceProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   }, []);
 
-  const closeConnectServerModal = useCallback(() => {
+  const closeConnectDataSourceModal = useCallback(() => {
     setOpen(false);
 
     const el = returnFocusToRef.current;
@@ -43,14 +43,14 @@ function DataSourceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({
-    openConnectServerModal,
-    closeConnectServerModal
-  }), [openConnectServerModal, closeConnectServerModal]);
+    openConnectDataSourceModal,
+    closeConnectDataSourceModal
+  }), [openConnectDataSourceModal, closeConnectDataSourceModal]);
 
   return (
     <DataSourceUICtx.Provider value={value}>
       {children}
-      <ConnectServerModal open={open} onClose={closeConnectServerModal} />
+      <ConnectDataSourceModal open={open} onClose={closeConnectDataSourceModal} />
     </DataSourceUICtx.Provider>
   );
 }

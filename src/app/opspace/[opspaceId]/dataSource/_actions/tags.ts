@@ -4,7 +4,3 @@
 export function dataSourcesListTag(opspacePublicId: string): string {
   return `data-sources:list:${opspacePublicId}`;
 }
-
-export function dataSourcesActiveTag(opspacePublicId: string): string {
-  return `data-sources:active:${opspacePublicId}`;
-}

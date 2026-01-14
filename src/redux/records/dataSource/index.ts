@@ -1,28 +1,19 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import type { RootState }     from '@Redux/store';
-import type { UUIDv7 }        from '@Types/primitives';
+import type { PayloadAction }       from '@reduxjs/toolkit';
+import type { RootState }           from '@Redux/store';
+import type { UUIDv7 }              from '@Types/primitives';
 import type {
-  DataSourceMeta,
-  DataSourceRecord
-}                             from './types';
+  DataSourceMeta, DataSourceRecord
+}                                   from './types';
 
 import {
-  createAction,
-  createReducer,
+  createAction, createReducer,
   createSelector
-}                             from '@reduxjs/toolkit';
+}                                   from '@reduxjs/toolkit';
 
-
-export type { DataSourceMeta, DataSourceRecord } from './types';
 
 // Actions
-export const setDataSourcesFromBootstrap = createAction<{
-  dataSources        : DataSourceMeta[];
-}>('dataSourceRecords/setDataSourcesFromBootstrap');
-
-export const upsertDataSourceFromFetch = createAction<{ dataSource: DataSourceMeta }>(
-  'dataSourceRecords/upsertDataSourceFromFetch'
-);
+export const setDataSourcesFromBootstrap = createAction<{ dataSources: DataSourceMeta[]; }>('dataSourceRecords/setDataSourcesFromBootstrap');
+export const upsertDataSourceFromFetch   = createAction<{ dataSource:  DataSourceMeta    }>('dataSourceRecords/upsertDataSourceFromFetch');
 
 
 // Selectors
@@ -96,6 +87,7 @@ const initialState: DataSourceRecord = {
   byId            : {},
   byCredentialId  : {}
 };
+
 
 export default createReducer(initialState, (builder) => {
   builder

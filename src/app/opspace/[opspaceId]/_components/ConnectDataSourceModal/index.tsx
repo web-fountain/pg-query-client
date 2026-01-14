@@ -240,7 +240,7 @@ function getFocusableElements(root: HTMLElement): HTMLElement[] {
   return all.filter((el) => el.getAttribute('data-focus-guard') !== 'true' && !el.hasAttribute('disabled'));
 }
 
-function ConnectServerModal({ open, onClose }: Props) {
+function ConnectDataSourceModal({ open, onClose }: Props) {
   const dispatch      = useReduxDispatch();
   const panelRef      = useRef<HTMLDivElement | null>(null);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
@@ -882,4 +882,4 @@ function ConnectServerModal({ open, onClose }: Props) {
 }
 
 
-export default ConnectServerModal;
+export default ConnectDataSourceModal;

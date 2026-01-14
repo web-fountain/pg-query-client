@@ -41,10 +41,10 @@ function formatDataSourceTooltip(ds: DataSourceMeta): string {
 }
 
 function ConnectionIndicator() {
-  const { openConnectServerModal }  = useDataSourceUI();
-  const dataSourceList              = useReduxSelector(selectDataSourceList);
-  const currentSelectedDataSource   = useReduxSelector(selectActiveTabDataSource);
-  const [open, setOpen]             = useState<boolean>(false);
+  const { openConnectDataSourceModal }  = useDataSourceUI();
+  const dataSourceList                  = useReduxSelector(selectDataSourceList);
+  const currentSelectedDataSource       = useReduxSelector(selectActiveTabDataSource);
+  const [open, setOpen]                 = useState<boolean>(false);
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -136,7 +136,7 @@ function ConnectionIndicator() {
                   className={styles['connection-connect']}
                   onClick={() => {
                     setOpen(false);
-                    openConnectServerModal();
+                    openConnectDataSourceModal();
                   }}
                 >
                   Connect a data source

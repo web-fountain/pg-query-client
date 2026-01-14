@@ -3,9 +3,7 @@
 import type { DataSourceMeta }                from '@Redux/records/dataSource/types';
 import type { UUIDv7 }                        from '@Types/primitives';
 
-import {
-  Fragment, useCallback, useTransition
-}                                             from 'react';
+import { useCallback, useTransition }         from 'react';
 import { useParams, useRouter }               from 'next/navigation';
 
 import { useDataSourceUI }                    from '@OpSpaceProviders/DataSourceProvider';
@@ -24,18 +22,18 @@ function formatDataSourceKind(kind: DataSourceMeta['kind']): string {
 }
 
 function OpSpaceIntro() {
-  const { opspaceId }                 = useParams<{ opspaceId: string }>()!;
-  const router                        = useRouter();
-  const dispatch                      = useReduxDispatch();
-  const { openConnectServerModal }    = useDataSourceUI();
+  const { opspaceId }                   = useParams<{ opspaceId: string }>()!;
+  const router                          = useRouter();
+  const dispatch                        = useReduxDispatch();
+  const { openConnectDataSourceModal }  = useDataSourceUI();
 
   const dataSourceList                = useReduxSelector(selectDataSourceList);
   const nextUntitledName              = useReduxSelector(selectNextUntitledName);
   const [isPending, startTransition]  = useTransition();
 
   const handleOpenConnect = useCallback(() => {
-    openConnectServerModal();
-  }, [openConnectServerModal]);
+    openConnectDataSourceModal();
+  }, [openConnectDataSourceModal]);
 
   const handleCreateForConnection = useCallback((dataSourceCredentialId: UUIDv7) => {
     if (isPending) return;
