@@ -4,12 +4,9 @@ import type { ClientAuditEnvelope }     from '@Observability/types';
 import type { ActionLogContext }        from '@Observability/types';
 
 import { generateBase64Url22 }          from '@Utils/generateId';
+import { isRecord }                     from '@Utils/typeGuards/isRecord';
 import { getLogger, runWithLogContext } from '@Observability/server';
 
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;

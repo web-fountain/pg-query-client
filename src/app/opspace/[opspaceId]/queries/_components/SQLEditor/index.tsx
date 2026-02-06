@@ -1,11 +1,11 @@
 'use client';
 
 import {
-  memo, useCallback, useEffect, useLayoutEffect,
+  memo, useCallback, useEffect,
   useImperativeHandle, useMemo, useRef
 }                                                 from 'react';
 
-import CodeMirror, { ExternalChange }             from '@uiw/react-codemirror';
+import CodeMirror                                 from '@uiw/react-codemirror';
 import { sql, PostgreSQL }                        from '@codemirror/lang-sql';
 import { EditorView, keymap, ViewPlugin, ViewUpdate, highlightWhitespace } from '@codemirror/view';
 import { indentUnit }                             from '@codemirror/language';
@@ -21,14 +21,10 @@ import { useDebouncedCallback }                   from '@Hooks/useDebounce';
 
 import { useSqlRunner }                           from '../../../_providers/SQLRunnerProvider';
 import { useSQLValidator }                        from '../../_providers/SQLValidatorProvider';
+import { useQueriesRoute }                        from '../../_providers/QueriesRouteProvider';
 import styles                                     from './styles.module.css';
 import type { UUIDv7 }                            from '@Types/primitives';
 
-
-// AIDEV-NOTE: Persist cursor positions per query within the session so switching tabs restores
-// the last cursor position (and scrolls it into view).
-type CursorPosition = { anchor: number; head: number };
-const cursorPositionCache = new Map<string, CursorPosition>();
 
 export type SQLEditorHandle = {
   runCurrentQuery: () => void;
@@ -226,17 +222,12 @@ const editingRevealPlugin = ViewPlugin.fromClass(class {
   destroy() { this.clear(); }
 });
 
-type SQLEditorProps = {
-  dataQueryId: UUIDv7 | null;
-  onChange?: (value: string) => void;
-  editorRef?: React.Ref<SQLEditorHandle | null>;
-  value?: string;
-  suppressDispatch?: boolean;
-};
+type SQLEditorProps = { onChange?: (value: string) => void; editorRef?: React.Ref<SQLEditorHandle | null>; value?: string; suppressDispatch?: boolean };
 
-function SQLEditorImpl({ dataQueryId, onChange, editorRef, value, suppressDispatch }: SQLEditorProps) {
+function SQLEditorImpl({ onChange, editorRef, value, suppressDispatch }: SQLEditorProps) {
   const { runQuery }        = useSqlRunner();
   const { getLinter }       = useSQLValidator();
+  const { dataQueryId }     = useQueriesRoute();
   const dispatch            = useReduxDispatch();
   const editorContainerRef  = useRef<HTMLDivElement | null>(null);
 
@@ -245,33 +236,12 @@ function SQLEditorImpl({ dataQueryId, onChange, editorRef, value, suppressDispat
   const latestTextRef = useRef<string>(value || '');
   const submitRef     = useRef<() => void>(() => {});
 
-  // AIDEV-NOTE: Cursor restore is keyed off the same dataQueryId that drives the `value` prop
-  // (passed from QueryWorkspace). We request a restore on tab-switch and then apply it after
-  // react-codemirror performs its ExternalChange doc replacement.
-  const currentDataQueryIdRef        = useRef<string>('');
-  const prevDataQueryIdRef           = useRef<string | null>(null);
-  const restoreRequestedForIdRef     = useRef<string | null>(null);
-
-  // Keep the current id available to ViewPlugins synchronously.
-  currentDataQueryIdRef.current = dataQueryId || '';
-
   // AIDEV-NOTE: Compartments hoisted to refs so we can reconfigure without rebuilding the extension pipeline.
   const themeCompartmentRef  = useRef(new Compartment());
   const wrapCompartmentRef   = useRef(new Compartment());
   const indentCompartmentRef = useRef(new Compartment());
   const lintCompartmentRef   = useRef(new Compartment());
   const keymapCompartmentRef = useRef(new Compartment());
-
-  // AIDEV-NOTE: Request a cursor restore when switching to a different query id.
-  // useLayoutEffect ensures this runs before react-codemirror's useEffect that dispatches ExternalChange.
-  useLayoutEffect(() => {
-    const id = dataQueryId || null;
-    const prev = prevDataQueryIdRef.current;
-    prevDataQueryIdRef.current = id;
-    if (id && id !== prev) {
-      restoreRequestedForIdRef.current = id;
-    }
-  }, [dataQueryId]);
 
   // AIDEV-NOTE: Build the CM6 extension pipeline once.
   const extensions = useMemo(() => {
@@ -293,61 +263,7 @@ function SQLEditorImpl({ dataQueryId, onChange, editorRef, value, suppressDispat
       ),
       domEnterPassthrough,
       themeCompartmentRef.current.of(cmStructuralTheme),
-      editingRevealPlugin,
-      ViewPlugin.fromClass(class {
-        private restoreRaf: number | null = null;
-
-        constructor(readonly view: EditorView) {}
-
-        update(u: ViewUpdate) {
-          const id = currentDataQueryIdRef.current;
-          if (!id) return;
-
-          const isExternal = u.transactions.some((tr) => Boolean(tr.annotation(ExternalChange)));
-
-          // AIDEV-NOTE: Save cursor position for real user interactions only.
-          // ExternalChange is the full-doc replacement react-codemirror does when `value` changes.
-          if (!isExternal && (u.selectionSet || u.docChanged)) {
-            const sel = this.view.state.selection.main;
-            cursorPositionCache.set(id, { anchor: sel.anchor, head: sel.head });
-          }
-
-          // AIDEV-NOTE: Restore after ExternalChange doc replacement when switching tabs.
-          if (!isExternal || !u.docChanged) return;
-          if (restoreRequestedForIdRef.current !== id) return;
-
-          restoreRequestedForIdRef.current = null;
-
-          const saved = cursorPositionCache.get(id);
-          if (!saved) return;
-
-          if (this.restoreRaf != null) {
-            cancelAnimationFrame(this.restoreRaf);
-          }
-
-          const restoreId = id;
-          this.restoreRaf = requestAnimationFrame(() => {
-            this.restoreRaf = null;
-            if (currentDataQueryIdRef.current !== restoreId) return;
-
-            const docLength = this.view.state.doc.length;
-            const anchor = Math.min(saved.anchor, docLength);
-            const head = Math.min(saved.head, docLength);
-
-            this.view.dispatch({
-              selection: EditorSelection.single(anchor, head),
-              scrollIntoView: true
-            });
-          });
-        }
-
-        destroy() {
-          if (this.restoreRaf != null) {
-            cancelAnimationFrame(this.restoreRaf);
-          }
-          this.restoreRaf = null;
-        }
-      })
+      editingRevealPlugin
     ];
   }, []);
 
@@ -413,7 +329,6 @@ function SQLEditorImpl({ dataQueryId, onChange, editorRef, value, suppressDispat
   useEffect(() => {
     return () => {
       const latest = latestTextRef.current || '';
-      if (!dataQueryId) return;
       const key = dataQueryId as UUIDv7;
 
       // AIDEV-NOTE: Only flush if there is a pending debounced write for this
@@ -436,7 +351,6 @@ function SQLEditorImpl({ dataQueryId, onChange, editorRef, value, suppressDispat
     // AIDEV-NOTE: Initialize dispatch caches so we avoid a first unmount flush
     // when nothing has changed for this dataQueryId.
     try {
-      if (!dataQueryId) return;
       const key = dataQueryId as UUIDv7;
       lastSentByIdRef.current[key] = value || '';
       pendingByIdRef.current[key] = false;
@@ -500,7 +414,6 @@ function SQLEditorImpl({ dataQueryId, onChange, editorRef, value, suppressDispat
           onChange={(next) => {
             handleChange(next);
             if (!suppressDispatch) {
-              if (!dataQueryId) return;
               const key = dataQueryId as UUIDv7;
               if (lastSentByIdRef.current[key] !== next) {
                 // AIDEV-NOTE: Mark a pending debounced write so unmount can

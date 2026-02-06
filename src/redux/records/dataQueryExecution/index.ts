@@ -1,5 +1,6 @@
 import type { PayloadAction }   from '@reduxjs/toolkit';
 import type { RootState }       from '@Redux/store';
+import type { UUIDv7 }          from '@Types/primitives';
 import type {
   DataQueryExecutionRecord,
   DataQueryExecution
@@ -12,25 +13,39 @@ import {
 
 
 // Action Creators
-export const setDataQueryExecutionRecord     = createAction<DataQueryExecutionRecord> ('queryExecution/setDataQueryExecutionRecord');
-export const createDataQueryExecutionRecord  = createAction<DataQueryExecution>       ('queryExecution/createDataQueryExecutionRecord');
+export const setDataQueryExecutionRecord      = createAction<DataQueryExecutionRecord> ('queryExecution/setDataQueryExecutionRecord');
+export const upsertDataQueryExecution         = createAction<DataQueryExecution>       ('queryExecution/upsertDataQueryExecution');
+export const clearDataQueryExecutionsForQuery = createAction<{ dataQueryId: UUIDv7 }>('queryExecution/clearDataQueryExecutionsForQuery');
+
 
 // Selectors
-export const selectLatestDataQueryExecution = createSelector.withTypes<RootState>()(
-  [
-    (state: RootState) => state.dataQueryRecords,
-    (state: RootState, dataQueryId: string) => dataQueryId,
-    (state: RootState) => state.dataQueryExecutionRecords
-  ],
-  (dataQueryRecords, dataQueryId, dataQueryExecutionRecords) => {
-    const dataQueryId = dataQueryRecords[dataQueryId]?.current?.dataQueryId;
-    if (!dataQueryId) return [];
+const EMPTY_EXECUTIONS: DataQueryExecution[] = [];
 
-    if (dataQueryExecutionRecords && dataQueryExecutionRecords[dataQueryId]) {
-      const executions = dataQueryExecutionRecords[dataQueryId];
-      return executions.length > 0 ? executions[executions.length - 1] : undefined;
-    }
-  }
+export const selectDataQueryExecutionsForQuery = createSelector.withTypes<RootState>()(
+  [
+    (state: RootState) => state.dataQueryExecutionRecords,
+    (_state: RootState, dataQueryId: UUIDv7 | null) => dataQueryId
+  ],
+  (dataQueryExecutionRecords, dataQueryId) => {
+    if (!dataQueryId) return EMPTY_EXECUTIONS;
+    return dataQueryExecutionRecords[dataQueryId] ?? EMPTY_EXECUTIONS;
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+
+export const selectLatestDataQueryExecution = createSelector.withTypes<RootState>()(
+  [selectDataQueryExecutionsForQuery],
+  (executions) => {
+    const len = executions.length;
+    return len > 0 ? executions[len - 1] : null;
+  },
+  { devModeChecks: { identityFunctionCheck: 'never' } }
+);
+
+export const selectIsDataQueryExecutionRunning = createSelector.withTypes<RootState>()(
+  [selectLatestDataQueryExecution],
+  (execution) => execution?.status === 'running',
+  { devModeChecks: { identityFunctionCheck: 'never' } }
 );
 
 // Reducer
@@ -38,22 +53,38 @@ const initialState: DataQueryExecutionRecord = {};
 export default createReducer(initialState, (builder) => {
   builder
     .addCase(setDataQueryExecutionRecord,
-      function(state: DataQueryExecutionRecord, action: PayloadAction<unknown>) {
-        // need to update this section when populated from database
-        //@ts-ignore
-        const { dataQueryId, ...rest } = action.payload;
-        state[dataQueryId] = rest;
+      function(_state: DataQueryExecutionRecord, action: PayloadAction<DataQueryExecutionRecord>) {
+        return action.payload;
       }
     )
-    .addCase(createDataQueryExecutionRecord,
+    .addCase(clearDataQueryExecutionsForQuery,
+      function(state: DataQueryExecutionRecord, action: PayloadAction<{ dataQueryId: UUIDv7 }>) {
+        const dataQueryId = action.payload.dataQueryId;
+        if (state[dataQueryId]) {
+          delete state[dataQueryId];
+        }
+      }
+    )
+    .addCase(upsertDataQueryExecution,
       function(state: DataQueryExecutionRecord, action: PayloadAction<DataQueryExecution>) {
-        const { dataQueryId } = action.payload;
+        const execution = action.payload;
+        const dataQueryId = execution.dataQueryId;
 
         if (!state[dataQueryId]) {
           state[dataQueryId] = [];
         }
 
-        state[dataQueryId].push(action.payload);
+        const list = state[dataQueryId];
+        const executionId = execution.dataQueryExecutionId;
+
+        for (let executionIndex = list.length - 1; executionIndex >= 0; executionIndex--) {
+          if (list[executionIndex]?.dataQueryExecutionId === executionId) {
+            list[executionIndex] = execution;
+            return;
+          }
+        }
+
+        list.push(execution);
       }
     )
 });

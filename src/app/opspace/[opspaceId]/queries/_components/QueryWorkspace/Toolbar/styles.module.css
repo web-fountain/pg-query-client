@@ -139,6 +139,16 @@
 .connection-option:hover {
   background: var(--surface-hover);
 }
+.connection-option:disabled {
+  cursor  : default;
+  opacity : 0.7;
+}
+.connection-option:disabled[data-selected="true"] {
+  opacity: 1;
+}
+.connection-option:disabled:hover {
+  background: transparent;
+}
 .connection-option[data-selected="true"] {
   background: var(--surface-selected);
 }

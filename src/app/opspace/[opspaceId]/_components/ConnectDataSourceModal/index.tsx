@@ -1,7 +1,6 @@
 'use client';
 
 import type {
-  ChangeEvent,
   ClipboardEvent,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent    as ReactMouseEvent
@@ -78,97 +77,103 @@ const SSL_MODE_OPTIONS: Array<{ value: DbSslMode; label: string }> = [
   { value: 'verify-full', label: 'verify-full' }
 ];
 
-const MAX_PASSWORD_MASK_LENGTH = 8;
-// AIDEV-NOTE: Generate dynamic password mask - 1 bullet per character, max 8.
-function getPasswordMask(passwordLength: number): string {
-  if (passwordLength <= 0) return '';
-  const maskLength = Math.min(passwordLength, MAX_PASSWORD_MASK_LENGTH);
-  return '•'.repeat(maskLength);
+// AIDEV-NOTE: Constant redaction token for password display - never leaks length.
+const REDACTED_PASSWORD = '[PASSWORD]';
+
+// AIDEV-NOTE: Lenient decoder for userinfo (username/password) that won't throw on stray '%'.
+// Converts stray '%' (not followed by two hex digits) into '%25' before decoding.
+function decodeUserInfoLenient(value: string): string {
+  if (!value) return '';
+  const normalized = value.replace(/%(?![0-9a-fA-F]{2})/g, '%25');
+  try {
+    return decodeURIComponent(normalized);
+  } catch {
+    return value;
+  }
 }
 
 // AIDEV-NOTE: Parse a postgres:// or postgresql:// URI and extract connection params.
+// Resilient parser that handles special chars in passwords (#, ?, /, %, @) by:
+// 1) Splitting authority (userinfo + host) from path/query/fragment
+// 2) Extracting userinfo using last '@' in authority
+// 3) Using lenient decoding that won't throw on stray '%'
 // Returns undefined if the URI is not parseable.
 function parsePostgresUri(uri: string): ParsedUri | undefined {
   if (!uri) return undefined;
 
   const trimmed = uri.trim();
-  if (!trimmed.startsWith('postgres://') && !trimmed.startsWith('postgresql://')) {
-    return undefined;
-  }
 
-  try {
-    // Replace postgres:// with http:// so URL constructor can parse it
-    const normalized  = trimmed.replace(/^postgres(ql)?:\/\//, 'http://');
-    const url         = new URL(normalized);
+  // Validate and extract scheme
+  const scheme = trimmed.startsWith('postgresql://')
+    ? 'postgresql://'
+    : trimmed.startsWith('postgres://')
+      ? 'postgres://'
+      : null;
 
-    const host        = url.hostname || undefined;
-    const portStr     = url.port;
-    const port        = portStr      ? Number.parseInt(portStr, 10)     : undefined;
-    const username    = url.username ? decodeURIComponent(url.username) : undefined;
-    const password    = url.password ? decodeURIComponent(url.password) : undefined;
-    const database    = url.pathname ? url.pathname.replace(/^\//, '')  : undefined;
+  if (!scheme) return undefined;
 
-    return {
-      host      : host || undefined,
-      port      : Number.isFinite(port) ? port : undefined,
-      username  : username || undefined,
-      password  : password || undefined,
-      database  : database || undefined
-    };
-  } catch {
-    return undefined;
-  }
-}
+  const rest = trimmed.slice(scheme.length);
 
-// AIDEV-NOTE: Mask the password portion of a connection URI for display.
-// e.g., postgresql://user:secret@host:5432/db → postgresql://user:••••••@host:5432/db (6 chars = 6 bullets)
-function maskPasswordInUri(uri: string): string {
-  if (!uri) return uri;
-
-  const trimmed = uri.trim();
-  if (!trimmed.startsWith('postgres://') && !trimmed.startsWith('postgresql://')) {
-    return uri;
-  }
-
-  try {
-    // Extract scheme
-    const schemeMatch = trimmed.match(/^(postgres(?:ql)?:\/\/)/);
-    if (!schemeMatch) return uri;
-
-    const scheme = schemeMatch[1];
-    const rest = trimmed.slice(scheme.length);
-
-    // Find the @ that separates userinfo from host
-    const atIndex = rest.indexOf('@');
-    if (atIndex === -1) return uri; // No userinfo
-
-    const userinfo = rest.slice(0, atIndex);
-    const hostAndPath = rest.slice(atIndex); // includes the @
-
-    // Find : that separates username from password in userinfo
-    const colonIndex = userinfo.indexOf(':');
-    if (colonIndex === -1) return uri; // No password
-
-    const usernameEncoded = userinfo.slice(0, colonIndex);
-    const passwordEncoded = userinfo.slice(colonIndex + 1);
-
-    // AIDEV-NOTE: Decode to get actual password length for dynamic masking
-    let passwordLength = passwordEncoded.length;
-    try {
-      passwordLength = decodeURIComponent(passwordEncoded).length;
-    } catch {
-      // If decode fails, use encoded length
+  // Find the end of authority (first /, ?, or # marks path/query/fragment)
+  let authorityEnd = rest.length;
+  for (let charIndex = 0; charIndex < rest.length; charIndex++) {
+    const currentChar = rest[charIndex];
+    if (currentChar === '/' || currentChar === '?' || currentChar === '#') {
+      authorityEnd = charIndex;
+      break;
     }
-
-    const mask = getPasswordMask(passwordLength);
-    return `${scheme}${usernameEncoded}:${mask}${hostAndPath}`;
-  } catch {
-    return uri;
   }
+
+  const authorityRaw = rest.slice(0, authorityEnd);
+  const pathAndRest = rest.slice(authorityEnd);
+
+  // Find userinfo using LAST '@' in authority (handles @ in password)
+  const atIndex = authorityRaw.lastIndexOf('@');
+
+  const userinfoRaw = atIndex >= 0 ? authorityRaw.slice(0, atIndex) : '';
+  const hostPortRaw = atIndex >= 0 ? authorityRaw.slice(atIndex + 1) : authorityRaw;
+
+  // Parse host/port/path using URL constructor (userinfo removed, so safe)
+  let url: URL;
+  try {
+    url = new URL(`http://${hostPortRaw}${pathAndRest}`);
+  } catch {
+    return undefined;
+  }
+
+  // Extract and decode userinfo
+  let username: string | undefined;
+  let password: string | undefined;
+
+  if (atIndex >= 0 && userinfoRaw) {
+    // Find FIRST ':' in userinfo (password may contain colons)
+    const colonIndex = userinfoRaw.indexOf(':');
+    const usernameEnc = colonIndex >= 0 ? userinfoRaw.slice(0, colonIndex) : userinfoRaw;
+    const passwordEnc = colonIndex >= 0 ? userinfoRaw.slice(colonIndex + 1) : '';
+
+    const decodedUsername = usernameEnc ? decodeUserInfoLenient(usernameEnc) : '';
+    const decodedPassword = passwordEnc ? decodeUserInfoLenient(passwordEnc) : '';
+
+    username = decodedUsername || undefined;
+    password = decodedPassword || undefined;
+  }
+
+  const host = url.hostname || undefined;
+  const portStr = url.port;
+  const port = portStr ? Number.parseInt(portStr, 10) : undefined;
+  const database = url.pathname ? decodeUserInfoLenient(url.pathname.replace(/^\//, '')) : undefined;
+
+  return {
+    host: host || undefined,
+    port: Number.isFinite(port) ? port : undefined,
+    username: username || undefined,
+    password: password || undefined,
+    database: database || undefined
+  };
 }
 
 // AIDEV-NOTE: Build a preview URI from individual params for display when in params mode.
-// Shows placeholders for missing values; password mask grows dynamically per character typed.
+// Shows placeholders for missing values; password always shows as [PASSWORD] (no length leak).
 function buildPreviewUri(params: {
   host: string;
   port: string;
@@ -178,17 +183,18 @@ function buildPreviewUri(params: {
 }): string {
   const { host, port, username, password, database } = params;
 
-  const hostPart = host.trim() || '<host>';
+  const hostTrimmed = host.trim();
   const portPart = port.trim() || '5432';
   const userPart = username.trim() || '<user>';
-  const passPart = password.length > 0 ? getPasswordMask(password.length) : '<password>';
+  const passPart = password.length > 0 ? REDACTED_PASSWORD : '<password>';
   const dbPart = database.trim() || '<database>';
 
-  return `postgresql://${userPart}:${passPart}@${hostPart}:${portPart}/${dbPart}`;
-}
+  // AIDEV-NOTE: Bracket IPv6 hosts for valid URI syntax
+  const hostPart = hostTrimmed
+    ? (hostTrimmed.includes(':') && !hostTrimmed.startsWith('[') ? `[${hostTrimmed}]` : hostTrimmed)
+    : '<host>';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  return `postgresql://${userPart}:${passPart}@${hostPart}:${portPart}/${dbPart}`;
 }
 
 function normalizeString(value: string): string | undefined {
@@ -248,64 +254,43 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
   const [dataSourceId, setDataSourceId] = useState<UUIDv7>(() => generateUUIDv7());
   const [name, setName] = useState<string>('');
 
-  // AIDEV-NOTE: rawConnectionUri stores the actual URI (with real password) for submission.
-  // displayConnectionUri stores what we show in the input (with masked password).
-  const [rawConnectionUri    , setRawConnectionUri]     = useState<string>('');
-  const [displayConnectionUri, setDisplayConnectionUri] = useState<string>('');
-  const [uriParseError       , setUriParseError]        = useState<string | null>(null);
+  // AIDEV-NOTE: failedImportUri stores the raw URI only when parse fails (for optional reveal).
+  // We no longer store the raw URI on success - fields become the source of truth.
+  const [failedImportUri   , setFailedImportUri]  = useState<string>('');
+  const [uriParseError     , setUriParseError]    = useState<string | null>(null);
+  const [revealFailedUri   , setRevealFailedUri]  = useState<boolean>(false);
 
-  const [host         , setHost]          = useState<string>('');
-  const [port         , setPort]          = useState<string>('');
-  const [username     , setUsername]      = useState<string>('');
-  const [password     , setPassword]      = useState<string>('');
-  const [persistSecret, setPersistSecret] = useState<boolean>(false);
-  const [database     , setDatabase]      = useState<string>('');
-  const [sslMode      , setSslMode]       = useState<DbSslMode>('require');
+  const [host         , setHost]                  = useState<string>('');
+  const [port         , setPort]                  = useState<string>('');
+  const [username     , setUsername]              = useState<string>('');
+  const [password     , setPassword]              = useState<string>('');
+  const [persistSecret, setPersistSecret]         = useState<boolean>(false);
+  const [database     , setDatabase]              = useState<string>('');
+  const [sslMode      , setSslMode]               = useState<DbSslMode>('require');
 
   // AIDEV-NOTE: Track which input mode the user is using.
-  const [inputMode, setInputMode] = useState<InputMode>('none');
+  const [inputMode, setInputMode]                 = useState<InputMode>('none');
 
-  const [isTesting   , setIsTesting]    = useState<boolean>(false);
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [testStatus  , setTestStatus]   = useState<'idle' | 'success' | 'error'>('idle');
-  const [testMessage , setTestMessage]  = useState<string | null>(null);
-  const [formError   , setFormError]    = useState<string | null>(null);
-  const [fieldErrors , setFieldErrors]  = useState<FieldErrorMap>({});
+  const [isTesting   , setIsTesting]              = useState<boolean>(false);
+  const [isConnecting, setIsConnecting]           = useState<boolean>(false);
+  const [testStatus  , setTestStatus]             = useState<'idle' | 'success' | 'error'>('idle');
+  const [testMessage , setTestMessage]            = useState<string | null>(null);
+  const [formError   , setFormError]              = useState<string | null>(null);
+  const [fieldErrors , setFieldErrors]            = useState<FieldErrorMap>({});
 
   const canSubmit = !isTesting && !isConnecting;
-  const isTestOk = testStatus === 'success';
+  const isTestOk  = testStatus === 'success';
 
-  // AIDEV-NOTE: In URI mode we surface connection issues under the URI field (connectionUriError),
-  // and suppress per-field errors on the dimmed manual inputs to reduce noise.
-  const showParamFieldErrors = inputMode !== 'uri';
 
-  const connectionUriError = useMemo(() => {
-    if (uriParseError) return uriParseError;
-    if (inputMode !== 'uri') return null;
-    const missingOrInvalid: string[] = [];
-    if (fieldErrors.host) missingOrInvalid.push('host');
-    if (fieldErrors.port) missingOrInvalid.push('port');
-    if (fieldErrors.username) missingOrInvalid.push('username');
-    if (fieldErrors.password) missingOrInvalid.push('password');
-    if (fieldErrors.database) missingOrInvalid.push('database');
-
-    if (missingOrInvalid.length === 0) return null;
-    if (missingOrInvalid.length === 1) {
-      return `Connection string is missing or invalid: ${missingOrInvalid[0]}.`;
-    }
-    return `Connection string is missing or invalid: ${missingOrInvalid.join(', ')}.`;
-  }, [fieldErrors, inputMode, uriParseError]);
+  // AIDEV-NOTE: connectionUriError only shows import parse errors (not field validation errors).
+  // Field validation errors are shown inline on each field.
+  const connectionUriError = uriParseError;
 
   // AIDEV-NOTE: Compute preview URI when in params mode
   const previewUri = useMemo(() => {
     if (inputMode !== 'params') return '';
     return buildPreviewUri({ host, port, username, password, database });
   }, [inputMode, host, port, username, password, database]);
-
-  // AIDEV-NOTE: Determine if params have any content (for mode detection)
-  const hasParamsContent = useMemo(() => {
-    return !!(host.trim() || port.trim() || username.trim() || password.trim() || database.trim());
-  }, [host, port, username, password, database]);
 
   const clearFeedback = useCallback(() => {
     setFormError(null);
@@ -317,17 +302,17 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
   const wipeSecrets = useCallback(() => {
     // AIDEV-NOTE: Treat connection materials as sensitive; wipe on close/success.
     setPassword('');
-    setRawConnectionUri('');
-    setDisplayConnectionUri('');
+    setFailedImportUri('');
     setUriParseError(null);
+    setRevealFailedUri(false);
   }, []);
 
   const resetForm = useCallback(() => {
     setDataSourceId(generateUUIDv7());
     setName('');
-    setRawConnectionUri('');
-    setDisplayConnectionUri('');
+    setFailedImportUri('');
     setUriParseError(null);
+    setRevealFailedUri(false);
     setHost('');
     setPort('');
     setUsername('');
@@ -339,46 +324,10 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
     clearFeedback();
   }, [clearFeedback]);
 
-  // AIDEV-NOTE: Handle connection URI paste/change - parse and populate fields
-  const handleConnectionUriChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-
-    // If user is clearing the field
-    if (!value.trim()) {
-      setRawConnectionUri('');
-      setDisplayConnectionUri('');
-      setUriParseError(null);
-      if (!hasParamsContent) {
-        setInputMode('none');
-      }
-      return;
-    }
-
-    setRawConnectionUri(value);
-    setDisplayConnectionUri(maskPasswordInUri(value));
-    setInputMode('uri');
-
-    // Parse and populate fields
-    const parsed = parsePostgresUri(value);
-    if (parsed) {
-      setUriParseError(null);
-      setHost(parsed.host ?? '');
-      setPort(typeof parsed.port === 'number' ? String(parsed.port) : '');
-      setUsername(parsed.username ?? '');
-      setPassword(parsed.password ?? '');
-      setDatabase(parsed.database ?? '');
-      return;
-    }
-
-    setUriParseError('Connection string must be a valid postgres:// or postgresql:// URI');
-    setHost('');
-    setPort('');
-    setUsername('');
-    setPassword('');
-    setDatabase('');
-  }, [hasParamsContent]);
-
-  // AIDEV-NOTE: Handle paste event specifically to capture full URI before masking
+  // AIDEV-NOTE: Handle paste event for connection URI import.
+  // After paste, we always switch to params mode (URI field becomes readOnly preview).
+  // On success: populate fields, clear error, don't store raw URI.
+  // On failure: set error, store raw URI for optional reveal, keep existing field values.
   const handleConnectionUriPaste = useCallback((e: ClipboardEvent<HTMLInputElement>) => {
     const pastedText = e.clipboardData.getData('text');
     if (!pastedText) return;
@@ -386,14 +335,16 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
     // Prevent default so we can handle the full paste
     e.preventDefault();
 
-    setRawConnectionUri(pastedText);
-    setDisplayConnectionUri(maskPasswordInUri(pastedText));
-    setInputMode('uri');
+    // Always switch to params mode after paste (URI field shows preview, becomes readOnly)
+    setInputMode('params');
+    setRevealFailedUri(false);
 
     // Parse and populate fields
     const parsed = parsePostgresUri(pastedText);
     if (parsed) {
+      // Success: populate fields, clear error, don't store raw URI
       setUriParseError(null);
+      setFailedImportUri('');
       setHost(parsed.host ?? '');
       setPort(typeof parsed.port === 'number' ? String(parsed.port) : '');
       setUsername(parsed.username ?? '');
@@ -402,30 +353,42 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
       return;
     }
 
-    setUriParseError('Connection string must be a valid postgres:// or postgresql:// URI');
-    setHost('');
-    setPort('');
-    setUsername('');
-    setPassword('');
-    setDatabase('');
+    // Failure: set error, store raw for reveal toggle, keep existing field values
+    setUriParseError('Could not import connection string. Use fields below or reveal to troubleshoot.');
+    setFailedImportUri(pastedText);
   }, []);
 
-  // AIDEV-NOTE: Handle individual param changes - switch to params mode
+  // AIDEV-NOTE: Handle individual param changes - switch to params mode and clear import errors.
   const handleParamChange = useCallback((
     setter: (value: string) => void,
     value: string
   ) => {
     setter(value);
 
-    // If user starts typing in params, switch to params mode and clear URI
+    // Clear any import error when user edits params (they're taking over manually)
+    if (uriParseError) {
+      setUriParseError(null);
+      setFailedImportUri('');
+      setRevealFailedUri(false);
+    }
+
+    // If user starts typing in params, switch to params mode
     if (inputMode !== 'params' && value.trim()) {
       setInputMode('params');
-      setRawConnectionUri('');
-      setDisplayConnectionUri('');
-      setUriParseError(null);
     }
-  }, [inputMode]);
+  }, [inputMode, uriParseError]);
 
+  // AIDEV-NOTE: Clear failed import state and allow user to paste again.
+  const handleClearAndPasteAgain = useCallback(() => {
+    setFailedImportUri('');
+    setUriParseError(null);
+    setRevealFailedUri(false);
+    setInputMode('none');
+    // Focus will be handled by the input's autoFocus or user interaction
+  }, []);
+
+  // AIDEV-NOTE: Build draft always uses the individual field values (params are source of truth).
+  // After paste, fields are populated, so we no longer need separate URI-mode logic.
   const buildDraft = useCallback((): PostgresDataSourceDraft => {
     const draft: PostgresDataSourceDraft = {
       dataSourceId  : dataSourceId,
@@ -434,18 +397,6 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
       sslMode       : sslMode,
       persistSecret : persistSecret
     };
-
-    if (inputMode === 'uri') {
-      const parsed = parsePostgresUri(rawConnectionUri);
-      if (parsed) {
-        if (parsed.host) draft.host = parsed.host;
-        if (typeof parsed.port === 'number') draft.port = parsed.port;
-        if (parsed.username) draft.username = parsed.username;
-        if (parsed.password) draft.password = parsed.password;
-        if (parsed.database) draft.database = parsed.database;
-      }
-      return draft;
-    }
 
     const hostVal = normalizeString(host);
     const userVal = normalizeString(username);
@@ -456,8 +407,8 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
       const raw = (port || '').trim();
       if (!raw) return undefined;
       if (!/^[0-9]{1,5}$/.test(raw)) return Number.NaN;
-      const n = Number.parseInt(raw, 10);
-      return Number.isFinite(n) ? n : Number.NaN;
+      const parsedPort = Number.parseInt(raw, 10);
+      return Number.isFinite(parsedPort) ? parsedPort : Number.NaN;
     })();
 
     if (hostVal) draft.host = hostVal;
@@ -467,7 +418,7 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
     if (dbVal)   draft.database = dbVal;
 
     return draft;
-  }, [dataSourceId, database, host, inputMode, name, password, persistSecret, port, rawConnectionUri, sslMode, username]);
+  }, [dataSourceId, database, host, name, password, persistSecret, port, sslMode, username]);
 
   const applyValidationErrors = useCallback((errors: FieldError[] | undefined) => {
     const mapped = mapFieldErrors(errors);
@@ -476,7 +427,6 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
   }, []);
 
   const validateForTest = useCallback((): PostgresDataSourceTestPayload | null => {
-    if (inputMode === 'uri' && uriParseError) return null;
     const draft = buildDraft();
     const res = validateDataSourceDraftForTest(draft);
     if (res.ok) {
@@ -486,10 +436,9 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
     }
     applyValidationErrors(res.errors);
     return null;
-  }, [applyValidationErrors, buildDraft, inputMode, uriParseError]);
+  }, [applyValidationErrors, buildDraft]);
 
   const validateForCreate = useCallback((): DataSource | null => {
-    if (inputMode === 'uri' && uriParseError) return null;
     const draft = buildDraft();
     const res = validateDataSourceDraftForCreate(draft);
     if (res.ok) {
@@ -499,7 +448,7 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
     }
     applyValidationErrors(res.errors);
     return null;
-  }, [applyValidationErrors, buildDraft, inputMode, uriParseError]);
+  }, [applyValidationErrors, buildDraft]);
 
   const focusFirst = useCallback(() => {
     const el = firstInputRef.current;
@@ -642,12 +591,12 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
     return inputMode === 'params' ? `${base} ${styles['input-dimmed']}` : base;
   }, [connectionUriError, inputMode]);
 
+  // AIDEV-NOTE: Params fields are always editable now (no dimming in uri mode).
   const paramsFieldClassName = useCallback((hasError: boolean) => {
-    const base = hasError
+    return hasError
       ? `${styles['input']} ${styles['input-error']}`
       : styles['input'];
-    return inputMode === 'uri' ? `${base} ${styles['input-dimmed']}` : base;
-  }, [inputMode]);
+  }, []);
 
   if (!open) return null;
 
@@ -693,19 +642,51 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
               <input
                 id="db-connection-uri"
                 className={uriInputClassName}
-                value={inputMode === 'params' ? previewUri : displayConnectionUri}
-                onChange={handleConnectionUriChange}
+                value={inputMode === 'params' ? previewUri : ''}
                 onPaste={handleConnectionUriPaste}
-                placeholder="postgresql://user:password@host:5432/db"
+                placeholder="Paste postgresql://user:password@host:5432/db"
                 aria-invalid={connectionUriError ? true : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                readOnly={inputMode === 'params'}
+                readOnly
               />
               {connectionUriError && <div className={styles['field-error']}>{connectionUriError}</div>}
-              {inputMode === 'params' && (
-                <div className={styles['mode-hint']}>Typing in fields below. Clear fields to use connection string.</div>
+
+              {/* AIDEV-NOTE: Show reveal toggle and CTA only when import failed */}
+              {uriParseError && failedImportUri && (
+                <div className={styles['import-actions']}>
+                  <button
+                    type="button"
+                    className={styles['reveal-button']}
+                    onClick={() => setRevealFailedUri((prev) => !prev)}
+                  >
+                    {revealFailedUri ? 'Hide connection string' : 'Reveal connection string'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles['clear-paste-button']}
+                    onClick={handleClearAndPasteAgain}
+                  >
+                    Clear & paste again
+                  </button>
+                </div>
+              )}
+
+              {/* AIDEV-NOTE: Revealed raw URI textarea (only when user opts in after parse failure) */}
+              {revealFailedUri && failedImportUri && (
+                <textarea
+                  className={styles['revealed-uri']}
+                  value={failedImportUri}
+                  readOnly
+                  rows={3}
+                  spellCheck={false}
+                  aria-label="Raw connection string (revealed)"
+                />
+              )}
+
+              {inputMode === 'params' && !uriParseError && (
+                <div className={styles['mode-hint']}>Fields populated. Edit below or paste a new connection string.</div>
               )}
             </div>
 
@@ -718,30 +699,30 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
                 <label className={styles['label']} htmlFor="db-host">Host</label>
                 <input
                   id="db-host"
-                  className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.host)}
+                  className={paramsFieldClassName(!!fieldErrors.host)}
                   value={host}
                   onChange={(e) => handleParamChange(setHost, e.target.value)}
                   placeholder="127.0.0.1"
-                  aria-invalid={showParamFieldErrors ? (fieldErrors.host ? true : undefined) : undefined}
+                  aria-invalid={fieldErrors.host ? true : undefined}
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                {showParamFieldErrors && fieldErrors.host && <div className={styles['field-error']}>{fieldErrors.host}</div>}
+                {fieldErrors.host && <div className={styles['field-error']}>{fieldErrors.host}</div>}
               </div>
 
               <div className={styles['field']}>
                 <label className={styles['label']} htmlFor="db-port">Port</label>
                 <input
                   id="db-port"
-                  className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.port)}
+                  className={paramsFieldClassName(!!fieldErrors.port)}
                   value={port}
                   onChange={(e) => handleParamChange(setPort, e.target.value)}
                   placeholder="5432"
                   inputMode="numeric"
-                  aria-invalid={showParamFieldErrors ? (fieldErrors.port ? true : undefined) : undefined}
+                  aria-invalid={fieldErrors.port ? true : undefined}
                 />
-                {showParamFieldErrors && fieldErrors.port && <div className={styles['field-error']}>{fieldErrors.port}</div>}
+                {fieldErrors.port && <div className={styles['field-error']}>{fieldErrors.port}</div>}
               </div>
             </div>
 
@@ -749,28 +730,28 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
               <label className={styles['label']} htmlFor="db-username">User</label>
               <input
                 id="db-username"
-                className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.username)}
+                className={paramsFieldClassName(!!fieldErrors.username)}
                 value={username}
                 onChange={(e) => handleParamChange(setUsername, e.target.value)}
                 placeholder="postgres"
-                aria-invalid={showParamFieldErrors ? (fieldErrors.username ? true : undefined) : undefined}
+                aria-invalid={fieldErrors.username ? true : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
-              {showParamFieldErrors && fieldErrors.username && <div className={styles['field-error']}>{fieldErrors.username}</div>}
+              {fieldErrors.username && <div className={styles['field-error']}>{fieldErrors.username}</div>}
             </div>
 
             <div className={styles['field']}>
               <label className={styles['label']} htmlFor="db-password">Password</label>
               <input
                 id="db-password"
-                className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.password)}
+                className={paramsFieldClassName(!!fieldErrors.password)}
                 type="password"
                 value={password}
                 onChange={(e) => handleParamChange(setPassword, e.target.value)}
                 placeholder="Enter password"
-                aria-invalid={showParamFieldErrors ? (fieldErrors.password ? true : undefined) : undefined}
+                aria-invalid={fieldErrors.password ? true : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
@@ -787,23 +768,23 @@ function ConnectDataSourceModal({ open, onClose }: Props) {
               <div className={styles['persist-help']}>
                 Store encrypted on the backend so you can reconnect later.
               </div>
-              {showParamFieldErrors && fieldErrors.password && <div className={styles['field-error']}>{fieldErrors.password}</div>}
+              {fieldErrors.password && <div className={styles['field-error']}>{fieldErrors.password}</div>}
             </div>
 
             <div className={styles['field']}>
               <label className={styles['label']} htmlFor="db-name">Database name</label>
               <input
                 id="db-name"
-                className={paramsFieldClassName(showParamFieldErrors && !!fieldErrors.database)}
+                className={paramsFieldClassName(!!fieldErrors.database)}
                 value={database}
                 onChange={(e) => handleParamChange(setDatabase, e.target.value)}
                 placeholder="postgres"
-                aria-invalid={showParamFieldErrors ? (fieldErrors.database ? true : undefined) : undefined}
+                aria-invalid={fieldErrors.database ? true : undefined}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
-              {showParamFieldErrors && fieldErrors.database && <div className={styles['field-error']}>{fieldErrors.database}</div>}
+              {fieldErrors.database && <div className={styles['field-error']}>{fieldErrors.database}</div>}
             </div>
 
             <div className={styles['field']}>

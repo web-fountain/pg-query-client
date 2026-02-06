@@ -6,7 +6,8 @@ import { createAsyncThunk }             from '@reduxjs/toolkit';
 import * as log                         from '@Observability/client/thunks';
 import {
   addTabFromFetch, closeTab,
-  reorderTabs, setActiveTab
+  reorderTabs, setActiveTab,
+  setTabDataSourceCredentialId
 }                                       from '@Redux/records/tabbar';
 import { removeUnsavedTreeNodeByTabId } from '@Redux/records/unsavedQueryTree';
 import {
@@ -16,7 +17,8 @@ import {
 import { removeDataQueryRecord }        from '@Redux/records/dataQuery';
 import {
   closeTabAction, openTabAction,
-  reorderTabAction, setActiveTabAction
+  reorderTabAction, setActiveTabAction,
+  setTabConnectionAction
 }                                       from '@OpSpaceQueriesActions/tabs/index';
 import {
   errorEntryFromActionError,
@@ -312,6 +314,68 @@ export const reorderTabsThunk = createAsyncThunk<void, UUIDv7[], { state: RootSt
         meta        : { error }
       }));
       return;
+    }
+  }
+);
+
+export const switchActiveTabConnectionThunk = createAsyncThunk<void, UUIDv7, { state: RootState }>(
+  'tabs/switchActiveTabConnectionThunk',
+  async (dataSourceCredentialId, { dispatch, getState }) => {
+    const state = getState();
+    const { activeTabId, entities } = state.tabs;
+    if (!activeTabId) return;
+
+    const tab = entities[activeTabId];
+    if (!tab) return;
+
+    const prevCredentialId = tab.dataSourceCredentialId;
+    if (prevCredentialId === dataSourceCredentialId) return;
+
+    log.thunkStart({
+      thunk : 'tabs/switchActiveTabConnectionThunk',
+      input : {
+        tabId                      : activeTabId,
+        prevDataSourceCredentialId : prevCredentialId,
+        nextDataSourceCredentialId : dataSourceCredentialId
+      }
+    });
+
+    dispatch(setTabDataSourceCredentialId({ tabId: activeTabId, dataSourceCredentialId }));
+
+    try {
+      const res = await setTabConnectionAction(activeTabId, dataSourceCredentialId);
+      log.thunkResult({
+        thunk  : 'tabs/switchActiveTabConnectionThunk',
+        result : res,
+        input  : {
+          tabId                      : activeTabId,
+          prevDataSourceCredentialId : prevCredentialId,
+          nextDataSourceCredentialId : dataSourceCredentialId
+        }
+      });
+
+      if (!res.success) {
+        dispatch(updateError(errorEntryFromActionError({
+          actionType  : 'tabs/switchActiveTabConnectionThunk',
+          error       : res.error
+        })));
+      }
+    } catch (error) {
+      log.thunkException({
+        thunk   : 'tabs/switchActiveTabConnectionThunk',
+        message : 'setTabConnectionAction threw',
+        error   : error,
+        input   : {
+          tabId                      : activeTabId,
+          prevDataSourceCredentialId : prevCredentialId,
+          nextDataSourceCredentialId : dataSourceCredentialId
+        }
+      });
+      dispatch(updateError({
+        actionType  : 'tabs/switchActiveTabConnectionThunk',
+        message     : 'Failed to switch tab connection.',
+        meta        : { error }
+      }));
     }
   }
 );

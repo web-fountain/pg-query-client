@@ -1,17 +1,33 @@
+import type { UUIDv7 } from '@Types/primitives';
+
+
+export type DataQueryExecutionStatus =
+  | 'running'
+  | 'succeeded'
+  | 'failed';
+
 export type DataQueryExecution = {
-  dataSourceId: string;
-  dataQueryId : string;
-  queryText   : string;
-  parameters  : Record<string, any>;
-  interpolatedQueryText: string;
-  queryTime   : string; // formatted duration
-  dateTime    : string;
-  duration    : string; // formatted duration
-  totalRows   : number;
-  message     : string;
-  results     : any;
+  dataQueryExecutionId    : UUIDv7;
+  dataQueryId             : UUIDv7;
+  dataSourceCredentialId  : UUIDv7;
+  status                   : DataQueryExecutionStatus;
+
+  // AIDEV-NOTE: Do not persist raw SQL in execution records (security-first).
+  // Use `dataQueryRecords[dataQueryId].current.queryText` as the source of truth.
+  queryTextLen            : number;
+
+  startedAt               : string; // ISO datetime
+  finishedAt?             : string; // ISO datetime
+  elapsedMs?              : number;
+
+  rows?                   : unknown[]; // capped (currently 1000 rows max)
+  rowCount?               : number | null;
+  fields?                 : string[];
+  isTruncated?            : boolean;
+
+  message?                : string | null;
+  errorCode?              : string;
+  error?                  : string;
 };
 
-export type DataQueryExecutionRecord = {
-  [dataQueryId: string]: DataQueryExecution[];
-};
+export type DataQueryExecutionRecord = Record<string, DataQueryExecution[]>;

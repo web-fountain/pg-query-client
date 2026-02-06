@@ -3,29 +3,28 @@
 import type {
   ChangeEvent,
   KeyboardEvent as ReactKeyboardEvent
-}                                             from 'react';
-import type { UUIDv7 }                        from '@Types/primitives';
+}                                                 from 'react';
+import type { UUIDv7 }                            from '@Types/primitives';
 
 import {
-  memo, useCallback, useEffect, useMemo,
+  useCallback, useEffect, useMemo,
   useRef, useState
-}                                             from 'react';
+}                                                 from 'react';
 
-import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
+import { useReduxDispatch, useReduxSelector }     from '@Redux/storeHooks';
 import {
   selectDataQueryRecord, updateDataQueryName,
   updateDataQueryText
-}                                             from '@Redux/records/dataQuery';
-import { selectIsDataQueryRunning }           from '@Redux/records/dataQueryExecution';
-import { saveDataQueryThunk }                 from '@Redux/records/dataQuery/thunks';
-import { useDebouncedCallback }               from '@Hooks/useDebounce';
-import Icon                                   from '@Components/Icons';
+}                                                 from '@Redux/records/dataQuery';
+import { selectActiveTabDataSourceCredentialId }  from '@Redux/records/dataSource';
+import { saveDataQueryThunk }                     from '@Redux/records/dataQuery/thunks';
+import { useDebouncedCallback }                   from '@Hooks/useDebounce';
+import Icon                                       from '@Components/Icons';
+import { useSqlRunner }                           from '../../../../_providers/SQLRunnerProvider';
+import { useQueriesRoute }                        from '../../../_providers/QueriesRouteProvider';
+import ConnectionIndicator                        from './ConnectionIndicator';
 
-import { useSqlRunner }                       from '../../../../_providers/SQLRunnerProvider';
-import { useQueriesRoute }                    from '../../../_providers/QueriesRouteProvider';
-import ConnectionIndicator                    from './ConnectionIndicator';
-
-import styles                                 from './styles.module.css';
+import styles                                     from './styles.module.css';
 
 
 type Props = {
@@ -35,30 +34,26 @@ type Props = {
 };
 
 function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
-  const { cancel }              = useSqlRunner();
-  const { navigateToSaved }     = useQueriesRoute();
-  const record                  = useReduxSelector(selectDataQueryRecord, dataQueryId);
-  const isRunning               = useReduxSelector(selectIsDataQueryRunning, dataQueryId);
-  const dispatch                = useReduxDispatch();
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [
-    queryName,
-    setQueryName
-  ]                             = useState<string>(record?.current?.name ?? record?.persisted?.name ?? '');
+  const { isRunning }                 = useSqlRunner();
+  const { navigateToSaved }           = useQueriesRoute();
+  const record                        = useReduxSelector(selectDataQueryRecord, dataQueryId);
+  const activeDataSourceCredentialId  = useReduxSelector(selectActiveTabDataSourceCredentialId);
+  const dispatch                      = useReduxDispatch();
+  const [isSaving, setIsSaving]       = useState<boolean>(false);
+  const [queryName, setQueryName]     = useState<string>(record?.current?.name ?? record?.persisted?.name ?? '');
   const [
     nameValidationError,
     setNameValidationError
-  ]                             = useState<string | null>(null);
-  const queryNameRef            = useRef(queryName);
-  const recordRef               = useRef(record);
-  const hasPendingNameCommitRef = useRef(false);
+  ]                                   = useState<string | null>(null);
+  const queryNameRef                  = useRef(queryName);
+  const recordRef                     = useRef(record);
+  const hasPendingNameCommitRef       = useRef(false);
 
-  queryNameRef.current          = queryName;
-  recordRef.current             = record;
+  queryNameRef.current                = queryName;
+  recordRef.current                   = record;
 
-  const canSave                 = !!record?.isUnsaved && !isSaving && !nameValidationError;
-  const canRun                  = !isRunning;
-  const isCancelMode            = isRunning;
+  const canSave                       = !!record?.isUnsaved && !isSaving && !nameValidationError;
+  const canRun                        = !!activeDataSourceCredentialId && !isRunning;
 
   const commitNameChange = useCallback((id: UUIDv7, next: string) => {
     // AIDEV-NOTE: Debounced Redux commit for name edits; clear pending flag once it runs.
@@ -194,28 +189,20 @@ function Toolbar({ dataQueryId, onRun, getCurrentEditorText }: Props) {
           <span className={styles['spacer']} />
           <button
             className={styles['run-button']}
-            title={
-              isCancelMode
-                ? 'Cancel'
-                : 'Run'
-            }
-            aria-label={
-              isCancelMode
-                ? 'Cancel'
-                : 'Run'
-            }
-            onClick={isCancelMode ? () => cancel(dataQueryId) : onRun}
-            disabled={isCancelMode ? false : !canRun}
+            title={activeDataSourceCredentialId ? 'Run' : 'Connect a server to run queries'}
+            aria-label={activeDataSourceCredentialId ? 'Run' : 'Connect a server to run queries'}
+            onClick={onRun}
+            disabled={!canRun}
           >
-            <Icon name={isCancelMode ? 'square' : 'play'} />
+            <Icon name="play" />
           </button>
         </div>
       </div>
 
-      <ConnectionIndicator />
+      <ConnectionIndicator isRunning={isRunning} />
     </div>
   );
 }
 
 
-export default memo(Toolbar);
+export default Toolbar;

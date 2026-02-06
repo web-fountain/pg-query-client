@@ -1,13 +1,10 @@
 'use client';
 
-import type { DataQueryExecutionRecord }  from './types';
-
 import { useMemo, useState }              from 'react';
 
 import { useReduxSelector }               from '@Redux/storeHooks';
-import { selectDataQueryRecord }          from '@Redux/records/dataQuery';
+import { selectLatestDataQueryExecution } from '@Redux/records/dataQueryExecution';
 
-import { useSqlRunner }                   from '../../../_providers/SQLRunnerProvider';
 import { useQueriesRoute }                from '../../_providers/QueriesRouteProvider';
 import JSONEditor                         from '../JSONEditor';
 
@@ -15,54 +12,84 @@ import styles                             from './styles.module.css';
 
 
 function QueryResults() {
-  const { lastResult, lastError } = useSqlRunner();
   const { dataQueryId }           = useQueriesRoute();
-  const activeDataQueryRecord     = useReduxSelector(selectDataQueryRecord, dataQueryId);
+  const latestExecution           = useReduxSelector(selectLatestDataQueryExecution, dataQueryId);
   const [activeTab, setActiveTab] = useState<'data-output' | 'messages'>('data-output');
-  const sqlText                   = (activeDataQueryRecord?.current?.queryText || '') as string;
 
-  // AIDEV-NOTE: Shape current provider results into the requested DataQueryExecutionRecord.
-  const executionPayload = useMemo<DataQueryExecutionRecord | null>(() => {
-    if (!lastResult) return null;
-    const elapsed = Math.max(0, Number(lastResult.elapsedMs || 0));
-    const iso = new Date().toISOString();
+  const executionPayload = useMemo<Record<string, unknown> | null>(() => {
+    if (!latestExecution) return null;
+    if (latestExecution.status !== 'succeeded') return null;
+
+    const rows      = Array.isArray(latestExecution.rows) ? latestExecution.rows : [];
+    const rowCount  = typeof latestExecution.rowCount === 'number' ? latestExecution.rowCount : rows.length;
+    const elapsedMs = typeof latestExecution.elapsedMs === 'number' ? latestExecution.elapsedMs : 0;
+
     return {
-      default: [
-        {
-          dataSourceId: 'default',
-          dataQueryId: 'default',
-          queryText: sqlText || '',
-          parameters: {},
-          interpolatedQueryText: sqlText || '',
-          queryTime: `${elapsed} ms`,
-          dateTime: iso,
-          duration: `${elapsed} ms`,
-          totalRows: Number(lastResult.rowCount || 0),
-          message: `Successfully run. Total query runtime: ${elapsed} msec. ${Number(lastResult.rowCount || 0)} rows affected.`,
-          results: Array.isArray(lastResult.rows) ? lastResult.rows : []
-        }
-      ]
+      rows,
+      rowCount,
+      fields: Array.isArray(latestExecution.fields) ? latestExecution.fields : undefined,
+      elapsedMs,
+      isTruncated: Boolean(latestExecution.isTruncated)
     };
-  }, [lastResult, sqlText]);
+  }, [latestExecution]);
 
   const panelHeader = useMemo(() => {
-    if (!lastResult) return null;
+    if (!latestExecution) return null;
+    if (latestExecution.status !== 'succeeded') return null;
+
+    const rowCount = typeof latestExecution.rowCount === 'number' ? latestExecution.rowCount : 0;
+    const elapsedMs = typeof latestExecution.elapsedMs === 'number' ? latestExecution.elapsedMs : null;
+    const returnedRows = Array.isArray(latestExecution.rows) ? latestExecution.rows.length : 0;
+
+    const isTruncated =
+      Boolean(latestExecution.isTruncated)
+        || (returnedRows > 0 && rowCount > returnedRows);
+
+    const rowsLabel = isTruncated
+      ? `Showing rows: ${returnedRows} (of ${rowCount})`
+      : `Total rows: ${rowCount}`;
+
     return (
       <div className={styles['panel-header']}>
-        <span className={styles['panel-header-item']}>Total rows: {lastResult.rowCount}</span>
-        <span className={styles['panel-header-item']}>Query complete: {lastResult.elapsedMs} ms</span>
+        <span className={styles['panel-header-item']}>{rowsLabel}</span>
+        {elapsedMs !== null && (
+          <span className={styles['panel-header-item']}>Query complete: {elapsedMs} ms</span>
+        )}
       </div>
     );
-  }, [lastResult]);
+  }, [latestExecution]);
 
   const messagesText = useMemo(() => {
-    if (lastError) return lastError.error;
-    if (lastResult) {
-      const elapsed = Math.max(0, Number(lastResult.elapsedMs || 0));
-      return `Successfully run. Total query runtime: ${elapsed} msec. ${Number(lastResult.rowCount || 0)} rows affected.`;
+    if (!latestExecution) {
+      return 'No messages. Execute a query to see messages.';
     }
-    return 'No messages. Execute a query to see messages.';
-  }, [lastResult, lastError]);
+
+    if (latestExecution.status === 'running') {
+      return 'Running query…';
+    }
+
+    if (latestExecution.status === 'failed') {
+      return latestExecution.error || latestExecution.message || 'Query failed.';
+    }
+
+    const elapsed = Math.max(0, Number(latestExecution.elapsedMs || 0));
+    const rows = Array.isArray(latestExecution.rows) ? latestExecution.rows : [];
+    const rowCount = typeof latestExecution.rowCount === 'number' ? latestExecution.rowCount : rows.length;
+
+    const isTruncated =
+      Boolean(latestExecution.isTruncated)
+        || (rows.length > 0 && rowCount > rows.length);
+
+    const suffix = isTruncated
+      ? ` Showing first ${rows.length} rows (of ${rowCount}).`
+      : '';
+
+    const base = latestExecution.message
+      ? latestExecution.message
+      : `Successfully run. Total query runtime: ${elapsed} msec. ${rowCount} rows affected.`;
+
+    return `${base}${suffix}`;
+  }, [latestExecution]);
 
   return (
     <div className={styles['query-results']}>
@@ -109,7 +136,13 @@ function QueryResults() {
             ) : (
               <div className={styles['placeholder']}>
                 <div className={styles['placeholder-icon']}>📊</div>
-                <p className={styles['placeholder-text']}>No data output. Execute a query to get output.</p>
+                <p className={styles['placeholder-text']}>
+                  {latestExecution?.status === 'running'
+                    ? 'Running query…'
+                    : latestExecution?.status === 'failed'
+                      ? 'Query failed. See Messages for details.'
+                      : 'No data output. Execute a query to get output.'}
+                </p>
               </div>
             )}
           </div>

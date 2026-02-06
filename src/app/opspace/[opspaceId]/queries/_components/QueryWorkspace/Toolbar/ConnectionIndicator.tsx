@@ -1,50 +1,60 @@
 'use client';
 
-import type { DataSourceMeta }              from '@Redux/records/dataSource/types';
+import type { DataSourceMeta }                from '@Redux/records/dataSource/types';
 
-import { memo, useCallback, useState }      from 'react';
+import { useCallback, useMemo, useState }     from 'react';
 import {
   FloatingPortal, autoUpdate, flip, offset,
   useClick, useDismiss, useFloating,
   useInteractions, useRole
-}                                           from '@floating-ui/react';
+}                                             from '@floating-ui/react';
 
-import { useDataSourceUI }                  from '@OpSpaceProviders/DataSourceProvider';
-import { useReduxSelector }                 from '@Redux/storeHooks';
-import { selectDataSourceList }             from '@Redux/records/dataSource';
-import { selectActiveTabDataSource }        from '@Redux/records/tabbar';
-import Icon                                 from '@Components/Icons';
+import { useDataSourceUI }                    from '@OpSpaceProviders/DataSourceProvider';
+import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
+import {
+  selectActiveTabDataSourceCredentialId,
+  selectDataSourceByCredentialId,
+  selectDataSourceList
+}                                             from '@Redux/records/dataSource';
+import { switchActiveTabConnectionThunk }     from '@Redux/records/tabbar/thunks';
+import Icon                                   from '@Components/Icons';
 
-import styles                               from './styles.module.css';
+import styles                                 from './styles.module.css';
 
 
 function formatDataSourceKind(kind: DataSourceMeta['kind']): string {
   return kind === 'pglite' ? 'PGlite' : 'Postgres';
 }
 
-function formatDataSourceTitle(ds: DataSourceMeta): string {
-  return ds.label || ds.name;
+function formatDataSourceTitle(dataSource: DataSourceMeta): string {
+  return dataSource.label || dataSource.name;
 }
 
-function formatDataSourceSubtitle(ds: DataSourceMeta): string {
+function formatDataSourceSubtitle(dataSource: DataSourceMeta): string {
   const parts: string[] = [];
-  parts.push(formatDataSourceKind(ds.kind));
-  if (ds.label) parts.push(ds.name);
+  parts.push(formatDataSourceKind(dataSource.kind));
+  if (dataSource.label) parts.push(dataSource.name);
   return parts.join(' · ');
 }
 
-function formatDataSourceTooltip(ds: DataSourceMeta): string {
-  const title = formatDataSourceTitle(ds);
-  const sub = formatDataSourceSubtitle(ds);
-  // return sub ? `${title} — ${sub}` : title;
-  return sub;
+function formatDataSourceTooltip(dataSource: DataSourceMeta): string {
+  const subtitle = formatDataSourceSubtitle(dataSource);
+  return subtitle;
 }
 
-function ConnectionIndicator() {
+type Props = {
+  isRunning: boolean;
+};
+
+function ConnectionIndicator({ isRunning }: Props) {
   const { openConnectDataSourceModal }  = useDataSourceUI();
   const dataSourceList                  = useReduxSelector(selectDataSourceList);
-  const currentSelectedDataSource       = useReduxSelector(selectActiveTabDataSource);
+  const selectedDataSourceCredentialId  = useReduxSelector(selectActiveTabDataSourceCredentialId);
+  const selectedDataSource              = useReduxSelector(selectDataSourceByCredentialId, selectedDataSourceCredentialId);
+  const dispatch                        = useReduxDispatch();
   const [open, setOpen]                 = useState<boolean>(false);
+
+  const canSwitchConnection = !isRunning;
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -64,18 +74,41 @@ function ConnectionIndicator() {
 
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
 
-  const triggerLabel    = formatDataSourceSubtitle(currentSelectedDataSource!);
-  const triggerSubLabel = formatDataSourceTitle(currentSelectedDataSource!);
-  const triggerTitle    = formatDataSourceTooltip(currentSelectedDataSource!);
+  const trigger = useMemo(() => {
+    if (selectedDataSource) {
+      return {
+        label    : formatDataSourceSubtitle(selectedDataSource),
+        subLabel : formatDataSourceTitle(selectedDataSource),
+        title    : formatDataSourceTooltip(selectedDataSource)
+      };
+    }
 
-  const handleSelect = useCallback((ds: DataSourceMeta) => {
+    if (selectedDataSourceCredentialId) {
+      return {
+        label    : 'Unknown connection',
+        subLabel : 'Select a data source',
+        title    : 'The selected connection is not available in the current data source list.'
+      };
+    }
+
+    return {
+      label    : 'No connection',
+      subLabel : 'Select a data source',
+      title    : 'Select a data source to run queries.'
+    };
+  }, [selectedDataSource, selectedDataSourceCredentialId]);
+
+  const triggerTitle = isRunning
+    ? `${trigger.title} — Connection switching is disabled while a query is running.`
+    : trigger.title;
+
+  const handleSelect = useCallback((dataSource: DataSourceMeta) => {
     setOpen(false);
-    if (ds.dataSourceCredentialId === currentSelectedDataSource!.dataSourceCredentialId) return;
+    if (!canSwitchConnection) return;
+    if (dataSource.dataSourceCredentialId === selectedDataSourceCredentialId) return;
 
-    // AIDEV-TODO: Also update the active tab's `dataSourceCredentialId` (per-tab connection)
-    // when the tab connection switch thunk is implemented.
-    // dispatch(switchTabConnectionAction(ds.dataSourceCredentialId));
-  }, [currentSelectedDataSource!.dataSourceCredentialId]);
+    dispatch(switchActiveTabConnectionThunk(dataSource.dataSourceCredentialId));
+  }, [canSwitchConnection, dispatch, selectedDataSourceCredentialId]);
 
   return (
     <div className={styles['connection-root']}>
@@ -92,8 +125,8 @@ function ConnectionIndicator() {
           <Icon name="database" />
         </span>
         <span className={styles['connection-text']}>
-          <span className={styles['connection-title']}>{triggerLabel}</span>
-          <span className={styles['connection-subtitle']}>{triggerSubLabel}</span>
+          <span className={styles['connection-title']}>{trigger.label}</span>
+          <span className={styles['connection-subtitle']}>{trigger.subLabel}</span>
         </span>
         <span className={styles['connection-chevron']} aria-hidden="true">
           <Icon name="chevron-down" />
@@ -109,27 +142,46 @@ function ConnectionIndicator() {
             {...getFloatingProps()}
           >
             <ul role="listbox" className={styles['connection-options']} aria-label="Data sources">
-              {dataSourceList.map((ds) => {
-                const selected = ds.dataSourceCredentialId === currentSelectedDataSource!.dataSourceCredentialId;
+              {dataSourceList.length === 0 && (
+                <li role="none" className={styles['connection-empty']}>
+                  <div className={styles['connection-empty-title']}>No data sources</div>
+                  <div className={styles['connection-empty-subtitle']}>
+                    Connect a data source to run queries.
+                  </div>
+                </li>
+              )}
+
+              {dataSourceList.map((dataSource) => {
+                const selected = dataSource.dataSourceCredentialId === selectedDataSourceCredentialId;
+                const isDisabled = selected || !canSwitchConnection;
+                const optionTitle = !canSwitchConnection
+                  ? 'Connection switching is disabled while a query is running.'
+                  : undefined;
+
                 return (
-                  <li key={ds.dataSourceId} role="none">
+                  <li key={dataSource.dataSourceId} role="none">
                     <button
                       type="button"
                       role="option"
                       className={styles['connection-option']}
                       data-selected={selected || undefined}
                       aria-selected={selected || undefined}
-                      onClick={() => handleSelect(ds)}
+                      disabled={isDisabled}
+                      title={optionTitle}
+                      onClick={() => handleSelect(dataSource)}
                     >
-                      <div className={styles['connection-option-title']}>{formatDataSourceTitle(ds)}</div>
+                      <div className={styles['connection-option-title']}>{formatDataSourceTitle(dataSource)}</div>
                       <div className={styles['connection-option-subtitle']}>
-                        {formatDataSourceSubtitle(ds)}
+                        {formatDataSourceSubtitle(dataSource)}
                       </div>
                     </button>
                   </li>
                 );
               })}
-              <li className={styles['connection-divider']} aria-hidden="true" />
+
+              {dataSourceList.length > 0 && (
+                <li className={styles['connection-divider']} aria-hidden="true" />
+              )}
               <li className={styles['connection-footer']} role="none">
                 <button
                   type="button"
@@ -151,4 +203,4 @@ function ConnectionIndicator() {
 }
 
 
-export default memo(ConnectionIndicator);
+export default ConnectionIndicator;

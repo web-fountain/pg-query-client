@@ -11,14 +11,15 @@ import {
 
 
 // Actions
-export const setInitialTabs            = createAction<TabbarRecord>             ('tabs/setInitialTabs');
-export const addTabFromFetch           = createAction<{ tab: Tab }>             ('tabs/addTabFromFetch');
-export const closeTab                  = createAction<{ tabId: UUIDv7 }>        ('tabs/closeTab');
-export const closeAllTabs              = createAction                           ('tabs/closeAllTabs');
-export const setActiveTab              = createAction<{ tabId: UUIDv7 }>        ('tabs/setActiveTab');
-export const focusTabIndex             = createAction<{ index: number }>        ('tabs/focusTabIndex');
-export const reorderTabs               = createAction<{ tabIds: UUIDv7[] }>     ('tabs/reorderTabs');
-export const setLastActiveUnsavedTabId = createAction<{ tabId: UUIDv7 | null }> ('tabs/setLastActiveUnsavedTabId');
+export const setInitialTabs               = createAction<TabbarRecord>                                      ('tabs/setInitialTabs');
+export const addTabFromFetch              = createAction<{ tab: Tab }>                                      ('tabs/addTabFromFetch');
+export const closeTab                     = createAction<{ tabId: UUIDv7 }>                                 ('tabs/closeTab');
+export const closeAllTabs                 = createAction                                                    ('tabs/closeAllTabs');
+export const setActiveTab                 = createAction<{ tabId: UUIDv7 }>                                 ('tabs/setActiveTab');
+export const focusTabIndex                = createAction<{ index: number }>                                 ('tabs/focusTabIndex');
+export const reorderTabs                  = createAction<{ tabIds: UUIDv7[] }>                              ('tabs/reorderTabs');
+export const setLastActiveUnsavedTabId    = createAction<{ tabId: UUIDv7 | null }>                          ('tabs/setLastActiveUnsavedTabId');
+export const setTabDataSourceCredentialId = createAction<{ tabId: UUIDv7; dataSourceCredentialId: UUIDv7 }> ('tabs/setTabDataSourceCredentialId');
 
 
 // Selectors
@@ -230,6 +231,14 @@ const reducer = createReducer(initialState, (builder) => {
     .addCase(setLastActiveUnsavedTabId,
       function(state: TabbarRecord, action: PayloadAction<{ tabId: UUIDv7 | null }>) {
         state.lastActiveUnsavedTabId = action.payload.tabId;
+      }
+    )
+    .addCase(setTabDataSourceCredentialId,
+      function(state: TabbarRecord, action: PayloadAction<{ tabId: UUIDv7; dataSourceCredentialId: UUIDv7 }>) {
+        const { tabId, dataSourceCredentialId } = action.payload;
+        const tab = state.entities[tabId];
+        if (!tab) return;
+        tab.dataSourceCredentialId = dataSourceCredentialId;
       }
     );
 });

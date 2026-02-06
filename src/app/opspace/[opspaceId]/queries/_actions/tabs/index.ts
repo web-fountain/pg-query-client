@@ -117,6 +117,24 @@ export async function setActiveTabAction(tabId: UUIDv7): Promise<ActionResult<vo
   );
 }
 
+export async function setTabConnectionAction(tabId: UUIDv7, dataSourceCredentialId: UUIDv7): Promise<ActionResult<void>> {
+  return withAction(
+    {
+      action : 'tabs.setConnection',
+      op     : 'write',
+      input  : { tabId, dataSourceCredentialId }
+    },
+    async ({ ctx, meta }) => {
+      // AIDEV-TODO: Backend endpoint is not yet implemented. Once available, persist the
+      // per-tab connection by POSTing `{ dataSourceCredentialId }` and then invalidate
+      // `tabsOpenListTag(ctx.opspacePublicId)` so refresh/SSR sees the updated connection.
+      // Example: POST `/tabs/${tabId}/connection` with scope `tabs-connection:write`.
+      void ctx;
+      return ok(meta, undefined);
+    }
+  );
+}
+
 export async function closeTabAction(tabId: UUIDv7): Promise<ActionResult<void>> {
   return withAction(
     {
