@@ -10,6 +10,10 @@ export type OpenTabApiResponse =
   | { ok: false }
   | { ok: true; data: Tab };
 
+export type SetTabDataSourceCredentialApiResponse =
+  | { ok: false }
+  | { ok: true; data: Tab };
+
 export type ReorderTabs = {
   from: number;
   to: number;

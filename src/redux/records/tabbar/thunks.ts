@@ -318,9 +318,9 @@ export const reorderTabsThunk = createAsyncThunk<void, UUIDv7[], { state: RootSt
   }
 );
 
-export const switchActiveTabConnectionThunk = createAsyncThunk<void, UUIDv7, { state: RootState }>(
+export const switchActiveTabConnectionThunk = createAsyncThunk<void, UUIDv7 | null, { state: RootState }>(
   'tabs/switchActiveTabConnectionThunk',
-  async (dataSourceCredentialId, { dispatch, getState }) => {
+  async (nextDataSourceCredentialId, { dispatch, getState }) => {
     const state = getState();
     const { activeTabId, entities } = state.tabs;
     if (!activeTabId) return;
@@ -329,37 +329,44 @@ export const switchActiveTabConnectionThunk = createAsyncThunk<void, UUIDv7, { s
     if (!tab) return;
 
     const prevCredentialId = tab.dataSourceCredentialId;
-    if (prevCredentialId === dataSourceCredentialId) return;
+    if (prevCredentialId === nextDataSourceCredentialId) return;
 
     log.thunkStart({
       thunk : 'tabs/switchActiveTabConnectionThunk',
       input : {
         tabId                      : activeTabId,
         prevDataSourceCredentialId : prevCredentialId,
-        nextDataSourceCredentialId : dataSourceCredentialId
+        nextDataSourceCredentialId : nextDataSourceCredentialId
       }
     });
 
-    dispatch(setTabDataSourceCredentialId({ tabId: activeTabId, dataSourceCredentialId }));
+    dispatch(setTabDataSourceCredentialId({ tabId: activeTabId, dataSourceCredentialId: nextDataSourceCredentialId }));
 
     try {
-      const res = await setTabConnectionAction(activeTabId, dataSourceCredentialId);
+      const actionResult = await setTabConnectionAction(activeTabId, nextDataSourceCredentialId);
       log.thunkResult({
         thunk  : 'tabs/switchActiveTabConnectionThunk',
-        result : res,
+        result : actionResult,
         input  : {
           tabId                      : activeTabId,
           prevDataSourceCredentialId : prevCredentialId,
-          nextDataSourceCredentialId : dataSourceCredentialId
+          nextDataSourceCredentialId : nextDataSourceCredentialId
         }
       });
 
-      if (!res.success) {
+      if (!actionResult.success) {
         dispatch(updateError(errorEntryFromActionError({
           actionType  : 'tabs/switchActiveTabConnectionThunk',
-          error       : res.error
+          error       : actionResult.error
         })));
+        return;
       }
+
+      // AIDEV-NOTE: Reconcile from server response (authoritative).
+      dispatch(setTabDataSourceCredentialId({
+        tabId: activeTabId,
+        dataSourceCredentialId: actionResult.data.dataSourceCredentialId ?? null
+      }));
     } catch (error) {
       log.thunkException({
         thunk   : 'tabs/switchActiveTabConnectionThunk',
@@ -368,7 +375,7 @@ export const switchActiveTabConnectionThunk = createAsyncThunk<void, UUIDv7, { s
         input   : {
           tabId                      : activeTabId,
           prevDataSourceCredentialId : prevCredentialId,
-          nextDataSourceCredentialId : dataSourceCredentialId
+          nextDataSourceCredentialId : nextDataSourceCredentialId
         }
       });
       dispatch(updateError({

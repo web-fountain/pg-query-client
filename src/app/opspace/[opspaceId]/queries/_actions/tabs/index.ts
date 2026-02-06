@@ -8,7 +8,8 @@ import type {
   ListOpenTabsApiResponse,
   OpenTabApiResponse,
   ReorderTabs,
-  ReorderTabsApiResponse
+  ReorderTabsApiResponse,
+  SetTabDataSourceCredentialApiResponse
 }                                         from './types';
 
 import { cacheLife, cacheTag, updateTag } from 'next/cache';
@@ -117,20 +118,48 @@ export async function setActiveTabAction(tabId: UUIDv7): Promise<ActionResult<vo
   );
 }
 
-export async function setTabConnectionAction(tabId: UUIDv7, dataSourceCredentialId: UUIDv7): Promise<ActionResult<void>> {
+export async function setTabConnectionAction(tabId: UUIDv7, dataSourceCredentialId: UUIDv7 | null): Promise<ActionResult<Tab>> {
   return withAction(
     {
-      action : 'tabs.setConnection',
+      action : 'tabs.setDataSourceCredential',
       op     : 'write',
       input  : { tabId, dataSourceCredentialId }
     },
-    async ({ ctx, meta }) => {
-      // AIDEV-TODO: Backend endpoint is not yet implemented. Once available, persist the
-      // per-tab connection by POSTing `{ dataSourceCredentialId }` and then invalidate
-      // `tabsOpenListTag(ctx.opspacePublicId)` so refresh/SSR sees the updated connection.
-      // Example: POST `/tabs/${tabId}/connection` with scope `tabs-connection:write`.
-      void ctx;
-      return ok(meta, undefined);
+    async ({ ctx: headersContext, meta }) => {
+      const path = `/tabs/${tabId}/data-source-credential`;
+      const scope = ['tabs-data-source-credential:write'];
+
+      const backendResponse = await backendFetchJSON<SetTabDataSourceCredentialApiResponse>({
+        path      : path,
+        method    : 'POST',
+        scope     : scope,
+        logLabel  : 'setTabDataSourceCredential',
+        context   : headersContext,
+        body      : { dataSourceCredentialId }
+      });
+
+      if (!backendResponse.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : backendResponse.status,
+          error           : backendResponse.error,
+          fallbackMessage : 'Failed to update tab connection.',
+          request         : { path: path, method: 'POST', scope: scope, logLabel: 'setTabDataSourceCredential' }
+        }));
+      }
+
+      if (!backendResponse.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to update tab connection.',
+          request: { path: path, method: 'POST', scope: scope, logLabel: 'setTabDataSourceCredential' }
+        }));
+      }
+
+      // AIDEV-NOTE: Connection changes affect the "open tabs" resource; invalidate cached list.
+      try {
+        updateTag(tabsOpenListTag(headersContext.opspacePublicId));
+      } catch {}
+
+      return ok(meta, backendResponse.data.data);
     }
   );
 }
