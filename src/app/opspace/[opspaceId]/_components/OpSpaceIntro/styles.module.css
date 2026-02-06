@@ -60,18 +60,68 @@
 
 .item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 14px;
+  flex-direction: column;
   border: var(--border-1) solid var(--border-secondary);
   border-radius: var(--radius-12);
   background: var(--surface-1);
+  overflow: hidden;
 }
 
 .item[data-active="true"] {
   border-color: color-mix(in oklch, var(--color-primary) 55%, var(--border-secondary));
   box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 40%, transparent);
+}
+
+.item-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.item-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-8);
+}
+
+.item-chevron {
+  --icon-size: var(--icon-size-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--icon-fill);
+  flex-shrink: 0;
+}
+
+.item-toggle:hover .item-chevron {
+  color: var(--icon-hover);
+}
+
+.item-chevron-icon {
+  transform: rotate(0deg);
+  transform-origin: center;
+  transition: transform var(--duration-150) var(--ease-standard);
+}
+
+.item-chevron-icon-expanded {
+  transform: rotate(90deg);
 }
 
 .item-main {
@@ -126,6 +176,78 @@
   font-weight: 600;
 }
 
+.item-detail {
+  /* AIDEV-NOTE: Details are always mounted and toggled with the `hidden` attribute
+   for reliable aria-controls wiring. If/when we add animations, prefer a wrapper
+   that transitions height/grid rows and a focus-management guard (e.g. inert). */
+  border-top: var(--border-1) solid var(--border-tertiary);
+  padding: 12px 14px 14px;
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.detail-row {
+  display: contents;
+}
+
+.detail-key {
+  margin: 0;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.detail-value {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-danger {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: var(--border-1) dashed var(--border-tertiary);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.remove-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.remove-button:hover {
+  color: var(--color-danger-hover);
+}
+
+.remove-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-8);
+}
+
+.remove-button-icon {
+  --icon-size: var(--icon-size-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .cta {
   display: flex;
   justify-content: center;
@@ -141,7 +263,11 @@
     row-gap: 20px;
   }
 
-  .item {
+  .item-header {
     padding: 14px 16px;
+  }
+
+  .item-detail {
+    padding: 14px 16px 16px;
   }
 }

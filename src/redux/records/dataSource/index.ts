@@ -14,6 +14,7 @@ import {
 // Actions
 export const setDataSourcesFromBootstrap = createAction<{ dataSources: DataSourceMeta[]; }>('dataSourceRecords/setDataSourcesFromBootstrap');
 export const upsertDataSourceFromFetch   = createAction<{ dataSource:  DataSourceMeta    }>('dataSourceRecords/upsertDataSourceFromFetch');
+export const removeDataSourceRecord      = createAction<{ dataSourceId: UUIDv7 }>          ('dataSourceRecords/removeDataSourceRecord');
 
 
 // Selectors
@@ -117,6 +118,23 @@ export default createReducer(initialState, (builder) => {
         }
         state.byId[ds.dataSourceId] = ds;
         state.byCredentialId[ds.dataSourceCredentialId] = ds;
+      }
+    )
+    .addCase(removeDataSourceRecord,
+      function(state: DataSourceRecord, action: PayloadAction<{ dataSourceId: UUIDv7 }>) {
+        const { dataSourceId } = action.payload;
+        const existing = state.byId[dataSourceId];
+        if (!existing) return;
+
+        const credentialId = existing.dataSourceCredentialId;
+
+        const dataSourceIndex = state.dataSourceIds.indexOf(dataSourceId);
+        if (dataSourceIndex >= 0) {
+          state.dataSourceIds.splice(dataSourceIndex, 1);
+        }
+
+        delete state.byId[dataSourceId];
+        delete state.byCredentialId[credentialId];
       }
     )
 });

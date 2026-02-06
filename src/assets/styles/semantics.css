@@ -6,6 +6,11 @@
     --color-primary-hover: #326aac;
     --color-primary-muted: #335075;
 
+    /* status roles: danger */
+    --color-danger      : #e05252;
+    --color-danger-hover: #ff6b6b;
+    --color-danger-muted: color-mix(in oklch, var(--color-danger) 55%, transparent);
+
     /* optional alias */
     --accent: var(--color-primary);
 

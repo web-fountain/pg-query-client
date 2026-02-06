@@ -1,39 +1,57 @@
 'use client';
 
-import type { DataSourceMeta }                from '@Redux/records/dataSource/types';
-import type { UUIDv7 }                        from '@Types/primitives';
+import type { DataSourceMeta }                  from '@Redux/records/dataSource/types';
+import type { UUIDv7 }                          from '@Types/primitives';
 
-import { useCallback, useTransition }         from 'react';
-import { useParams, useRouter }               from 'next/navigation';
+import { useCallback, useState, useTransition } from 'react';
+import { useParams, useRouter }                 from 'next/navigation';
 
-import { useDataSourceUI }                    from '@OpSpaceProviders/DataSourceProvider';
-import { useReduxDispatch, useReduxSelector } from '@Redux/storeHooks';
-import { selectDataSourceList }               from '@Redux/records/dataSource';
-import { createNewUnsavedDataQueryThunk }     from '@Redux/records/dataQuery/thunks';
-import { selectNextUntitledName }             from '@Redux/records/unsavedQueryTree';
-import { generateUUIDv7 }                     from '@Utils/generateId';
+import { useDataSourceUI }                      from '@OpSpaceProviders/DataSourceProvider';
+import { useReduxDispatch, useReduxSelector }   from '@Redux/storeHooks';
+import { selectDataSourceList }                 from '@Redux/records/dataSource';
+import { createNewUnsavedDataQueryThunk }       from '@Redux/records/dataQuery/thunks';
+import { selectNextUntitledName }               from '@Redux/records/unsavedQueryTree';
+import Icon                                     from '@Components/Icons';
+import { generateUUIDv7 }                       from '@Utils/generateId';
 
-import opspaceStyles                          from '../../../styles.module.css';
-import styles                                 from './styles.module.css';
+import opspaceStyles                            from '../../../styles.module.css';
+import styles                                   from './styles.module.css';
 
 
 function formatDataSourceKind(kind: DataSourceMeta['kind']): string {
   return kind === 'pglite' ? 'PGlite' : 'Postgres';
 }
 
-function OpSpaceIntro() {
-  const { opspaceId }                   = useParams<{ opspaceId: string }>()!;
-  const router                          = useRouter();
-  const dispatch                        = useReduxDispatch();
-  const { openConnectDataSourceModal }  = useDataSourceUI();
+function formatDataSourceLabel(label: string | null): string | null {
+  if (!label) return null;
+  // AIDEV-NOTE: Show IndexDB connections as 'idx://' instead of 'pglite://' in list for clarity
+  return label.replace(/^pglite:\/\//, 'idx://pgqc_');
+}
 
-  const dataSourceList                = useReduxSelector(selectDataSourceList);
-  const nextUntitledName              = useReduxSelector(selectNextUntitledName);
-  const [isPending, startTransition]  = useTransition();
+function OpSpaceIntro() {
+  const { opspaceId }                                   = useParams<{ opspaceId: string }>()!;
+  const router                                          = useRouter();
+  const dispatch                                        = useReduxDispatch();
+  const { openConnectDataSourceModal }                  = useDataSourceUI();
+
+  const dataSourceList                                  = useReduxSelector(selectDataSourceList);
+  const nextUntitledName                                = useReduxSelector(selectNextUntitledName);
+  const [isPending, startTransition]                    = useTransition();
+  const [expandedDataSourceId, setExpandedDataSourceId] = useState<UUIDv7 | null>(null);
 
   const handleOpenConnect = useCallback(() => {
     openConnectDataSourceModal();
   }, [openConnectDataSourceModal]);
+
+  const handleToggleExpand = useCallback((dataSourceId: UUIDv7) => {
+    setExpandedDataSourceId((prev) => prev === dataSourceId ? null : dataSourceId);
+  }, []);
+
+  const handleRemoveDataSource = useCallback((dataSourceId: UUIDv7) => {
+    // AIDEV-TODO: Implement delete data source (server action + thunk) and then dispatch
+    // `removeDataSourceRecord({ dataSourceId })` to update the local list.
+    console.info('AIDEV-TODO: delete data source', { dataSourceId });
+  }, []);
 
   const handleCreateForConnection = useCallback((dataSourceCredentialId: UUIDv7) => {
     if (isPending) return;
@@ -72,35 +90,96 @@ function OpSpaceIntro() {
               )
             : (
                 <ul className={styles['list']} aria-label="Data sources">
-                  {dataSourceList.map((ds) => {
-                    const title = `${formatDataSourceKind(ds.kind)} · ${ds.name}`;
+                  {dataSourceList.map((dataSource) => {
+                    const formattedLabel    = formatDataSourceLabel(dataSource.label);
+                    const kindLabel         = formatDataSourceKind(dataSource.kind);
+                    const isExpanded        = expandedDataSourceId === dataSource.dataSourceId;
+                    const detailPanelId     = `data-source-detail-${dataSource.dataSourceId}`;
+                    const chevronClassName  = isExpanded
+                      ? `${styles['item-chevron-icon']} ${styles['item-chevron-icon-expanded']}`
+                      : styles['item-chevron-icon'];
+
                     return (
                       <li
-                        key={ds.dataSourceId}
+                        key={dataSource.dataSourceId}
                         className={styles['item']}
+                        data-active={isExpanded ? 'true' : undefined}
                       >
-                        <div className={styles['item-main']}>
-                          <div className={styles['item-title']}>
-                            <span className={styles['item-name']}>{title}</span>
-                          </div>
-                          <div className={styles['item-meta']}>
-                            {/* AIDEV-NOTE: Show IndexDB connections as 'idx://' instead of 'pglite://' in list for clarity */}
-                            <span>
-                              {ds.label?.replace(/^pglite:\/\//, 'idx://pgqc_')}
+                        <div className={styles['item-header']}>
+                          <button
+                            type="button"
+                            className={styles['item-toggle']}
+                            onClick={() => handleToggleExpand(dataSource.dataSourceId)}
+                            aria-expanded={isExpanded}
+                            aria-controls={detailPanelId}
+                            aria-label={isExpanded ? `Collapse ${dataSource.name}` : `Expand ${dataSource.name}`}
+                          >
+                            <span className={styles['item-chevron']} aria-hidden="true">
+                              <Icon name="chevron-right" className={chevronClassName} />
                             </span>
+
+                            <div className={styles['item-main']}>
+                              <div className={styles['item-title']}>
+                                <span className={styles['item-name']}>{dataSource.name}</span>
+                                <span className={styles['badge']}>{kindLabel}</span>
+                              </div>
+                              <div className={styles['item-meta']}>
+                                <span>{formattedLabel ?? ''}</span>
+                              </div>
+                            </div>
+                          </button>
+
+                          <div className={styles['item-actions']}>
+                            <button
+                              type="button"
+                              className={styles['create-button']}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleCreateForConnection(dataSource.dataSourceCredentialId);
+                              }}
+                              disabled={isPending}
+                              aria-busy={isPending}
+                            >
+                              {isPending ? 'Opening…' : 'New Query'}
+                            </button>
                           </div>
                         </div>
 
-                        <div className={styles['item-actions']}>
-                          <button
-                            type="button"
-                            className={styles['create-button']}
-                            onClick={() => handleCreateForConnection(ds.dataSourceCredentialId)}
-                            disabled={isPending}
-                            aria-busy={isPending}
-                          >
-                            {isPending ? 'Opening…' : 'Create New Query'}
-                          </button>
+                        <div
+                          className={styles['item-detail']}
+                          id={detailPanelId}
+                          hidden={!isExpanded}
+                          role="region"
+                          aria-label={`Connection details for ${dataSource.name}`}
+                        >
+                          {/* AIDEV-NOTE: The detail panel is always mounted and toggled with `hidden`
+                           so aria-controls always points to a real element. */}
+                          <dl className={styles['detail-meta']}>
+                            <div className={styles['detail-row']}>
+                              <dt className={styles['detail-key']}>Kind</dt>
+                              <dd className={styles['detail-value']}>{kindLabel}</dd>
+                            </div>
+                            <div className={styles['detail-row']}>
+                              <dt className={styles['detail-key']}>Label</dt>
+                              <dd className={styles['detail-value']}>{formattedLabel ?? '—'}</dd>
+                            </div>
+                          </dl>
+
+                          <div className={styles['detail-danger']}>
+                            <button
+                              type="button"
+                              className={styles['remove-button']}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRemoveDataSource(dataSource.dataSourceId);
+                              }}
+                            >
+                              <span className={styles['remove-button-icon']} aria-hidden="true">
+                                <Icon name="trash-can" />
+                              </span>
+                              <span>Remove</span>
+                            </button>
+                          </div>
                         </div>
                       </li>
                     );
