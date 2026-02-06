@@ -1,5 +1,8 @@
 import type { UUIDv7 }          from '@Types/primitives';
-import type { DataSourceMeta }  from '@Redux/records/dataSource/types';
+import type {
+  DataSourceMeta,
+  DataSourceRecord
+}                              from '@Redux/records/dataSource/types';
 
 
 export type DataSourceTestResult = {
@@ -9,7 +12,7 @@ export type DataSourceTestResult = {
 
 export type ListDataSourceApiResponse = {
   ok      : boolean;
-  data    : DataSourceMeta[];
+  data    : DataSourceRecord;
   error?  : unknown;
 };
 

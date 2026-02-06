@@ -2,7 +2,7 @@
 
 import type { UUIDv7 }                            from '@Types/primitives';
 import type { DataQuery, DataQueryRecord }        from '@Redux/records/dataQuery/types';
-import type { DataSourceMeta, DataSourceRecord }  from '@Redux/records/dataSource/types';
+import type { DataSourceRecord }                  from '@Redux/records/dataSource/types';
 import type { TabbarRecord }                      from '@Redux/records/tabbar/types';
 import type { QueryTreeRecord }                   from '@Redux/records/queryTree/types';
 import type { UnsavedQueryTreeRecord }            from '@Redux/records/unsavedQueryTree/types';
@@ -70,7 +70,7 @@ async function bootstrapWorkspaceAction(): Promise<ActionResult<WorkspaceBootstr
       const queryTree         = queryTreeResult.data   as unknown as QueryTreeRecord;
       const unsavedQueryTree  = unsavedTreeResult.data as unknown as UnsavedQueryTreeRecord;
       const queries           = queriesResult.data     as DataQuery[] | undefined;
-      const dataSourceRecords = dataSourcesResult.data as unknown as DataSourceRecord;
+      const dataSourceRecords = dataSourcesResult.data as DataSourceRecord;
 
       // AIDEV-NOTE: Backend listDataQueries now returns only DataQueries for
       // open tabs (saved + unsaved). Build the DataQueryRecord directly from

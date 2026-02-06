@@ -11,6 +11,7 @@ export type DataSourceMeta = {
   name                    : string;
   kind                    : DataSourceKind;
   label                   : string | null;
+  persistSecret           : boolean;
 };
 
 export type DataSourceRecord = {

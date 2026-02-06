@@ -4,7 +4,10 @@ import type { HeadersContext }            from '@Utils/backendFetch';
 import type { ActionMeta }                from '@Errors/types';
 import type { ActionResult }              from '@Errors/types';
 import type { FieldError }                from '@Errors/fieldError';
-import type { DataSourceMeta }            from '@Redux/records/dataSource/types';
+import type {
+  DataSourceMeta,
+  DataSourceRecord
+}                                         from '@Redux/records/dataSource/types';
 import type { UUIDv7 }                    from '@Types/primitives';
 import type {
   DataSource,
@@ -115,7 +118,7 @@ function invalidInputResult<T>(meta: ActionMeta, errors: FieldError[]): ActionRe
 
 // Cached list per HeadersContext using "use cache".
 type ListDataSourcesCachedResult =
-  | { ok: true; data: DataSourceMeta[] }
+  | { ok: true; data: DataSourceRecord }
   | { ok: false; status: number; reason: 'fetch-failed' | 'backend-ok-false' };
 
 async function listDataSourcesCached(ctx: HeadersContext): Promise<ListDataSourcesCachedResult> {
@@ -146,7 +149,7 @@ async function listDataSourcesCached(ctx: HeadersContext): Promise<ListDataSourc
   return { ok: true, data: res.data.data };
 }
 
-export async function listDataSourcesAction(): Promise<ActionResult<DataSourceMeta[]>> {
+export async function listDataSourcesAction(): Promise<ActionResult<DataSourceRecord>> {
   return withAction(
     { action: 'dataSource.list', op: 'read' },
     async ({ ctx, meta }) => {
