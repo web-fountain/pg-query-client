@@ -5,6 +5,7 @@ import type { ActionMeta }                from '@Errors/types';
 import type { ActionResult }              from '@Errors/types';
 import type { FieldError }                from '@Errors/fieldError';
 import type { DataSourceMeta }            from '@Redux/records/dataSource/types';
+import type { UUIDv7 }                    from '@Types/primitives';
 import type {
   DataSource,
   PostgresDataSourceTestPayload
@@ -12,6 +13,7 @@ import type {
 import type {
   CreateDataSourceApiResponse,
   DataSourceTestResult,
+  DeleteDataSourceApiResponse,
   ListDataSourceApiResponse,
   TestDataSourceApiResponse
 }                                         from './types';
@@ -30,6 +32,7 @@ import {
 }                                         from '@Errors/server/actionResult.server';
 import { ERROR_CODES }                    from '@Errors/codes';
 import { backendFetchJSON }               from '@Utils/backendFetch';
+import { tabsOpenListTag }                from '../../queries/_actions/tags';
 import { dataSourcesListTag }             from './tags';
 
 
@@ -253,6 +256,49 @@ export async function createDataSourceAction(payload: DataSource): Promise<Actio
       try { updateTag(dataSourcesListTag(ctx.opspacePublicId)); } catch {}
 
       return ok(meta, res.data.data);
+    }
+  );
+}
+
+export async function deleteDataSourceAction(dataSourceId: UUIDv7): Promise<ActionResult<void>> {
+  return withAction(
+    {
+      action : 'dataSource.delete',
+      op     : 'write',
+      input  : { dataSourceId }
+    },
+    async ({ ctx, meta }) => {
+      const path = `/data-sources/${dataSourceId}`;
+
+      const backendResult = await backendFetchJSON<DeleteDataSourceApiResponse>({
+        path        : path,
+        method      : 'DELETE',
+        contentType : null,
+        scope       : ['data-sources:delete'],
+        logLabel    : 'deleteDataSourceAction',
+        context     : ctx
+      });
+
+      if (!backendResult.ok) {
+        return fail(meta, actionErrorFromBackendFetch(meta, {
+          status          : backendResult.status,
+          error           : backendResult.error,
+          fallbackMessage : 'Failed to delete data source.',
+          request         : { path, method: 'DELETE', scope: ['data-sources:delete'], logLabel: 'deleteDataSourceAction' }
+        }));
+      }
+
+      if (!backendResult.data?.ok) {
+        return fail(meta, backendFailedActionError(meta, {
+          message: 'Failed to delete data source.',
+          request: { path, method: 'DELETE', scope: ['data-sources:delete'], logLabel: 'deleteDataSourceAction' }
+        }));
+      }
+
+      try { updateTag(dataSourcesListTag(ctx.opspacePublicId)); } catch {}
+      try { updateTag(tabsOpenListTag(ctx.opspacePublicId)); } catch {}
+
+      return ok(meta, undefined);
     }
   );
 }

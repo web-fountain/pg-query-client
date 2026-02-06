@@ -9,6 +9,7 @@ import { useParams, useRouter }                 from 'next/navigation';
 import { useDataSourceUI }                      from '@OpSpaceProviders/DataSourceProvider';
 import { useReduxDispatch, useReduxSelector }   from '@Redux/storeHooks';
 import { selectDataSourceList }                 from '@Redux/records/dataSource';
+import { deleteDataSourceThunk }                from '@Redux/records/dataSource/thunks';
 import { createNewUnsavedDataQueryThunk }       from '@Redux/records/dataQuery/thunks';
 import { selectNextUntitledName }               from '@Redux/records/unsavedQueryTree';
 import Icon                                     from '@Components/Icons';
@@ -29,15 +30,16 @@ function formatDataSourceLabel(label: string | null): string | null {
 }
 
 function OpSpaceIntro() {
-  const { opspaceId }                                   = useParams<{ opspaceId: string }>()!;
-  const router                                          = useRouter();
-  const dispatch                                        = useReduxDispatch();
-  const { openConnectDataSourceModal }                  = useDataSourceUI();
+  const { opspaceId }                                     = useParams<{ opspaceId: string }>()!;
+  const router                                            = useRouter();
+  const dispatch                                          = useReduxDispatch();
+  const { openConnectDataSourceModal }                    = useDataSourceUI();
 
-  const dataSourceList                                  = useReduxSelector(selectDataSourceList);
-  const nextUntitledName                                = useReduxSelector(selectNextUntitledName);
-  const [isPending, startTransition]                    = useTransition();
-  const [expandedDataSourceId, setExpandedDataSourceId] = useState<UUIDv7 | null>(null);
+  const dataSourceList                                    = useReduxSelector(selectDataSourceList);
+  const nextUntitledName                                  = useReduxSelector(selectNextUntitledName);
+  const [isPending, startTransition]                      = useTransition();
+  const [expandedDataSourceId, setExpandedDataSourceId]   = useState<UUIDv7 | null>(null);
+  const [deletingDataSourceIds, setDeletingDataSourceIds] = useState<Set<UUIDv7>>(() => new Set<UUIDv7>());
 
   const handleOpenConnect = useCallback(() => {
     openConnectDataSourceModal();
@@ -47,11 +49,26 @@ function OpSpaceIntro() {
     setExpandedDataSourceId((prev) => prev === dataSourceId ? null : dataSourceId);
   }, []);
 
-  const handleRemoveDataSource = useCallback((dataSourceId: UUIDv7) => {
-    // AIDEV-TODO: Implement delete data source (server action + thunk) and then dispatch
-    // `removeDataSourceRecord({ dataSourceId })` to update the local list.
-    console.info('AIDEV-TODO: delete data source', { dataSourceId });
-  }, []);
+  const handleRemoveDataSource = useCallback(async (dataSourceId: UUIDv7) => {
+    setDeletingDataSourceIds((prev) => {
+      const next = new Set(prev);
+      next.add(dataSourceId);
+      return next;
+    });
+
+    try {
+      const result = await dispatch(deleteDataSourceThunk({ dataSourceId })).unwrap();
+      if (result.deleted) {
+        setExpandedDataSourceId((prev) => prev === dataSourceId ? null : prev);
+      }
+    } finally {
+      setDeletingDataSourceIds((prev) => {
+        const next = new Set(prev);
+        next.delete(dataSourceId);
+        return next;
+      });
+    }
+  }, [dispatch]);
 
   const handleCreateForConnection = useCallback((dataSourceCredentialId: UUIDv7) => {
     if (isPending) return;
@@ -94,6 +111,7 @@ function OpSpaceIntro() {
                     const formattedLabel    = formatDataSourceLabel(dataSource.label);
                     const kindLabel         = formatDataSourceKind(dataSource.kind);
                     const isExpanded        = expandedDataSourceId === dataSource.dataSourceId;
+                    const isDeleting        = deletingDataSourceIds.has(dataSource.dataSourceId);
                     const detailPanelId     = `data-source-detail-${dataSource.dataSourceId}`;
                     const chevronClassName  = isExpanded
                       ? `${styles['item-chevron-icon']} ${styles['item-chevron-icon-expanded']}`
@@ -110,6 +128,7 @@ function OpSpaceIntro() {
                             type="button"
                             className={styles['item-toggle']}
                             onClick={() => handleToggleExpand(dataSource.dataSourceId)}
+                            disabled={isDeleting}
                             aria-expanded={isExpanded}
                             aria-controls={detailPanelId}
                             aria-label={isExpanded ? `Collapse ${dataSource.name}` : `Expand ${dataSource.name}`}
@@ -137,7 +156,7 @@ function OpSpaceIntro() {
                                 event.stopPropagation();
                                 handleCreateForConnection(dataSource.dataSourceCredentialId);
                               }}
-                              disabled={isPending}
+                              disabled={isPending || isDeleting}
                               aria-busy={isPending}
                             >
                               {isPending ? 'Opening…' : 'New Query'}
@@ -173,11 +192,13 @@ function OpSpaceIntro() {
                                 event.stopPropagation();
                                 handleRemoveDataSource(dataSource.dataSourceId);
                               }}
+                              disabled={isDeleting}
+                              aria-busy={isDeleting || undefined}
                             >
                               <span className={styles['remove-button-icon']} aria-hidden="true">
                                 <Icon name="trash-can" />
                               </span>
-                              <span>Remove</span>
+                              <span>{isDeleting ? 'Removing…' : 'Remove'}</span>
                             </button>
                           </div>
                         </div>

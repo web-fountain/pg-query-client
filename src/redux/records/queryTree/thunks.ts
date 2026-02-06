@@ -289,7 +289,7 @@ export const createSavedQueryFileThunk = createAsyncThunk<TreeNode | null, Creat
           tabId    : tab.tabId as UUIDv7,
           mountId  : tab.mountId as UUIDv7,
           position : tab.position,
-          dataSourceCredentialId : tab.dataSourceCredentialId as UUIDv7
+          dataSourceCredentialId : (tab.dataSourceCredentialId as UUIDv7 | null) ?? null
         }
       }));
     }

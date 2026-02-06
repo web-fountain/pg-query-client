@@ -25,6 +25,12 @@ export type TestDataSourceApiResponse = {
   error?  : unknown;
 };
 
+export type DeleteDataSourceApiResponse = {
+  ok      : boolean;
+  data    : Record<string, never>;
+  error?  : unknown;
+};
+
 export type GetActiveDataSourceApiResponse = {
   ok      : boolean;
   data    : { dataSourceId: UUIDv7 | null };

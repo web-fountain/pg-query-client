@@ -6,7 +6,7 @@ type Tab = {
   tabId                  : UUIDv7;
   mountId                : UUIDv7;
   position               : number;
-  dataSourceCredentialId : UUIDv7;
+  dataSourceCredentialId : UUIDv7 | null;
 };
 
 type Tabbar = {
