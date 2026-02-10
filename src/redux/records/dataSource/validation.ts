@@ -1,12 +1,13 @@
 import type {
   DataSource,
-  PostgresDataSourceTestPayload
-}                               from '@Types/dataSource';
-import type { FieldError }      from '@Errors/fieldError';
-import type { DataSourceDraft } from './types';
+  PostgresDataSourceTestPayload,
+  ReconnectDataSourceCredentialPayload
+}                                       from '@Types/dataSource';
+import type { FieldError }              from '@Errors/fieldError';
+import type { DataSourceDraft }         from './types';
 
-import { createAjv }            from '@Utils/ajv/createAjv';
-import { toFieldErrors }        from '@Utils/ajv/toFieldErrors';
+import { createAjv }                    from '@Utils/ajv/createAjv';
+import { toFieldErrors }                from '@Utils/ajv/toFieldErrors';
 
 
 // Canonical UUIDv7 shape: xxxxxxxx-xxxx-7xxx-[89ab]xxx-xxxxxxxxxxxx (lowercase hex).
@@ -338,10 +339,52 @@ const DataSourceCreatePayloadSchema = {
   }
 } as const;
 
+// AIDEV-NOTE: Mirrors backend schema for POST /data-sources/credentials/:dataSourceCredentialId/reconnect.
+const ReconnectDataSourceCredentialPayloadSchema = {
+  $id: 'ReconnectDataSourceCredentialPayload',
+  type: 'object',
+  additionalProperties: false,
+  required: ['dataSourceCredentialId', 'password'],
+  properties: {
+    dataSourceCredentialId: {
+      type: 'string',
+      pattern: UUIDV7_PATTERN,
+      errorMessage: {
+        type: 'dataSourceCredentialId must be a string',
+        pattern: 'dataSourceCredentialId must be a valid UUIDv7'
+      }
+    },
+    password: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 2048,
+      errorMessage: {
+        type: 'password must be a string',
+        minLength: 'password must be at least 1 character',
+        maxLength: 'password must be at most 2048 characters'
+      }
+    },
+    persistSecret: {
+      type: 'boolean',
+      errorMessage: {
+        type: 'persistSecret must be true or false'
+      }
+    }
+  },
+  errorMessage: {
+    required: {
+      dataSourceCredentialId: 'dataSourceCredentialId is required',
+      password: 'password is required'
+    },
+    additionalProperties: 'Only dataSourceCredentialId, password, and persistSecret are allowed in body'
+  }
+} as const;
+
 const ajv = createAjv();
 
 const validatePostgresDataSourceTestPayloadImpl = ajv.compile<PostgresDataSourceTestPayload>(PostgresDataSourceTestPayloadSchema);
 const validateDataSourceCreatePayloadImpl       = ajv.compile<DataSource>(DataSourceCreatePayloadSchema);
+const validateReconnectDataSourceCredentialPayloadImpl = ajv.compile<ReconnectDataSourceCredentialPayload>(ReconnectDataSourceCredentialPayloadSchema);
 
 export function validatePostgresDataSourceTestPayload(payload: PostgresDataSourceTestPayload): { ok: true } | { ok: false; errors: FieldError[] } {
   const ok = validatePostgresDataSourceTestPayloadImpl(payload) as boolean;
@@ -353,6 +396,12 @@ export function validateDataSourceCreatePayload(payload: DataSource): { ok: true
   const ok = validateDataSourceCreatePayloadImpl(payload) as boolean;
   if (ok) return { ok: true };
   return { ok: false, errors: toFieldErrors(validateDataSourceCreatePayloadImpl.errors) };
+}
+
+export function validateReconnectDataSourceCredentialPayload(payload: ReconnectDataSourceCredentialPayload): { ok: true } | { ok: false; errors: FieldError[] } {
+  const ok = validateReconnectDataSourceCredentialPayloadImpl(payload) as boolean;
+  if (ok) return { ok: true };
+  return { ok: false, errors: toFieldErrors(validateReconnectDataSourceCredentialPayloadImpl.errors) };
 }
 
 export function validateDataSourceDraftForTest(draft: DataSourceDraft): { ok: true; data: PostgresDataSourceTestPayload } | { ok: false; errors: FieldError[] } {

@@ -87,9 +87,10 @@ export function normalizeQueryExecutionApiPayload(args: NormalizeQueryExecutionA
   }
 
   if (okValue === false) {
-    const errorValue = isRecord(payload['error']) ? payload['error'] : null;
-    const messageValue = errorValue && typeof errorValue['message'] === 'string' ? errorValue['message'] : null;
-    const message = messageValue && messageValue.length > 0 ? messageValue : 'Query failed';
+    const errorValue      = isRecord(payload['error']) ? payload['error'] : null;
+    const messageValue    = errorValue && typeof errorValue['message'] === 'string' ? errorValue['message'] : null;
+    const errorCodeValue  = errorValue && typeof errorValue['code'] === 'string' ? errorValue['code'] : undefined;
+    const message         = messageValue && messageValue.length > 0 ? messageValue : 'Query failed';
 
     return {
       dataQueryExecutionId    : dataQueryExecutionId,
@@ -99,6 +100,7 @@ export function normalizeQueryExecutionApiPayload(args: NormalizeQueryExecutionA
       queryTextLen            : queryTextLen,
       startedAt               : startedAtClient,
       finishedAt              : finishedAtClient,
+      ...(typeof errorCodeValue === 'string' ? { errorCode: errorCodeValue } : {}),
       error                   : message
     };
   }

@@ -12,7 +12,7 @@ type PostQueryExecutionArgs = {
 
 type PostQueryExecutionResult =
   | { ok: false; message: string }
-  | { ok: true; httpOk: boolean; status: number; payload: unknown; message: string | null };
+  | { ok: true; httpOk: boolean; status: number; payload: unknown; message: string | null; errorCode?: string };
 
 function extractErrorMessage(payload: unknown): string | null {
   if (!isRecord(payload)) return null;
@@ -32,6 +32,25 @@ function extractErrorMessage(payload: unknown): string | null {
   const messageValue = payload['message'];
   if (typeof messageValue === 'string' && messageValue.length > 0) {
     return messageValue;
+  }
+
+  return null;
+}
+
+function extractErrorCode(payload: unknown): string | null {
+  if (!isRecord(payload)) return null;
+
+  const errorValue = payload['error'];
+  if (isRecord(errorValue)) {
+    const codeValue = errorValue['code'];
+    if (typeof codeValue === 'string' && codeValue.length > 0) {
+      return codeValue;
+    }
+  }
+
+  const codeValue = payload['code'];
+  if (typeof codeValue === 'string' && codeValue.length > 0) {
+    return codeValue;
   }
 
   return null;
@@ -61,12 +80,14 @@ export async function postQueryExecution(args: PostQueryExecutionArgs): Promise<
     const payloadUnknown = await response.json().catch(() => null);
 
     if (!response.ok) {
+      const errorCode = extractErrorCode(payloadUnknown);
       return {
         ok: true,
         httpOk: false,
         status: response.status,
         payload: payloadUnknown,
-        message: extractErrorMessage(payloadUnknown) || 'Query failed'
+        message: extractErrorMessage(payloadUnknown) || 'Query failed',
+        ...(errorCode ? { errorCode } : {})
       };
     }
 

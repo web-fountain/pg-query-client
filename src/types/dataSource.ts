@@ -52,6 +52,12 @@ export type PgliteDataSourceCreatePayload = {
   username      : string;
 };
 
+export type ReconnectDataSourceCredentialPayload = {
+  dataSourceCredentialId  : UUIDv7;
+  password                : string;
+  persistSecret?          : boolean;
+};
+
 // AIDEV-NOTE: Canonical union payload shape for POST /data-sources (create).
 export type DataSource =
   | PostgresDataSourceCreatePayload

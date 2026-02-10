@@ -42,4 +42,4 @@ export type QueryExecutionBackendData =
 
 export type QueryExecutionApiResponse =
   | { ok: true; data: QueryExecutionBackendData }
-  | { ok: false; error: { message: string } };
+  | { ok: false; error: { message: string; code?: string; requestId?: string; correlationId?: string } };

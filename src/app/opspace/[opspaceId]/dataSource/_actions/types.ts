@@ -28,6 +28,20 @@ export type TestDataSourceApiResponse = {
   error?  : unknown;
 };
 
+export type ReconnectDataSourceResult = {
+  dataSourceId            : UUIDv7;
+  dataSourceCredentialId  : UUIDv7;
+  kind                    : 'postgres';
+  latencyMs               : number;
+  serverVersion?          : string;
+};
+
+export type ReconnectDataSourceApiResponse = {
+  ok      : boolean;
+  data    : ReconnectDataSourceResult;
+  error?  : unknown;
+};
+
 export type DeleteDataSourceApiResponse = {
   ok      : boolean;
   data    : Record<string, never>;

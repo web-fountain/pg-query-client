@@ -11,13 +11,16 @@ import type {
 import type { UUIDv7 }                    from '@Types/primitives';
 import type {
   DataSource,
-  PostgresDataSourceTestPayload
+  PostgresDataSourceTestPayload,
+  ReconnectDataSourceCredentialPayload
 }                                         from '@Types/dataSource';
 import type {
   CreateDataSourceApiResponse,
   DataSourceTestResult,
   DeleteDataSourceApiResponse,
   ListDataSourceApiResponse,
+  ReconnectDataSourceApiResponse,
+  ReconnectDataSourceResult,
   TestDataSourceApiResponse
 }                                         from './types';
 
@@ -25,7 +28,8 @@ import { cacheLife, cacheTag, updateTag } from 'next/cache';
 import { withAction }                     from '@Observability/server/action';
 import {
   validateDataSourceCreatePayload,
-  validatePostgresDataSourceTestPayload
+  validatePostgresDataSourceTestPayload,
+  validateReconnectDataSourceCredentialPayload
 }                                         from '@Redux/records/dataSource/validation';
 import {
   actionErrorFromBackendFetch,
@@ -76,6 +80,12 @@ type CreateInputSummary = {
   locationLen?    : number;
 };
 
+type ReconnectInputSummary = {
+  dataSourceCredentialId?  : UUIDv7;
+  passwordLen?             : number;
+  persistSecret?           : boolean;
+};
+
 function summarizeCreateInput(payload: DataSource): CreateInputSummary {
   if (payload.kind === 'postgres') {
     return {
@@ -101,6 +111,14 @@ function summarizeCreateInput(payload: DataSource): CreateInputSummary {
     locationLen     : typeof payload.location    === 'string' ? payload.location.length    : undefined,
     dbLen           : typeof payload.database    === 'string' ? payload.database.length    : undefined,
     userLen         : typeof payload.username    === 'string' ? payload.username.length    : undefined
+  };
+}
+
+function summarizeReconnectInput(payload: ReconnectDataSourceCredentialPayload): ReconnectInputSummary {
+  return {
+    dataSourceCredentialId : payload.dataSourceCredentialId,
+    passwordLen            : typeof payload.password === 'string' ? payload.password.length : undefined,
+    persistSecret          : typeof payload.persistSecret === 'boolean' ? payload.persistSecret : undefined
   };
 }
 
@@ -213,6 +231,58 @@ export async function testDataSourceAction(payload: PostgresDataSourceTestPayloa
       }
 
       return ok(meta, res.data.data);
+    }
+  );
+}
+
+export async function reconnectDataSourceCredentialAction(payload: ReconnectDataSourceCredentialPayload): Promise<ActionResult<ReconnectDataSourceResult>> {
+  const summary = summarizeReconnectInput(payload);
+  return withAction(
+    {
+      action : 'dataSource.reconnect',
+      op     : 'write',
+      input  : summary
+    },
+    async ({ ctx: headersContext, meta: actionMeta }) => {
+      const validated = validateReconnectDataSourceCredentialPayload(payload);
+      if (!validated.ok) {
+        return invalidInputResult(actionMeta, validated.errors);
+      }
+
+      const path = `/data-sources/credentials/${payload.dataSourceCredentialId}/reconnect`;
+      const body: Record<string, unknown> = { password: payload.password };
+      if (typeof payload.persistSecret === 'boolean') {
+        body['persistSecret'] = payload.persistSecret;
+      }
+
+      const backendResult = await backendFetchJSON<ReconnectDataSourceApiResponse>({
+        path      : path,
+        method    : 'POST',
+        scope     : ['data-sources:write'],
+        logLabel  : 'reconnectDataSourceCredentialAction',
+        context   : headersContext,
+        body      : body
+      });
+
+      if (!backendResult.ok) {
+        return fail(actionMeta, actionErrorFromBackendFetch(actionMeta, {
+          status          : backendResult.status,
+          error           : backendResult.error,
+          fallbackMessage : 'Failed to reconnect.',
+          request         : { path, method: 'POST', scope: ['data-sources:write'], logLabel: 'reconnectDataSourceCredentialAction' }
+        }));
+      }
+
+      if (!backendResult.data?.ok) {
+        return fail(actionMeta, backendFailedActionError(actionMeta, {
+          message: 'Failed to reconnect.',
+          request: { path, method: 'POST', scope: ['data-sources:write'], logLabel: 'reconnectDataSourceCredentialAction' }
+        }));
+      }
+
+      try { updateTag(dataSourcesListTag(headersContext.opspacePublicId)); } catch {}
+
+      return ok(actionMeta, backendResult.data.data);
     }
   );
 }

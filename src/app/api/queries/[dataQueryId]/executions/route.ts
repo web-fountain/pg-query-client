@@ -42,6 +42,39 @@ function asNonNegativeInt(value: unknown): number | null {
   return Math.max(0, Math.round(value));
 }
 
+type BackendErrorEnvelope = {
+  message         : string;
+  code?           : string;
+  requestId?      : string;
+  correlationId?  : string;
+};
+
+// AIDEV-NOTE: Preserve backend domain error codes (e.g. `secret_not_found`) so
+// the client can drive explicit recovery UX (reconnect modal) instead of generic failures.
+function extractBackendErrorEnvelope(payload: unknown): BackendErrorEnvelope | null {
+  if (!isRecord(payload)) return null;
+
+  const errorValue  = payload['error'];
+  const errorObject = isRecord(errorValue) ? errorValue : null;
+
+  const message =
+    asNonEmptyStringOrNull(errorObject?.['message']) ||
+    asNonEmptyStringOrNull(payload['message']);
+
+  if (!message) return null;
+
+  const code          = asNonEmptyStringOrNull(errorObject?.['code']);
+  const requestId     = asNonEmptyStringOrNull(errorObject?.['requestId']);
+  const correlationId = asNonEmptyStringOrNull(errorObject?.['correlationId']);
+
+  return {
+    message,
+    ...(code ? { code } : {}),
+    ...(requestId ? { requestId } : {}),
+    ...(correlationId ? { correlationId } : {})
+  };
+}
+
 function capRows(rows: unknown[]): { rows: unknown[]; isTruncated: boolean } {
   if (!Array.isArray(rows)) return { rows: [], isTruncated: false };
   if (rows.length <= MAX_RETURN_ROWS) return { rows, isTruncated: false };
@@ -140,7 +173,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dat
           elapsedMs             : elapsedMs
         });
         const status = backendResult.status && backendResult.status > 0 ? backendResult.status : 502;
-        return json({ ok: false, error: { message: 'Failed to execute query.' } }, status);
+        const backendError = extractBackendErrorEnvelope(backendResult.error);
+        return json({ ok: false, error: backendError || { message: 'Failed to execute query.' } }, status);
       }
 
       const unwrapped = unwrapBackendOkData(backendResult.data);
@@ -152,7 +186,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dat
           dataQueryExecutionId  : dataQueryExecutionId,
           elapsedMs             : elapsedMs
         });
-        return json({ ok: false, error: { message: 'Query execution failed.' } }, 502);
+        const status = backendResult.status && backendResult.status > 0 ? backendResult.status : 502;
+        const backendError = extractBackendErrorEnvelope(backendResult.data);
+        return json({ ok: false, error: backendError || { message: 'Query execution failed.' } }, status);
       }
 
       const backendData = unwrapped.data;

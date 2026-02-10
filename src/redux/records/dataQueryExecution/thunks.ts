@@ -60,6 +60,7 @@ export const executeDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv
     }
 
     if (!postResult.httpOk) {
+      const errorCode = postResult.errorCode;
       dispatch(upsertDataQueryExecution({
         dataQueryExecutionId    : dataQueryExecutionId,
         dataQueryId             : dataQueryId,
@@ -68,8 +69,11 @@ export const executeDataQueryThunk = createAsyncThunk<void, { dataQueryId: UUIDv
         queryTextLen            : rawQueryText.length,
         startedAt               : startedAtClient,
         finishedAt              : finishedAtClient,
+        ...(typeof errorCode === 'string' ? { errorCode } : {}),
         error                   : postResult.message || 'Query failed'
       }));
+      // AIDEV-NOTE: Reconnect UI is owned by `SQLRunnerProvider` (component layer).
+      // This thunk only records execution state and error metadata.
       return;
     }
 
