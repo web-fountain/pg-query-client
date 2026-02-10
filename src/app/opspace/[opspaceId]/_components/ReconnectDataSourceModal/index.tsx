@@ -17,8 +17,11 @@ import {
 import { FloatingPortal }                       from '@floating-ui/react';
 
 import { reconnectDataSourceCredentialAction }  from '@OpSpaceDataSourceActions';
-import { useReduxSelector }                     from '@Redux/storeHooks';
-import { selectDataSourceByCredentialId }       from '@Redux/records/dataSource';
+import { useReduxDispatch, useReduxSelector }   from '@Redux/storeHooks';
+import {
+  selectDataSourceByCredentialId,
+  upsertDataSourceFromFetch
+}                                               from '@Redux/records/dataSource';
 
 import styles                                   from './styles.module.css';
 
@@ -82,6 +85,7 @@ function ReconnectDataSourceModal(props: Props) {
     onSuccess
   } = props;
 
+  const dispatch                            = useReduxDispatch();
   const dataSourceMeta                      = useReduxSelector(selectDataSourceByCredentialId, dataSourceCredentialId);
 
   const panelRef                            = useRef<HTMLDivElement | null>(null);
@@ -193,8 +197,9 @@ function ReconnectDataSourceModal(props: Props) {
 
     setIsReconnecting(true);
     try {
+      const credentialIdToSync = dataSourceCredentialId;
       const actionResult = await reconnectDataSourceCredentialAction({
-        dataSourceCredentialId,
+        dataSourceCredentialId: credentialIdToSync,
         password,
         persistSecret
       });
@@ -207,6 +212,15 @@ function ReconnectDataSourceModal(props: Props) {
         return;
       }
 
+      if (dataSourceMeta) {
+        dispatch(upsertDataSourceFromFetch({
+          dataSource: {
+            ...dataSourceMeta,
+            persistSecret: persistSecret
+          }
+        }));
+      }
+
       wipeSecrets();
       onClose();
       try { onSuccess?.(); } catch {}
@@ -216,7 +230,7 @@ function ReconnectDataSourceModal(props: Props) {
     } finally {
       setIsReconnecting(false);
     }
-  }, [canSubmit, clearFeedback, dataSourceCredentialId, focusFirst, onClose, onSuccess, password, persistSecret, wipeSecrets]);
+  }, [canSubmit, clearFeedback, dataSourceCredentialId, dataSourceMeta, dispatch, focusFirst, onClose, onSuccess, password, persistSecret, wipeSecrets]);
 
   const handlePasswordKeyDown = useCallback((e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
