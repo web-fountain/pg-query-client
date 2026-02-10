@@ -173,7 +173,10 @@ z*
 .cursorindexingignore
 .specstory
 
-# prompts
+# AI
 prompts/
 _*.md
 CONTEXT.md
+.agents/
+.claude/
+.entire/
